@@ -105,6 +105,23 @@ npm run dev
 docker compose up -d postgres redis minio
 ```
 
+## 跨机器接力开发
+
+在另一台机器拉取仓库后，需要重新安装本地依赖和运行环境，不能直接复用其他机器的 `.venv`、`node_modules` 或本地容器状态。
+
+建议执行：
+
+```bash
+git pull
+cp .env.example backend/.env
+cd backend
+uv sync
+cd ../frontend
+npm install
+cd ..
+docker compose up -d postgres redis minio
+```
+
 ## 开发进度
 
 当前开发进度只在 [TASKS.md](/home/liguoma/code-repos/digidocs-mgt/TASKS.md) 维护，README 不再重复记录。
