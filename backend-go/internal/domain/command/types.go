@@ -23,6 +23,17 @@ type HandoverCreateInput struct {
 	Remark         string
 }
 
+type HandoverItemInput struct {
+	DocumentID string
+	Selected   bool
+	Note       string
+}
+
+type HandoverItemUpdateInput struct {
+	HandoverID string
+	Items      []HandoverItemInput
+}
+
 type HandoverActionInput struct {
 	HandoverID string
 	Action     string

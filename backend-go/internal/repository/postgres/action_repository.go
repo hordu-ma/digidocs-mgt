@@ -3,7 +3,9 @@ package postgres
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -11,64 +13,147 @@ import (
 )
 
 type ActionRepository struct {
-	db DBTX
+	db *sql.DB
 }
 
-func NewActionRepository(db DBTX) ActionRepository {
+func NewActionRepository(db *sql.DB) ActionRepository {
 	return ActionRepository{db: db}
 }
 
 func (r ActionRepository) CreateFlowRecord(ctx context.Context, input command.FlowActionInput) (map[string]any, error) {
-	id := newID()
-	toStatus := flowActionToStatus(input.Action)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
 
-	_, err := r.db.ExecContext(
+	var fromUserID string
+	var fromStatus string
+	if err := tx.QueryRowContext(
+		ctx,
+		`
+		SELECT
+			current_owner_id::text,
+			current_status::text
+		FROM documents
+		WHERE id::text = $1
+		`,
+		input.DocumentID,
+	).Scan(&fromUserID, &fromStatus); err != nil {
+		return nil, err
+	}
+
+	toStatus := flowActionToStatus(input.Action)
+	nextOwnerID := nextOwnerID(input, fromUserID)
+	now := nowUTC()
+
+	_, err = tx.ExecContext(
 		ctx,
 		`
 		INSERT INTO flow_records (
 			id,
 			document_id,
+			from_user_id,
 			to_user_id,
+			from_status,
 			to_status,
 			action,
 			note,
 			created_by,
 			created_at
 		)
-		VALUES ($1::uuid, $2::uuid, NULLIF($3, '')::uuid, $4::document_status, $5, NULLIF($6, ''), $7::uuid, $8)
+		VALUES (
+			$1::uuid,
+			$2::uuid,
+			NULLIF($3, '')::uuid,
+			NULLIF($4, '')::uuid,
+			NULLIF($5, '')::document_status,
+			$6::document_status,
+			$7,
+			NULLIF($8, ''),
+			$9::uuid,
+			$10
+		)
 		`,
-		id,
+		newID(),
 		input.DocumentID,
-		input.ToUserID,
+		fromUserID,
+		nextOwnerID,
+		fromStatus,
 		toStatus,
 		input.Action,
 		input.Note,
 		systemUserID(),
-		time.Now().UTC(),
+		now,
 	)
 	if err != nil {
 		return nil, err
 	}
 
+	if _, err := tx.ExecContext(
+		ctx,
+		`
+		UPDATE documents
+		SET current_owner_id = COALESCE(NULLIF($2, '')::uuid, current_owner_id),
+		    current_status = $3::document_status,
+		    is_archived = $4,
+		    updated_at = $5
+		WHERE id::text = $1
+		`,
+		input.DocumentID,
+		nullableOwnerID(input, nextOwnerID),
+		toStatus,
+		toStatus == "archived",
+		now,
+	); err != nil {
+		return nil, err
+	}
+
+	if err := insertAuditEvent(
+		ctx,
+		tx,
+		input.DocumentID,
+		"",
+		mappedAuditAction(input.Action),
+		map[string]any{
+			"note":       input.Note,
+			"to_user_id": nextOwnerID,
+			"to_status":  toStatus,
+		},
+	); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
 	data := map[string]any{
-		"id":          id,
-		"document_id": input.DocumentID,
-		"action":      input.Action,
+		"document_id":    input.DocumentID,
+		"action":         input.Action,
+		"current_status": toStatus,
 	}
 	if input.Note != "" {
 		data["note"] = input.Note
 	}
-	if input.ToUserID != "" {
-		data["to_user_id"] = input.ToUserID
+	if nextOwnerID != "" {
+		data["current_owner_id"] = nextOwnerID
 	}
 
 	return data, nil
 }
 
 func (r ActionRepository) CreateHandover(ctx context.Context, input command.HandoverCreateInput) (map[string]any, error) {
-	id := newID()
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
 
-	_, err := r.db.ExecContext(
+	id := newID()
+	now := nowUTC()
+
+	_, err = tx.ExecContext(
 		ctx,
 		`
 		INSERT INTO graduation_handovers (
@@ -89,9 +174,30 @@ func (r ActionRepository) CreateHandover(ctx context.Context, input command.Hand
 		input.ProjectID,
 		input.Remark,
 		systemUserID(),
-		time.Now().UTC(),
+		now,
 	)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := insertAuditEvent(
+		ctx,
+		tx,
+		"",
+		"",
+		"handover_generate",
+		map[string]any{
+			"handover_id":      id,
+			"target_user_id":   input.TargetUserID,
+			"receiver_user_id": input.ReceiverUserID,
+			"project_id":       input.ProjectID,
+			"remark":           input.Remark,
+		},
+	); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 
@@ -105,8 +211,86 @@ func (r ActionRepository) CreateHandover(ctx context.Context, input command.Hand
 	}, nil
 }
 
+func (r ActionRepository) UpdateHandoverItems(
+	ctx context.Context,
+	input command.HandoverItemUpdateInput,
+) (map[string]any, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(
+		ctx,
+		`DELETE FROM graduation_handover_items WHERE handover_id::text = $1`,
+		input.HandoverID,
+	); err != nil {
+		return nil, err
+	}
+
+	now := nowUTC()
+	for _, item := range input.Items {
+		if item.DocumentID == "" {
+			continue
+		}
+		if _, err := tx.ExecContext(
+			ctx,
+			`
+			INSERT INTO graduation_handover_items (
+				id,
+				handover_id,
+				document_id,
+				selected,
+				note,
+				created_at
+			)
+			VALUES ($1::uuid, $2::uuid, $3::uuid, $4, NULLIF($5, ''), $6)
+			`,
+			newID(),
+			input.HandoverID,
+			item.DocumentID,
+			item.Selected,
+			item.Note,
+			now,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := insertAuditEvent(
+		ctx,
+		tx,
+		"",
+		"",
+		"admin_update",
+		map[string]any{
+			"handover_id": input.HandoverID,
+			"item_count":  len(input.Items),
+		},
+	); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"id":    input.HandoverID,
+		"items": input.Items,
+	}, nil
+}
+
 func (r ActionRepository) ApplyHandover(ctx context.Context, input command.HandoverActionInput) (map[string]any, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
 	status, field := handoverActionToUpdate(input.Action)
+	now := nowUTC()
 
 	query := fmt.Sprintf(
 		`
@@ -118,14 +302,68 @@ func (r ActionRepository) ApplyHandover(ctx context.Context, input command.Hando
 		field,
 	)
 
-	_, err := r.db.ExecContext(ctx, query, input.HandoverID, status, time.Now().UTC())
-	if err != nil {
+	if _, err := tx.ExecContext(ctx, query, input.HandoverID, status, now); err != nil {
+		return nil, err
+	}
+
+	if input.Action == "complete" {
+		var receiverUserID string
+		if err := tx.QueryRowContext(
+			ctx,
+			`
+			SELECT receiver_user_id::text
+			FROM graduation_handovers
+			WHERE id::text = $1
+			`,
+			input.HandoverID,
+		).Scan(&receiverUserID); err != nil {
+			return nil, err
+		}
+
+		if _, err := tx.ExecContext(
+			ctx,
+			`
+			UPDATE documents d
+			SET current_owner_id = $2::uuid,
+			    current_status = 'handed_over'::document_status,
+			    updated_at = $3
+			FROM graduation_handover_items ghi
+			WHERE ghi.handover_id::text = $1
+			  AND ghi.selected = TRUE
+			  AND d.id = ghi.document_id
+			`,
+			input.HandoverID,
+			receiverUserID,
+			now,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := insertAuditEvent(
+		ctx,
+		tx,
+		"",
+		"",
+		mappedHandoverAuditAction(input.Action),
+		map[string]any{
+			"handover_id": input.HandoverID,
+			"note":        input.Note,
+			"reason":      input.Reason,
+			"status":      status,
+		},
+	); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 
 	data := map[string]any{
 		"id":     input.HandoverID,
 		"action": input.Action,
+		"status": status,
 	}
 	if input.Note != "" {
 		data["note"] = input.Note
@@ -135,6 +373,105 @@ func (r ActionRepository) ApplyHandover(ctx context.Context, input command.Hando
 	}
 
 	return data, nil
+}
+
+func insertAuditEvent(
+	ctx context.Context,
+	db DBTX,
+	documentID string,
+	versionID string,
+	actionType string,
+	extra map[string]any,
+) error {
+	extraData, err := json.Marshal(extra)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.ExecContext(
+		ctx,
+		`
+		INSERT INTO audit_events (
+			id,
+			document_id,
+			version_id,
+			user_id,
+			action_type,
+			request_id,
+			terminal_info,
+			extra_data,
+			created_at
+		)
+		VALUES (
+			$1::uuid,
+			NULLIF($2, '')::uuid,
+			NULLIF($3, '')::uuid,
+			$4::uuid,
+			$5::audit_action_type,
+			NULL,
+			'backend-go',
+			$6::jsonb,
+			$7
+		)
+		`,
+		newID(),
+		documentID,
+		versionID,
+		systemUserID(),
+		actionType,
+		string(extraData),
+		nowUTC(),
+	)
+	return err
+}
+
+func nextOwnerID(input command.FlowActionInput, currentOwnerID string) string {
+	switch input.Action {
+	case "transfer":
+		if input.ToUserID != "" {
+			return input.ToUserID
+		}
+		return currentOwnerID
+	default:
+		return currentOwnerID
+	}
+}
+
+func nullableOwnerID(input command.FlowActionInput, nextOwnerID string) string {
+	switch input.Action {
+	case "transfer":
+		return nextOwnerID
+	default:
+		return ""
+	}
+}
+
+func mappedAuditAction(action string) string {
+	switch action {
+	case "transfer":
+		return "transfer"
+	case "accept_transfer":
+		return "receive_transfer"
+	case "finalize":
+		return "finalize"
+	case "archive":
+		return "archive"
+	case "unarchive":
+		return "restore"
+	default:
+		return "admin_update"
+	}
+}
+
+func mappedHandoverAuditAction(action string) string {
+	switch action {
+	case "confirm":
+		return "handover_confirm"
+	case "complete":
+		return "handover_complete"
+	default:
+		return "admin_update"
+	}
 }
 
 func newID() string {

@@ -60,6 +60,10 @@ func (h HandoverHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h HandoverHandler) Get(w http.ResponseWriter, r *http.Request) {
 	item, err := h.queryService.Get(r.Context(), r.PathValue("handoverID"))
 	if err != nil {
+		if err == service.ErrNotFound {
+			response.WriteError(w, http.StatusNotFound, "not_found", "handover not found")
+			return
+		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to get handover")
 		return
 	}
@@ -69,14 +73,36 @@ func (h HandoverHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h HandoverHandler) UpdateItems(w http.ResponseWriter, r *http.Request) {
 	payload := map[string]any{}
-	if r.Body != nil {
-		_ = json.NewDecoder(r.Body).Decode(&payload)
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid request body")
+		return
 	}
 
-	response.WriteData(w, http.StatusOK, map[string]any{
-		"id":    r.PathValue("handoverID"),
-		"items": payload["items"],
+	items := make([]command.HandoverItemInput, 0)
+	if rawItems, ok := payload["items"].([]any); ok {
+		for _, raw := range rawItems {
+			itemMap, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			items = append(items, command.HandoverItemInput{
+				DocumentID: stringValue(itemMap["document_id"]),
+				Selected:   boolValue(itemMap["selected"]),
+				Note:       stringValue(itemMap["note"]),
+			})
+		}
+	}
+
+	data, err := h.actionService.UpdateHandoverItems(r.Context(), command.HandoverItemUpdateInput{
+		HandoverID: r.PathValue("handoverID"),
+		Items:      items,
 	})
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update handover items")
+		return
+	}
+
+	response.WriteData(w, http.StatusOK, data)
 }
 
 func (h HandoverHandler) Confirm(w http.ResponseWriter, r *http.Request) {
@@ -109,4 +135,13 @@ func (h HandoverHandler) writeAction(w http.ResponseWriter, r *http.Request, act
 	}
 
 	response.WriteData(w, http.StatusOK, data)
+}
+
+func boolValue(value any) bool {
+	raw, ok := value.(bool)
+	if !ok {
+		return false
+	}
+
+	return raw
 }

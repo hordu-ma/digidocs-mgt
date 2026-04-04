@@ -150,4 +150,10 @@ docker compose up -d postgres redis minio
 
 ## 开发进度
 
-当前开发进度只在 [TASKS.md](/home/liguoma/code-repos/digidocs-mgt/TASKS.md) 维护，README 不再重复记录。
+当前阶段已进入 Go 主业务迁移的真实读写补齐：
+
+- 已完成 `versions` 事务上传工作流
+- 已完成 `audit-events` Go 查询接口与 summary 聚合骨架
+- 已完成 `flow / handover` 写链的首轮事务化与审计联动
+
+详细任务状态持续维护在 [TASKS.md](/home/liguoma/code-repos/digidocs-mgt/TASKS.md)。

@@ -72,6 +72,11 @@
   - 为 `versions / flows / handovers` 接入 postgres repository 读链
   - 为 `flow / handover / version upload` 接入 repository 写链骨架
   - 为 `version upload -> documents.current_version_id/current_status -> audit_events` 接入事务工作流骨架
+  - 增加 `audit-events` Go 查询接口与 summary 聚合
+  - 为 `flow` 动作接入 `documents.current_status/current_owner_id` 联动更新
+  - 为 `flow / handover` 写路径接入 `audit_events` 落库
+  - 为 `handovers/{id}/items` 接入持久化写链
+  - 为 `handover complete` 接入选中文档责任人和状态联动
 - Docker 网络内真实数据库链路验证
   - 宿主机直连 PostgreSQL 仍异常
   - 改走 compose 网络内联调路径
@@ -90,7 +95,7 @@
 - 增加文档上传与版本管理服务层
 - 增加流转状态机服务层
 - 增加毕业交接服务层
-- 增加审计事件统一写入
+- 增加审计事件统一查询与统计聚合
 - 增加 OpenClaw 客户端真实调用
 - 增加群晖 NAS 适配器
 - 增加基础测试

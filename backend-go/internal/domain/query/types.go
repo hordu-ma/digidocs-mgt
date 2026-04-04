@@ -54,6 +54,30 @@ type FlowItem struct {
 	CreatedAt  string `json:"created_at"`
 }
 
+type AuditEventItem struct {
+	ID         string `json:"id"`
+	DocumentID string `json:"document_id,omitempty"`
+	VersionID  string `json:"version_id,omitempty"`
+	UserID     string `json:"user_id,omitempty"`
+	ActionType string `json:"action_type"`
+	CreatedAt  string `json:"created_at"`
+}
+
+type AuditSummary struct {
+	ProjectID      string            `json:"project_id,omitempty"`
+	DownloadCount  int               `json:"download_count"`
+	UploadCount    int               `json:"upload_count"`
+	TransferCount  int               `json:"transfer_count"`
+	ArchiveCount   int               `json:"archive_count"`
+	TopActiveUsers []AuditUserMetric `json:"top_active_users"`
+}
+
+type AuditUserMetric struct {
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name,omitempty"`
+	ActionCount int    `json:"action_count"`
+}
+
 type HandoverItem struct {
 	ID             string         `json:"id"`
 	TargetUserID   string         `json:"target_user_id,omitempty"`
@@ -107,4 +131,12 @@ type PaginationMeta struct {
 	Page     int `json:"page"`
 	PageSize int `json:"page_size"`
 	Total    int `json:"total"`
+}
+
+type AuditEventFilter struct {
+	ProjectID  string
+	DocumentID string
+	ActionType string
+	Page       int
+	PageSize   int
 }

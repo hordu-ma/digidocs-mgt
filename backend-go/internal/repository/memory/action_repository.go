@@ -42,6 +42,18 @@ func (r ActionRepository) CreateHandover(ctx context.Context, input command.Hand
 	}, nil
 }
 
+func (r ActionRepository) UpdateHandoverItems(
+	ctx context.Context,
+	input command.HandoverItemUpdateInput,
+) (map[string]any, error) {
+	_ = ctx
+
+	return map[string]any{
+		"id":    input.HandoverID,
+		"items": input.Items,
+	}, nil
+}
+
 func (r ActionRepository) ApplyHandover(ctx context.Context, input command.HandoverActionInput) (map[string]any, error) {
 	_ = ctx
 

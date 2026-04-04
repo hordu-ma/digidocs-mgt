@@ -38,9 +38,15 @@ type HandoverReader interface {
 	GetHandover(ctx context.Context, handoverID string) (*query.HandoverItem, error)
 }
 
+type AuditReader interface {
+	ListAuditEvents(ctx context.Context, filter query.AuditEventFilter) ([]query.AuditEventItem, int, error)
+	GetAuditSummary(ctx context.Context, projectID string) (query.AuditSummary, error)
+}
+
 type ActionWriter interface {
 	CreateFlowRecord(ctx context.Context, input command.FlowActionInput) (map[string]any, error)
 	CreateHandover(ctx context.Context, input command.HandoverCreateInput) (map[string]any, error)
+	UpdateHandoverItems(ctx context.Context, input command.HandoverItemUpdateInput) (map[string]any, error)
 	ApplyHandover(ctx context.Context, input command.HandoverActionInput) (map[string]any, error)
 }
 

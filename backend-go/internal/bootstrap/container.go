@@ -15,6 +15,7 @@ import (
 type Container struct {
 	DB                     *sql.DB
 	QueryService           service.QueryService
+	AuditQueryService      service.AuditQueryService
 	VersionQueryService    service.VersionQueryService
 	VersionCommandService  service.VersionCommandService
 	VersionWorkflowService service.VersionWorkflowService
@@ -49,6 +50,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				pgrepo.NewProjectRepository(postgresDB),
 				pgrepo.NewDocumentRepository(postgresDB),
 			),
+			AuditQueryService:      service.NewAuditQueryService(pgrepo.NewAuditRepository(postgresDB)),
 			VersionQueryService:    service.NewVersionQueryService(pgrepo.NewVersionRepository(postgresDB)),
 			VersionCommandService:  service.NewVersionCommandService(pgrepo.NewVersionRepository(postgresDB)),
 			VersionWorkflowService: service.NewVersionWorkflowService(pgrepo.NewVersionWorkflow(postgresDB)),
@@ -68,6 +70,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				memory.NewProjectRepository(),
 				memory.NewDocumentRepository(),
 			),
+			AuditQueryService:      service.NewAuditQueryService(memory.NewAuditRepository()),
 			VersionQueryService:    service.NewVersionQueryService(memory.NewVersionRepository()),
 			VersionCommandService:  service.NewVersionCommandService(memory.NewVersionRepository()),
 			VersionWorkflowService: service.NewVersionWorkflowService(memory.NewVersionWorkflow()),
@@ -87,6 +90,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				memory.NewProjectRepository(),
 				memory.NewDocumentRepository(),
 			),
+			AuditQueryService:      service.NewAuditQueryService(memory.NewAuditRepository()),
 			VersionQueryService:    service.NewVersionQueryService(memory.NewVersionRepository()),
 			VersionCommandService:  service.NewVersionCommandService(memory.NewVersionRepository()),
 			VersionWorkflowService: service.NewVersionWorkflowService(memory.NewVersionWorkflow()),

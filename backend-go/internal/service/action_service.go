@@ -23,6 +23,13 @@ func (s ActionService) CreateHandover(ctx context.Context, input command.Handove
 	return s.writer.CreateHandover(ctx, input)
 }
 
+func (s ActionService) UpdateHandoverItems(
+	ctx context.Context,
+	input command.HandoverItemUpdateInput,
+) (map[string]any, error) {
+	return s.writer.UpdateHandoverItems(ctx, input)
+}
+
 func (s ActionService) ApplyHandover(ctx context.Context, input command.HandoverActionInput) (map[string]any, error) {
 	return s.writer.ApplyHandover(ctx, input)
 }
