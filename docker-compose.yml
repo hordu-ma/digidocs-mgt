@@ -30,6 +30,45 @@ services:
     volumes:
       - minio_data:/data
 
+  backend-go:
+    build:
+      context: ./backend-go
+    container_name: digidocs-backend-go
+    environment:
+      APP_NAME: DigiDocs Mgt Go API
+      HTTP_ADDR: :8080
+      APP_ENV: development
+      API_V1_PREFIX: /api/v1
+      DATA_BACKEND: postgres
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/digidocs_mgt?sslmode=disable
+      WORKER_CALLBACK_TOKEN: replace-me
+      JWT_SECRET: dev-secret
+    ports:
+      - "18081:8080"
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    profiles:
+      - app
+
+  backend-py-worker:
+    build:
+      context: ./backend-py-worker
+    container_name: digidocs-backend-py-worker
+    environment:
+      WORKER_NAME: digidocs-py-worker
+      WORKER_MODE: local
+      OPENCLAW_BASE_URL: http://openclaw:8000
+      OPENCLAW_API_KEY: replace-me
+      CALLBACK_BASE_URL: http://backend-go:8080
+      CALLBACK_TOKEN: replace-me
+    depends_on:
+      - backend-go
+      - redis
+    profiles:
+      - app
+
 volumes:
   postgres_data:
   minio_data:

@@ -22,6 +22,8 @@
 ├── SKILLS/
 ├── TASKS.md
 ├── backend/
+├── backend-go/
+├── backend-py-worker/
 ├── docker-compose.yml
 ├── frontend/
 ├── 数据库设计.md
@@ -33,12 +35,16 @@
 - [项目定义与技术架构.md](/home/liguoma/code-repos/digidocs-mgt/项目定义与技术架构.md)
 - [数据库设计.md](/home/liguoma/code-repos/digidocs-mgt/数据库设计.md)
 - [API设计.md](/home/liguoma/code-repos/digidocs-mgt/API设计.md)
+- [Go-Python混合迁移方案.md](/home/liguoma/code-repos/digidocs-mgt/Go-Python混合迁移方案.md)
+- [异步任务消息契约.md](/home/liguoma/code-repos/digidocs-mgt/异步任务消息契约.md)
 
 ## 技术栈
 
 ### 后端
 
+- Go（迁移中，承接主业务后端）
 - Python 3.12
+- Python Worker（迁移中，承接 AI 与文档处理任务）
 - FastAPI
 - SQLAlchemy 2.x
 - Alembic
@@ -91,6 +97,20 @@ uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
 
+### Go 主后端骨架
+
+```bash
+cd backend-go
+go run ./cmd/api
+```
+
+### Python Worker 骨架
+
+```bash
+cd backend-py-worker
+uv run python -m app.main
+```
+
 ### 前端
 
 ```bash
@@ -103,6 +123,12 @@ npm run dev
 
 ```bash
 docker compose up -d postgres redis minio
+```
+
+启动容器内联调路径：
+
+```bash
+docker compose --profile app up -d backend-go backend-py-worker
 ```
 
 ## 跨机器接力开发
