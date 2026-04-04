@@ -99,6 +99,7 @@ func (r VersionRepository) CreateVersion(ctx context.Context, input command.Vers
 		SELECT COALESCE(MAX(version_no), 0) + 1
 		FROM document_versions
 		WHERE document_id::text = $1
+		FOR UPDATE
 		`,
 		input.DocumentID,
 	).Scan(&versionNo); err != nil {

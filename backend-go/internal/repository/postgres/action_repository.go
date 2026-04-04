@@ -531,7 +531,8 @@ func isValidHandoverTransition(currentStatus string, action string) bool {
 func newID() string {
 	buf := make([]byte, 16)
 	if _, err := rand.Read(buf); err != nil {
-		return "00000000-0000-0000-0000-000000000000"
+		// rand.Read failing is an unrecoverable OS-level error; panic to surface it.
+		panic("crypto/rand unavailable: " + err.Error())
 	}
 
 	buf[6] = (buf[6] & 0x0f) | 0x40
@@ -547,7 +548,10 @@ func flowActionToStatus(action string) string {
 		return "archived"
 	case "finalize":
 		return "finalized"
-	case "transfer", "accept_transfer", "mark_in_progress":
+	case "transfer":
+		// Transfer puts the document into pending_handover, waiting for accept.
+		return "pending_handover"
+	case "accept_transfer", "mark_in_progress":
 		return "in_progress"
 	case "unarchive":
 		return "in_progress"

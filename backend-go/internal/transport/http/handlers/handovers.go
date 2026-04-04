@@ -61,7 +61,7 @@ func (h HandoverHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h HandoverHandler) Get(w http.ResponseWriter, r *http.Request) {
 	item, err := h.queryService.Get(r.Context(), r.PathValue("handoverID"))
 	if err != nil {
-		if err == service.ErrNotFound {
+		if errors.Is(err, service.ErrNotFound) {
 			response.WriteError(w, http.StatusNotFound, "not_found", "handover not found")
 			return
 		}

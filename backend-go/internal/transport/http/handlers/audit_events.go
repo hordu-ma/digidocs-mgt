@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/service"
@@ -18,8 +17,8 @@ func NewAuditEventHandler(queryService service.AuditQueryService) AuditEventHand
 }
 
 func (h AuditEventHandler) List(w http.ResponseWriter, r *http.Request) {
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+	page := parseIntOrDefault(r.URL.Query().Get("page"), 1)
+	pageSize := parseIntOrDefault(r.URL.Query().Get("page_size"), 20)
 
 	items, total, err := h.queryService.List(r.Context(), query.AuditEventFilter{
 		ProjectID:  r.URL.Query().Get("project_id"),
@@ -34,8 +33,8 @@ func (h AuditEventHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.WriteWithMeta(w, http.StatusOK, items, query.PaginationMeta{
-		Page:     max(page, 1),
-		PageSize: max(pageSize, 20),
+		Page:     page,
+		PageSize: pageSize,
 		Total:    total,
 	})
 }
@@ -48,11 +47,4 @@ func (h AuditEventHandler) Summary(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.WriteData(w, http.StatusOK, data)
-}
-
-func max(value int, fallback int) int {
-	if value > 0 {
-		return value
-	}
-	return fallback
 }
