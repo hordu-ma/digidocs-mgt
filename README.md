@@ -16,33 +16,40 @@
 
 ```text
 .
-├── AGENTS.md
+├── AGENTS.md          # 多轮协作与代理执行约束
+├── README.md          # 项目入口与阶段快照
+├── TASKS.md           # 执行任务账本
+├── Makefile
 ├── .github/
 ├── .githooks/
-├── API设计.md
-├── Makefile
-├── README.md
+├── docs/
+│   ├── INDEX.md
+│   ├── 项目定义与技术架构.md
+│   ├── 数据库设计.md
+│   ├── API设计.md
+│   ├── 异步任务消息契约.md
+│   ├── adr/
+│   │   └── 001-go-python-hybrid.md
+│   └── Harness Engineering 学习笔记.md
 ├── SKILLS/
-├── TASKS.md
 ├── backend/
 ├── backend-go/
 ├── backend-py-worker/
-├── docs/
 ├── docker-compose.yml
 ├── frontend/
 ├── ops/
-├── scripts/
-├── 数据库设计.md
-└── 项目定义与技术架构.md
+└── scripts/
 ```
 
 ## 核心文档
 
-- [项目定义与技术架构.md](/home/liguoma/code-repos/digidocs-mgt/项目定义与技术架构.md)
-- [数据库设计.md](/home/liguoma/code-repos/digidocs-mgt/数据库设计.md)
-- [API设计.md](/home/liguoma/code-repos/digidocs-mgt/API设计.md)
-- [Go-Python混合迁移方案.md](/home/liguoma/code-repos/digidocs-mgt/Go-Python混合迁移方案.md)
-- [异步任务消息契约.md](/home/liguoma/code-repos/digidocs-mgt/异步任务消息契约.md)
+详见 [docs/INDEX.md](docs/INDEX.md)，快速入口：
+
+- [项目定义与技术架构](docs/项目定义与技术架构.md)
+- [数据库设计](docs/数据库设计.md)
+- [API 设计](docs/API设计.md)
+- [异步任务消息契约](docs/异步任务消息契约.md)
+- [ADR-001 Go-Python 混合迁移方案](docs/adr/001-go-python-hybrid.md)
 
 ## 技术栈
 

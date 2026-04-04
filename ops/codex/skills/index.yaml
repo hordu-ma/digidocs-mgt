@@ -9,16 +9,16 @@ skills:
       - schema
       - api
     sources:
-      - 项目定义与技术架构.md
-      - 数据库设计.md
-      - API设计.md
+      - docs/项目定义与技术架构.md
+      - docs/数据库设计.md
+      - docs/API设计.md
       - AGENTS.md
     owned_paths:
       - /
     verify_commands:
-      - "sed -n '1,220p' 项目定义与技术架构.md"
-      - "sed -n '1,220p' 数据库设计.md"
-      - "sed -n '1,220p' API设计.md"
+      - "sed -n '1,220p' docs/项目定义与技术架构.md"
+      - "sed -n '1,220p' docs/数据库设计.md"
+      - "sed -n '1,220p' docs/API设计.md"
     done_updates:
       - README.md
       - TASKS.md
@@ -32,9 +32,9 @@ skills:
       - transaction
       - dashboard
     sources:
-      - 项目定义与技术架构.md
-      - 数据库设计.md
-      - API设计.md
+      - docs/项目定义与技术架构.md
+      - docs/数据库设计.md
+      - docs/API设计.md
       - AGENTS.md
       - TASKS.md
     owned_paths:
@@ -56,9 +56,9 @@ skills:
       - async-task
       - celery
     sources:
-      - 项目定义与技术架构.md
-      - 数据库设计.md
-      - API设计.md
+      - docs/项目定义与技术架构.md
+      - docs/数据库设计.md
+      - docs/API设计.md
       - AGENTS.md
       - TASKS.md
     owned_paths:
@@ -79,8 +79,8 @@ skills:
       - dashboard-ui
       - document-detail
     sources:
-      - 项目定义与技术架构.md
-      - API设计.md
+      - docs/项目定义与技术架构.md
+      - docs/API设计.md
       - AGENTS.md
       - TASKS.md
     owned_paths:

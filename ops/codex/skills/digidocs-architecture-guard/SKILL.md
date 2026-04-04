@@ -14,9 +14,9 @@
 
 按顺序读取：
 
-1. `项目定义与技术架构.md`
-2. `数据库设计.md`
-3. `API设计.md`
+1. `docs/项目定义与技术架构.md`
+2. `docs/数据库设计.md`
+3. `docs/API设计.md`
 4. `AGENTS.md`
 5. `README.md`
 6. `TASKS.md`

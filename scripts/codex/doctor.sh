@@ -32,7 +32,7 @@ for cmd in git go uv node npm docker; do
 done
 
 echo '== core docs =='
-for file in AGENTS.md README.md TASKS.md 项目定义与技术架构.md 数据库设计.md API设计.md; do
+for file in AGENTS.md README.md TASKS.md docs/项目定义与技术架构.md docs/数据库设计.md docs/API设计.md; do
   check_file "$file"
 done
 

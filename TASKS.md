@@ -67,6 +67,19 @@ Go 主业务迁移与协作环境固化阶段
   - 已启用 `.githooks`
   - 已跑通 `make status`
   - 已执行 `make smoke`，当前以非严格模式跳过宿主机 `18081/healthz`
+- 完成代码审查与安全修复（一期）
+  - JWT 改为真实 HMAC-SHA256 签名，淘汰伪造 base64 token
+  - login 接入 bcrypt 密码校验与独立 AuthService
+  - 全业务路由接入 JWT 鉴权中间件
+  - 前端登录接入真实 API，增加 localStorage 持久化与路由守卫
+  - 修复 `transfer` 动作状态映射错误（应为 `pending_handover`）
+  - 补齐 memory ActionRepository 状态机跳转校验逻辑
+  - version_no 自增改为 `SELECT ... FOR UPDATE` 防并发写冲突
+  - 修复 audit-events 分页参数无下界约束
+  - 修复 handovers 错误判断改用 `errors.Is`
+  - 修复 `newID()` 随机数失败时返回零值 UUID（改为 panic）
+  - 删除与标准库冲突的自定义 `max()` 函数
+  - 访问日志补充 HTTP 响应状态码记录
 
 ## 进行中
 
@@ -121,9 +134,13 @@ Go 主业务迁移与协作环境固化阶段
 
 - 跑通 Alembic 初始迁移
 - 将占位 API 改为真实数据库读写
+- **前端页面接入真实后端 API**（仪表盘 / 文档列表 / 文档详情 / 交接单），当前页面全部使用硬编码 mock 数据
+- **Python Worker 实现真实队列消费**，`run_forever()` 当前为空循环占位，需对接 Redis/内存队列并驱动真实任务处理
 - 增加文档上传与版本管理服务层
 - 增加流转状态机服务层
 - 增加毕业交接服务层
+- **将 JWT 用户 ID 透传至所有审计事件写入**，当前所有审计记录 `user_id` 固定为系统占位 ID，需从请求上下文中读取真实登录用户
+- **Python CallbackClient / OpenClawClient 实现真实 HTTP 调用**，当前两个客户端均返回硬编码 dict，无任何网络请求
 - 增加更完整的审计事件过滤条件与统计聚合
 - 增加 dashboard 聚合相关基础测试
 - 补充数据库种子数据与真实业务链路联调
@@ -132,6 +149,7 @@ Go 主业务迁移与协作环境固化阶段
 - 增加基础测试
 - 增加更细粒度的 smoke test 和分层验证矩阵
 - 将 smoke 验证进一步细化到关键业务闭环接口
+- **前端 Element Plus 改为按需引入**以减小 bundle 体积（当前打包产物 >500 KB，需配置 `unplugin-vue-components` + `unplugin-auto-import`）
 
 ## 更新规则
 
