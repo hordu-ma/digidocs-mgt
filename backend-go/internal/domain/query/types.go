@@ -94,6 +94,29 @@ type HandoverLine struct {
 	Note       string `json:"note,omitempty"`
 }
 
+type DashboardOverview struct {
+	DocumentTotal        int            `json:"document_total"`
+	StatusCounts         map[string]int `json:"status_counts"`
+	HandoverPendingCount int            `json:"handover_pending_count"`
+	RiskDocumentCount    int            `json:"risk_document_count"`
+}
+
+type RecentFlowItem struct {
+	DocumentID string `json:"document_id"`
+	Title      string `json:"title"`
+	Action     string `json:"action"`
+	FromStatus string `json:"from_status,omitempty"`
+	ToStatus   string `json:"to_status"`
+	CreatedAt  string `json:"created_at"`
+}
+
+type RiskDocumentItem struct {
+	DocumentID  string `json:"document_id"`
+	Title       string `json:"title"`
+	RiskType    string `json:"risk_type"`
+	RiskMessage string `json:"risk_message"`
+}
+
 type DocumentListItem struct {
 	ID               string       `json:"id"`
 	Title            string       `json:"title"`

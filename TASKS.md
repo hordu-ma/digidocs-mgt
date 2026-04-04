@@ -77,10 +77,14 @@
   - 为 `flow / handover` 写路径接入 `audit_events` 落库
   - 为 `handovers/{id}/items` 接入持久化写链
   - 为 `handover complete` 接入选中文档责任人和状态联动
+  - 为 `dashboard/overview`、`dashboard/recent-flows`、`dashboard/risk-documents` 接入真实聚合查询
+  - 为 `flow / handover` 接口增加非法状态跳转校验和 `400 invalid_transition` 响应
 - Docker 网络内真实数据库链路验证
   - 宿主机直连 PostgreSQL 仍异常
   - 改走 compose 网络内联调路径
   - 宿主机访问 `18081` 仍待单独排查
+  - 已通过 Docker 网络内 Alembic 路径完成 PostgreSQL 初始 schema 初始化
+  - 已验证 `dashboard/overview` 与 `audit-events` 在容器网络内可正常返回
 - `backend-py-worker/` 职责收口
   - 明确 Worker 任务类型
   - 从旧 Python Web API 中抽离 AI 能力边界
@@ -95,7 +99,9 @@
 - 增加文档上传与版本管理服务层
 - 增加流转状态机服务层
 - 增加毕业交接服务层
-- 增加审计事件统一查询与统计聚合
+- 增加更完整的审计事件过滤条件与统计聚合
+- 增加 dashboard 聚合相关基础测试
+- 补充数据库种子数据与真实业务链路联调
 - 增加 OpenClaw 客户端真实调用
 - 增加群晖 NAS 适配器
 - 增加基础测试

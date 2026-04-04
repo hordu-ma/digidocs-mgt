@@ -43,6 +43,12 @@ type AuditReader interface {
 	GetAuditSummary(ctx context.Context, projectID string) (query.AuditSummary, error)
 }
 
+type DashboardReader interface {
+	GetOverview(ctx context.Context, projectID string) (query.DashboardOverview, error)
+	ListRecentFlows(ctx context.Context, projectID string) ([]query.RecentFlowItem, error)
+	ListRiskDocuments(ctx context.Context, projectID string) ([]query.RiskDocumentItem, error)
+}
+
 type ActionWriter interface {
 	CreateFlowRecord(ctx context.Context, input command.FlowActionInput) (map[string]any, error)
 	CreateHandover(ctx context.Context, input command.HandoverCreateInput) (map[string]any, error)

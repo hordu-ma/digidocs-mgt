@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"digidocs-mgt/backend-go/internal/domain/command"
+	"digidocs-mgt/backend-go/internal/service"
 )
 
 type ActionRepository struct {
@@ -41,6 +42,10 @@ func (r ActionRepository) CreateFlowRecord(ctx context.Context, input command.Fl
 		input.DocumentID,
 	).Scan(&fromUserID, &fromStatus); err != nil {
 		return nil, err
+	}
+
+	if !isValidFlowTransition(fromStatus, input.Action) {
+		return nil, fmt.Errorf("%w: action=%s from_status=%s", service.ErrInvalidTransition, input.Action, fromStatus)
 	}
 
 	toStatus := flowActionToStatus(input.Action)
@@ -289,6 +294,23 @@ func (r ActionRepository) ApplyHandover(ctx context.Context, input command.Hando
 	}
 	defer tx.Rollback()
 
+	var currentStatus string
+	if err := tx.QueryRowContext(
+		ctx,
+		`
+		SELECT status::text
+		FROM graduation_handovers
+		WHERE id::text = $1
+		`,
+		input.HandoverID,
+	).Scan(&currentStatus); err != nil {
+		return nil, err
+	}
+
+	if !isValidHandoverTransition(currentStatus, input.Action) {
+		return nil, fmt.Errorf("%w: action=%s from_status=%s", service.ErrInvalidTransition, input.Action, currentStatus)
+	}
+
 	status, field := handoverActionToUpdate(input.Action)
 	now := nowUTC()
 
@@ -471,6 +493,38 @@ func mappedHandoverAuditAction(action string) string {
 		return "handover_complete"
 	default:
 		return "admin_update"
+	}
+}
+
+func isValidFlowTransition(currentStatus string, action string) bool {
+	switch action {
+	case "mark_in_progress":
+		return currentStatus == "draft" || currentStatus == "handed_over" || currentStatus == "in_progress"
+	case "transfer":
+		return currentStatus == "in_progress"
+	case "accept_transfer":
+		return currentStatus == "pending_handover"
+	case "finalize":
+		return currentStatus == "in_progress" || currentStatus == "handed_over"
+	case "archive":
+		return currentStatus == "finalized" || currentStatus == "handed_over"
+	case "unarchive":
+		return currentStatus == "archived"
+	default:
+		return false
+	}
+}
+
+func isValidHandoverTransition(currentStatus string, action string) bool {
+	switch action {
+	case "confirm":
+		return currentStatus == "generated"
+	case "complete":
+		return currentStatus == "pending_confirm"
+	case "cancel":
+		return currentStatus == "generated" || currentStatus == "pending_confirm"
+	default:
+		return false
 	}
 }
 

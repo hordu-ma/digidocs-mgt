@@ -18,7 +18,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-user_role = sa.Enum("member", "project_lead", "admin", name="user_role")
+user_role = sa.Enum("member", "project_lead", "admin", name="user_role", create_type=False)
 document_status = sa.Enum(
     "draft",
     "in_progress",
@@ -27,6 +27,7 @@ document_status = sa.Enum(
     "finalized",
     "archived",
     name="document_status",
+    create_type=False,
 )
 handover_status = sa.Enum(
     "generated",
@@ -34,9 +35,10 @@ handover_status = sa.Enum(
     "completed",
     "cancelled",
     name="handover_status",
+    create_type=False,
 )
 suggestion_status = sa.Enum(
-    "pending", "confirmed", "dismissed", "expired", name="suggestion_status"
+    "pending", "confirmed", "dismissed", "expired", name="suggestion_status", create_type=False
 )
 suggestion_type = sa.Enum(
     "document_summary",
@@ -46,6 +48,7 @@ suggestion_type = sa.Enum(
     "archive_recommendation",
     "structure_recommendation",
     name="suggestion_type",
+    create_type=False,
 )
 audit_action_type = sa.Enum(
     "create",
@@ -67,18 +70,11 @@ audit_action_type = sa.Enum(
     "ai_confirm",
     "ai_dismiss",
     name="audit_action_type",
+    create_type=False,
 )
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    user_role.create(bind, checkfirst=True)
-    document_status.create(bind, checkfirst=True)
-    handover_status.create(bind, checkfirst=True)
-    suggestion_status.create(bind, checkfirst=True)
-    suggestion_type.create(bind, checkfirst=True)
-    audit_action_type.create(bind, checkfirst=True)
-
     op.create_table(
         "users",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
@@ -348,9 +344,3 @@ def downgrade() -> None:
     op.drop_index("idx_users_status", table_name="users")
     op.drop_index("idx_users_role", table_name="users")
     op.drop_table("users")
-    audit_action_type.drop(op.get_bind(), checkfirst=True)
-    suggestion_type.drop(op.get_bind(), checkfirst=True)
-    suggestion_status.drop(op.get_bind(), checkfirst=True)
-    handover_status.drop(op.get_bind(), checkfirst=True)
-    document_status.drop(op.get_bind(), checkfirst=True)
-    user_role.drop(op.get_bind(), checkfirst=True)

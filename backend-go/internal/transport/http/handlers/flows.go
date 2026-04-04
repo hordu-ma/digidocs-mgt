@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"digidocs-mgt/backend-go/internal/domain/command"
@@ -70,6 +71,10 @@ func (h FlowHandler) writeAction(w http.ResponseWriter, r *http.Request, action 
 		ToUserID:   stringValue(payload["to_user_id"]),
 	})
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidTransition) {
+			response.WriteError(w, http.StatusBadRequest, "invalid_transition", "invalid flow transition")
+			return
+		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to apply flow action")
 		return
 	}

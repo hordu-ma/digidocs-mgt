@@ -16,6 +16,7 @@ type Container struct {
 	DB                     *sql.DB
 	QueryService           service.QueryService
 	AuditQueryService      service.AuditQueryService
+	DashboardQueryService  service.DashboardQueryService
 	VersionQueryService    service.VersionQueryService
 	VersionCommandService  service.VersionCommandService
 	VersionWorkflowService service.VersionWorkflowService
@@ -51,6 +52,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				pgrepo.NewDocumentRepository(postgresDB),
 			),
 			AuditQueryService:      service.NewAuditQueryService(pgrepo.NewAuditRepository(postgresDB)),
+			DashboardQueryService:  service.NewDashboardQueryService(pgrepo.NewDashboardRepository(postgresDB)),
 			VersionQueryService:    service.NewVersionQueryService(pgrepo.NewVersionRepository(postgresDB)),
 			VersionCommandService:  service.NewVersionCommandService(pgrepo.NewVersionRepository(postgresDB)),
 			VersionWorkflowService: service.NewVersionWorkflowService(pgrepo.NewVersionWorkflow(postgresDB)),
@@ -71,6 +73,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				memory.NewDocumentRepository(),
 			),
 			AuditQueryService:      service.NewAuditQueryService(memory.NewAuditRepository()),
+			DashboardQueryService:  service.NewDashboardQueryService(memory.NewDashboardRepository()),
 			VersionQueryService:    service.NewVersionQueryService(memory.NewVersionRepository()),
 			VersionCommandService:  service.NewVersionCommandService(memory.NewVersionRepository()),
 			VersionWorkflowService: service.NewVersionWorkflowService(memory.NewVersionWorkflow()),
@@ -91,6 +94,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				memory.NewDocumentRepository(),
 			),
 			AuditQueryService:      service.NewAuditQueryService(memory.NewAuditRepository()),
+			DashboardQueryService:  service.NewDashboardQueryService(memory.NewDashboardRepository()),
 			VersionQueryService:    service.NewVersionQueryService(memory.NewVersionRepository()),
 			VersionCommandService:  service.NewVersionCommandService(memory.NewVersionRepository()),
 			VersionWorkflowService: service.NewVersionWorkflowService(memory.NewVersionWorkflow()),

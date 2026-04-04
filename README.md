@@ -155,5 +155,9 @@ docker compose up -d postgres redis minio
 - 已完成 `versions` 事务上传工作流
 - 已完成 `audit-events` Go 查询接口与 summary 聚合骨架
 - 已完成 `flow / handover` 写链的首轮事务化与审计联动
+- 已完成 `dashboard` 三个聚合接口的 Go 真实查询接入
+- 已完成 `flow / handover` 非法状态跳转校验
+- 已通过 Docker 网络内 Alembic 路径完成 PostgreSQL 初始 schema 初始化
+- 已完成 `dashboard/overview` 与 `audit-events` 容器网络烟测
 
 详细任务状态持续维护在 [TASKS.md](/home/liguoma/code-repos/digidocs-mgt/TASKS.md)。

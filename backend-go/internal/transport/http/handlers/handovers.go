@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"digidocs-mgt/backend-go/internal/domain/command"
@@ -130,6 +131,10 @@ func (h HandoverHandler) writeAction(w http.ResponseWriter, r *http.Request, act
 		Reason:     stringValue(payload["reason"]),
 	})
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidTransition) {
+			response.WriteError(w, http.StatusBadRequest, "invalid_transition", "invalid handover transition")
+			return
+		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to apply handover action")
 		return
 	}

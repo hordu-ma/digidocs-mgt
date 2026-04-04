@@ -18,7 +18,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	auditEventHandler := handlers.NewAuditEventHandler(container.AuditQueryService)
 	flowHandler := handlers.NewFlowHandler(container.FlowQueryService, container.ActionService)
 	handoverHandler := handlers.NewHandoverHandler(container.HandoverQueryService, container.ActionService)
-	dashboardHandler := handlers.NewDashboardHandler()
+	dashboardHandler := handlers.NewDashboardHandler(container.DashboardQueryService)
 	internalWorkerHandler := handlers.NewInternalWorkerHandler(cfg)
 	teamSpaceHandler := handlers.NewTeamSpaceHandler(container.QueryService)
 	projectHandler := handlers.NewProjectHandler(container.QueryService)
