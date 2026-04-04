@@ -1,18 +1,48 @@
 <script setup lang="ts">
-import { ElButton, ElCard, ElForm, ElFormItem, ElInput } from "element-plus";
-import { reactive } from "vue";
+import { ElButton, ElCard, ElForm, ElFormItem, ElInput, ElMessage } from "element-plus";
+import { reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 
+import axios from "axios";
+import { useAuthStore } from "@/stores/auth";
+
 const router = useRouter();
+const auth = useAuthStore();
+const loading = ref(false);
 const form = reactive({
   username: "admin",
   password: "",
 });
 
-function submit() {
-  void router.push("/dashboard");
+async function submit() {
+  if (!form.username || !form.password) {
+    ElMessage.error("请输入用户名和密码");
+    return;
+  }
+
+  loading.value = true;
+  try {
+    const res = await axios.post("/api/v1/auth/login", {
+      username: form.username,
+      password: form.password,
+    });
+    const data = res.data?.data;
+    auth.login({
+      token: data.access_token,
+      id: data.user.id,
+      displayName: data.user.display_name,
+      role: data.user.role,
+    });
+    void router.push("/dashboard");
+  } catch (err: any) {
+    const msg = err.response?.data?.error?.message ?? "登录失败，请检查用户名和密码";
+    ElMessage.error(msg);
+  } finally {
+    loading.value = false;
+  }
 }
 </script>
+
 
 <template>
   <div class="login-page">

@@ -2,20 +2,21 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
-	"digidocs-mgt/backend-go/internal/domain/auth"
 	"digidocs-mgt/backend-go/internal/service"
 	"digidocs-mgt/backend-go/internal/transport/http/request"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
 )
 
 type AuthHandler struct {
+	authService  service.AuthService
 	tokenService service.TokenService
 }
 
-func NewAuthHandler(tokenService service.TokenService) AuthHandler {
-	return AuthHandler{tokenService: tokenService}
+func NewAuthHandler(authService service.AuthService, tokenService service.TokenService) AuthHandler {
+	return AuthHandler{authService: authService, tokenService: tokenService}
 }
 
 func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -30,14 +31,13 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.tokenService.Generate(auth.Claims{
-		UserID:      "00000000-0000-0000-0000-000000000001",
-		Username:    payload.Username,
-		DisplayName: "开发用户",
-		Role:        "admin",
-	})
+	token, claims, err := h.authService.Login(r.Context(), payload.Username, payload.Password)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to generate token")
+		if errors.Is(err, service.ErrUnauthorized) {
+			response.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid username or password")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "login failed")
 		return
 	}
 
@@ -46,10 +46,10 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		"token_type":   "Bearer",
 		"expires_in":   7200,
 		"user": map[string]string{
-			"id":           "00000000-0000-0000-0000-000000000001",
-			"username":     payload.Username,
-			"display_name": "开发用户",
-			"role":         "admin",
+			"id":           claims.UserID,
+			"username":     claims.Username,
+			"display_name": claims.DisplayName,
+			"role":         claims.Role,
 		},
 	})
 }
@@ -83,3 +83,4 @@ func (h AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 	})
 }
+

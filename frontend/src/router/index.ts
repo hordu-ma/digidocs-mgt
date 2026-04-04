@@ -12,12 +12,20 @@ const router = createRouter({
   routes: [
     { path: "/login", name: "login", component: LoginView },
     { path: "/", redirect: "/dashboard" },
-    { path: "/dashboard", name: "dashboard", component: DashboardView },
-    { path: "/documents", name: "documents", component: DocumentsView },
-    { path: "/documents/:id", name: "document-detail", component: DocumentDetailView },
-    { path: "/handovers", name: "handovers", component: HandoversView },
-    { path: "/assistant", name: "assistant", component: AssistantView },
+    { path: "/dashboard", name: "dashboard", component: DashboardView, meta: { requiresAuth: true } },
+    { path: "/documents", name: "documents", component: DocumentsView, meta: { requiresAuth: true } },
+    { path: "/documents/:id", name: "document-detail", component: DocumentDetailView, meta: { requiresAuth: true } },
+    { path: "/handovers", name: "handovers", component: HandoversView, meta: { requiresAuth: true } },
+    { path: "/assistant", name: "assistant", component: AssistantView, meta: { requiresAuth: true } },
   ],
 });
 
+router.beforeEach((to) => {
+  const token = localStorage.getItem("access_token");
+  if (to.meta.requiresAuth && !token) {
+    return { name: "login" };
+  }
+});
+
 export default router;
+

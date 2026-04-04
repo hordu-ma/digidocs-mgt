@@ -24,6 +24,7 @@ type Container struct {
 	HandoverQueryService   service.HandoverQueryService
 	TaskService            service.TaskService
 	ActionService          service.ActionService
+	AuthService            service.AuthService
 	TokenService           service.TokenService
 	AuditService           service.AuditService
 	UploadService          service.UploadService
@@ -43,6 +44,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			return Container{}, err
 		}
 		actionService := service.NewActionService(pgrepo.NewActionRepository(postgresDB))
+		authService := service.NewAuthService(pgrepo.NewUserAuthRepository(postgresDB), tokenService)
 
 		return Container{
 			DB: postgresDB,
@@ -60,33 +62,14 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			HandoverQueryService:   service.NewHandoverQueryService(pgrepo.NewHandoverRepository(postgresDB)),
 			TaskService:            service.NewTaskService(publisher),
 			ActionService:          actionService,
-			TokenService:           tokenService,
-			AuditService:           auditService,
-			UploadService:          uploadService,
-		}, nil
-	case "memory":
-		actionService := service.NewActionService(memory.NewActionRepository())
-		return Container{
-			QueryService: service.NewQueryService(
-				memory.NewTeamSpaceRepository(),
-				memory.NewProjectRepository(),
-				memory.NewDocumentRepository(),
-			),
-			AuditQueryService:      service.NewAuditQueryService(memory.NewAuditRepository()),
-			DashboardQueryService:  service.NewDashboardQueryService(memory.NewDashboardRepository()),
-			VersionQueryService:    service.NewVersionQueryService(memory.NewVersionRepository()),
-			VersionCommandService:  service.NewVersionCommandService(memory.NewVersionRepository()),
-			VersionWorkflowService: service.NewVersionWorkflowService(memory.NewVersionWorkflow()),
-			FlowQueryService:       service.NewFlowQueryService(memory.NewFlowRepository()),
-			HandoverQueryService:   service.NewHandoverQueryService(memory.NewHandoverRepository()),
-			TaskService:            service.NewTaskService(publisher),
-			ActionService:          actionService,
+			AuthService:            authService,
 			TokenService:           tokenService,
 			AuditService:           auditService,
 			UploadService:          uploadService,
 		}, nil
 	default:
 		actionService := service.NewActionService(memory.NewActionRepository())
+		authService := service.NewAuthService(memory.NewUserAuthRepository(), tokenService)
 		return Container{
 			QueryService: service.NewQueryService(
 				memory.NewTeamSpaceRepository(),
@@ -102,6 +85,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			HandoverQueryService:   service.NewHandoverQueryService(memory.NewHandoverRepository()),
 			TaskService:            service.NewTaskService(publisher),
 			ActionService:          actionService,
+			AuthService:            authService,
 			TokenService:           tokenService,
 			AuditService:           auditService,
 			UploadService:          uploadService,

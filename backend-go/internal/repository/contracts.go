@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 
+	"digidocs-mgt/backend-go/internal/domain/auth"
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 )
@@ -59,4 +60,8 @@ type ActionWriter interface {
 type DocumentReader interface {
 	ListDocuments(ctx context.Context, filter query.DocumentListFilter) ([]query.DocumentListItem, int, error)
 	GetDocument(ctx context.Context, documentID string) (*query.DocumentDetail, error)
+}
+
+type UserAuthReader interface {
+	FindUserByUsername(ctx context.Context, username string) (*auth.UserRecord, error)
 }
