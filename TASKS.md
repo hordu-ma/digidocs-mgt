@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-项目骨架初始化阶段
+Go 主业务迁移与协作环境固化阶段
 
 ## 已完成
 
@@ -44,6 +44,29 @@
   - compose profile `app`
   - `backend-go` / `backend-py-worker` 镜像构建通过
   - compose 网络内部 `backend-go:8080/healthz` 验证通过
+- 完成项目级 Codex 协作资产首轮固化
+  - 增加 `ops/codex/skills/` 真实 skill 包
+  - 增加 `ops/codex/skills/index.yaml` 技能索引
+  - 增加 `scripts/codex/install-project-skills.sh`
+  - 增加 `scripts/codex/doctor.sh`
+  - 增强 `AGENTS.md` 的会话启动清单、状态同步规则和验证约束
+  - 新增 `docs/Harness Engineering 学习笔记.md`
+- 完成第二阶段统一验证入口
+  - 增加 `Makefile`
+  - 增加 `scripts/codex/check-doc-sync.sh`
+  - `doctor.sh` 接入文档一致性检查
+  - 增加 `make verify` 聚合验证入口
+  - 已实际跑通 `make verify`
+- 完成第三阶段自动化门禁骨架
+  - 增加 `.github/workflows/verify.yml`
+  - 增加 `.githooks/pre-commit` 与 `.githooks/pre-push`
+  - 增加 `scripts/codex/install-hooks.sh`
+  - 增加 `scripts/codex/report.sh`
+  - 增加 `scripts/codex/smoke-local.sh`
+  - `Makefile` 增加 `status`、`smoke`、`install-hooks`
+  - 已启用 `.githooks`
+  - 已跑通 `make status`
+  - 已执行 `make smoke`，当前以非严格模式跳过宿主机 `18081/healthz`
 
 ## 进行中
 
@@ -88,12 +111,14 @@
 - `backend-py-worker/` 职责收口
   - 明确 Worker 任务类型
   - 从旧 Python Web API 中抽离 AI 能力边界
+- Codex 项目技能运行时接入
+  - 待在本机执行 `./scripts/codex/install-project-skills.sh`
+  - 待按实际使用反馈继续补 `backend-go` / `worker` / `verify` skill 内容
+- 联调 smoke 验证
+  - 待排查宿主机 `18081/healthz` 不可达问题
 
 ## 待办
 
-- 建立 `backend-go/` 主业务后端骨架
-- 建立 `backend-py-worker/` AI 与文档处理 Worker 骨架
-- 明确 Go 与 Python 的异步任务消息契约
 - 跑通 Alembic 初始迁移
 - 将占位 API 改为真实数据库读写
 - 增加文档上传与版本管理服务层
@@ -105,6 +130,8 @@
 - 增加 OpenClaw 客户端真实调用
 - 增加群晖 NAS 适配器
 - 增加基础测试
+- 增加更细粒度的 smoke test 和分层验证矩阵
+- 将 smoke 验证进一步细化到关键业务闭环接口
 
 ## 更新规则
 

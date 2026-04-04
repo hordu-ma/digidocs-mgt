@@ -17,15 +17,21 @@
 ```text
 .
 ├── AGENTS.md
+├── .github/
+├── .githooks/
 ├── API设计.md
+├── Makefile
 ├── README.md
 ├── SKILLS/
 ├── TASKS.md
 ├── backend/
 ├── backend-go/
 ├── backend-py-worker/
+├── docs/
 ├── docker-compose.yml
 ├── frontend/
+├── ops/
+├── scripts/
 ├── 数据库设计.md
 └── 项目定义与技术架构.md
 ```
@@ -75,6 +81,10 @@
 - AI 建议与主业务事实必须分离，禁止让 AI 直接改写主状态。
 - 优先走薄业务层自研，不重复造通用底座。
 - 涉及群晖 NAS 和 OpenClaw 的调用，必须统一经由适配层/客户端模块，不允许散落在业务代码中。
+- `TASKS.md` 作为执行账本，`README.md` 作为阶段快照；两者阶段判断必须保持一致。
+- 项目级 Codex 可执行 skills 维护在 `ops/codex/skills/`，人类可读专项说明保留在 `SKILLS/`。
+- 新机器或新会话接力开发时，优先运行 `./scripts/codex/doctor.sh` 做环境体检。
+- 若需让 Codex 在运行时发现项目技能，执行 `./scripts/codex/install-project-skills.sh`。
 
 ## 近期开发顺序
 
@@ -131,6 +141,33 @@ docker compose up -d postgres redis minio
 docker compose --profile app up -d backend-go backend-py-worker
 ```
 
+### Codex 协作环境
+
+```bash
+./scripts/codex/doctor.sh
+./scripts/codex/check-doc-sync.sh
+make status
+make smoke
+make verify
+./scripts/codex/install-hooks.sh
+./scripts/codex/install-project-skills.sh
+```
+
+项目级 Codex 协作资产：
+
+- `ops/codex/skills/`：可执行 skill 包
+- `ops/codex/skills/index.yaml`：技能索引
+- `scripts/codex/install-project-skills.sh`：把项目技能安装到 `~/.codex/skills/`
+- `scripts/codex/install-hooks.sh`：启用仓库内 `pre-commit` / `pre-push` hooks
+- `scripts/codex/doctor.sh`：环境与协作资产体检
+- `scripts/codex/check-doc-sync.sh`：检查 `README.md` / `TASKS.md` / `AGENTS.md` 的阶段与协作约束一致性
+- `scripts/codex/report.sh`：输出当前分支、阶段、技能安装与 hooks 状态
+- `scripts/codex/smoke-local.sh`：本地容器联调烟测骨架
+- `Makefile`：统一 `make doctor`、`make verify`、`make check-doc-sync`
+- `.githooks/`：本地提交前和推送前门禁
+- `.github/workflows/verify.yml`：远端 GitHub Actions 验证门禁
+- `docs/Harness Engineering 学习笔记.md`：本项目的 Harness Engineering 学习文档
+
 ## 跨机器接力开发
 
 在另一台机器拉取仓库后，需要重新安装本地依赖和运行环境，不能直接复用其他机器的 `.venv`、`node_modules` 或本地容器状态。
@@ -150,7 +187,7 @@ docker compose up -d postgres redis minio
 
 ## 开发进度
 
-当前阶段已进入 Go 主业务迁移的真实读写补齐：
+当前阶段已进入 Go 主业务迁移与协作环境固化阶段：
 
 - 已完成 `versions` 事务上传工作流
 - 已完成 `audit-events` Go 查询接口与 summary 聚合骨架
@@ -159,5 +196,13 @@ docker compose up -d postgres redis minio
 - 已完成 `flow / handover` 非法状态跳转校验
 - 已通过 Docker 网络内 Alembic 路径完成 PostgreSQL 初始 schema 初始化
 - 已完成 `dashboard/overview` 与 `audit-events` 容器网络烟测
+- 已完成项目级 Codex skills、技能索引、安装脚本与 doctor 体检脚本初版
+- 已完成 `make verify` 与 `check-doc-sync.sh` 统一验证入口
+- 已实际跑通 `make verify`，当前通过 Go 测试、Python Worker 测试与前端构建验证
+- 已完成第三阶段自动化门禁骨架：本地 hooks、GitHub Actions、状态报告与联调 smoke 脚本
+- 已启用仓库本地 `.githooks`，并已跑通 `make status`
+- 已执行 `make smoke`，当前容器存在但宿主机 `18081/healthz` 不可达，脚本按非严格模式跳过
+- 已完成 `AGENTS.md` 会话启动清单、状态账本同步规则与验证约束增强
+- 已完成 [Harness Engineering 学习笔记](/home/liguoma/code-repos/digidocs-mgt/docs/Harness Engineering 学习笔记.md) 初版
 
 详细任务状态持续维护在 [TASKS.md](/home/liguoma/code-repos/digidocs-mgt/TASKS.md)。

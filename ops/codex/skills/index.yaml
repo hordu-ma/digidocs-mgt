@@ -1,0 +1,134 @@
+version: 1
+skills:
+  - name: digidocs-architecture-guard
+    path: ops/codex/skills/digidocs-architecture-guard
+    triggers:
+      - architecture
+      - contract
+      - design-doc
+      - schema
+      - api
+    sources:
+      - 项目定义与技术架构.md
+      - 数据库设计.md
+      - API设计.md
+      - AGENTS.md
+    owned_paths:
+      - /
+    verify_commands:
+      - "sed -n '1,220p' 项目定义与技术架构.md"
+      - "sed -n '1,220p' 数据库设计.md"
+      - "sed -n '1,220p' API设计.md"
+    done_updates:
+      - README.md
+      - TASKS.md
+
+  - name: digidocs-backend-go
+    path: ops/codex/skills/digidocs-backend-go
+    triggers:
+      - backend-go
+      - go-api
+      - repository
+      - transaction
+      - dashboard
+    sources:
+      - 项目定义与技术架构.md
+      - 数据库设计.md
+      - API设计.md
+      - AGENTS.md
+      - TASKS.md
+    owned_paths:
+      - backend-go/
+      - backend-go/tests/
+      - backend-go/migrations/
+    verify_commands:
+      - "cd backend-go && go test ./..."
+    done_updates:
+      - README.md
+      - TASKS.md
+
+  - name: digidocs-worker-python
+    path: ops/codex/skills/digidocs-worker-python
+    triggers:
+      - worker
+      - assistant
+      - openclaw
+      - async-task
+      - celery
+    sources:
+      - 项目定义与技术架构.md
+      - 数据库设计.md
+      - API设计.md
+      - AGENTS.md
+      - TASKS.md
+    owned_paths:
+      - backend-py-worker/
+      - backend/
+    verify_commands:
+      - "cd backend-py-worker && .venv/bin/python -m pytest -q"
+    done_updates:
+      - README.md
+      - TASKS.md
+
+  - name: digidocs-frontend-vue
+    path: ops/codex/skills/digidocs-frontend-vue
+    triggers:
+      - frontend
+      - vue
+      - element-plus
+      - dashboard-ui
+      - document-detail
+    sources:
+      - 项目定义与技术架构.md
+      - API设计.md
+      - AGENTS.md
+      - TASKS.md
+    owned_paths:
+      - frontend/
+    verify_commands:
+      - "cd frontend && npm run build"
+    done_updates:
+      - README.md
+      - TASKS.md
+
+  - name: digidocs-doc-sync
+    path: ops/codex/skills/digidocs-doc-sync
+    triggers:
+      - readme
+      - tasks
+      - progress
+      - sync
+      - docs-update
+    sources:
+      - README.md
+      - TASKS.md
+      - AGENTS.md
+    owned_paths:
+      - README.md
+      - TASKS.md
+      - AGENTS.md
+    verify_commands:
+      - "rg -n '当前开发进度|当前阶段|已完成|进行中|待办' README.md TASKS.md AGENTS.md"
+    done_updates:
+      - README.md
+      - TASKS.md
+
+  - name: digidocs-verify
+    path: ops/codex/skills/digidocs-verify
+    triggers:
+      - verify
+      - doctor
+      - smoke-test
+      - validation
+      - env-check
+    sources:
+      - README.md
+      - TASKS.md
+      - AGENTS.md
+    owned_paths:
+      - scripts/codex/
+      - ops/codex/
+    verify_commands:
+      - "./scripts/codex/doctor.sh"
+    done_updates:
+      - TASKS.md

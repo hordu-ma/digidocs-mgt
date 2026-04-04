@@ -21,7 +21,8 @@
 3. `API设计.md`
 4. `README.md`
 5. `TASKS.md`
-6. `SKILLS/` 下的专项技能文档
+6. `ops/codex/skills/` 下的项目级可执行技能
+7. `SKILLS/` 下的专项技能文档
 
 如果实现与这些文档冲突，先更新文档再改代码，禁止静默偏离设计。
 
@@ -33,6 +34,12 @@
   - Vue 3 前端实现
 - `SKILLS/`
   - 面向本项目的专项开发技能、约束和操作清单
+- `ops/codex/skills/`
+  - 面向 Codex 运行时的项目级可执行技能
+- `scripts/codex/`
+  - 项目级 Codex 安装、体检与辅助脚本
+- `docs/`
+  - 项目文档与学习材料
 - `README.md`
   - 项目总入口和阶段进度
 - `TASKS.md`
@@ -59,6 +66,50 @@
 5. 落前端联动
 6. 更新任务账本和 README 开发进度
 
+## 5.1 会话启动清单
+
+每次进入本仓库开始开发前，代理或开发者应先完成以下动作：
+
+1. 读取 `项目定义与技术架构.md`、`数据库设计.md`、`API设计.md`
+2. 读取 `README.md` 和 `TASKS.md`，确认当前阶段与进行中事项
+3. 判断本次任务是否需要启用 `ops/codex/skills/` 下的专项 skill
+4. 明确本次会影响的目录、契约和验证命令
+5. 如发现 `README.md` 与 `TASKS.md` 阶段不一致，先修正文档再进入实现
+
+## 5.2 项目技能使用约定
+
+- 仓库内项目级 Codex 技能统一放在 `ops/codex/skills/`
+- 技能索引维护在 `ops/codex/skills/index.yaml`
+- 如需让 Codex 在运行时发现这些项目技能，应执行 `./scripts/codex/install-project-skills.sh`
+- `SKILLS/` 目录继续保留为面向项目成员的人类可读专项说明；可执行 skill 以 `ops/codex/skills/` 为准
+
+## 5.3 状态账本同步规则
+
+- `TASKS.md` 是执行账本，记录“已完成 / 进行中 / 待办”
+- `README.md` 是阶段快照，记录当前阶段与对外可读进展
+- 两者允许细节粒度不同，但不允许阶段判断冲突
+- 任何会改变项目阶段判断的工作，必须同时检查并按需更新 `TASKS.md` 与 `README.md`
+
+## 5.4 验证与交付证据
+
+- 任何功能或环境改造完成后，至少给出一种基础验证方式
+- 优先使用可重复执行的命令，而不是口头说明
+- 仓库级环境检查统一优先使用 `./scripts/codex/doctor.sh`
+- 涉及多子系统联动时，优先使用 `make verify`
+- 本地提交与推送前，优先启用 `./scripts/codex/install-hooks.sh`
+- 需要说明当前仓库健康状态时，优先使用 `make status`
+- 需要做本地容器联调烟测时，优先使用 `make smoke`
+- 子系统验证优先使用：
+  - `cd backend-go && go test ./...`
+  - `cd backend-py-worker && .venv/bin/python -m pytest -q`
+  - `cd frontend && npm run build`
+
+## 5.5 冲突处理规则
+
+- 若实现与设计文档冲突：先改文档，再改代码
+- 若 `README.md` 与 `TASKS.md` 冲突：以 `TASKS.md` 为执行账本，并在本次交付中同步 `README.md`
+- 若项目技能与 `AGENTS.md` 规则冲突：以 `AGENTS.md` 为准，并及时修正 skill
+
 ## 6. 完成定义
 
 一项功能只有同时满足以下条件才算完成：
@@ -68,4 +119,4 @@
 - 至少有基础验证方式
 - `TASKS.md` 已更新状态
 - `README.md` 的开发进度已按需更新
-
+- 如涉及协作约束或环境能力，`ops/codex/skills/`、相关脚本与说明文档也已同步更新
