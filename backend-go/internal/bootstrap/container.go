@@ -13,16 +13,17 @@ import (
 )
 
 type Container struct {
-	DB                   *sql.DB
-	QueryService         service.QueryService
-	VersionQueryService  service.VersionQueryService
-	FlowQueryService     service.FlowQueryService
-	HandoverQueryService service.HandoverQueryService
-	TaskService          service.TaskService
-	ActionService        service.ActionService
-	TokenService         service.TokenService
-	AuditService         service.AuditService
-	UploadService        service.UploadService
+	DB                    *sql.DB
+	QueryService          service.QueryService
+	VersionQueryService   service.VersionQueryService
+	VersionCommandService service.VersionCommandService
+	FlowQueryService      service.FlowQueryService
+	HandoverQueryService  service.HandoverQueryService
+	TaskService           service.TaskService
+	ActionService         service.ActionService
+	TokenService          service.TokenService
+	AuditService          service.AuditService
+	UploadService         service.UploadService
 }
 
 func BuildContainer(cfg config.Config) (Container, error) {
@@ -31,7 +32,6 @@ func BuildContainer(cfg config.Config) (Container, error) {
 	tokenService := service.NewTokenService(cfg.JWTSecret)
 	auditService := service.NewAuditService()
 	uploadService := service.NewUploadService(storageProvider)
-	actionService := service.NewActionService()
 
 	switch cfg.DataBackend {
 	case "postgres":
@@ -39,6 +39,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 		if err != nil {
 			return Container{}, err
 		}
+		actionService := service.NewActionService(pgrepo.NewActionRepository(postgresDB))
 
 		return Container{
 			DB: postgresDB,
@@ -47,46 +48,51 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				pgrepo.NewProjectRepository(postgresDB),
 				pgrepo.NewDocumentRepository(postgresDB),
 			),
-			VersionQueryService:  service.NewVersionQueryService(memory.NewVersionRepository()),
-			FlowQueryService:     service.NewFlowQueryService(memory.NewFlowRepository()),
-			HandoverQueryService: service.NewHandoverQueryService(memory.NewHandoverRepository()),
-			TaskService:          service.NewTaskService(publisher),
-			ActionService:        actionService,
-			TokenService:         tokenService,
-			AuditService:         auditService,
-			UploadService:        uploadService,
+			VersionQueryService:   service.NewVersionQueryService(pgrepo.NewVersionRepository(postgresDB)),
+			VersionCommandService: service.NewVersionCommandService(pgrepo.NewVersionRepository(postgresDB)),
+			FlowQueryService:      service.NewFlowQueryService(pgrepo.NewFlowRepository(postgresDB)),
+			HandoverQueryService:  service.NewHandoverQueryService(pgrepo.NewHandoverRepository(postgresDB)),
+			TaskService:           service.NewTaskService(publisher),
+			ActionService:         actionService,
+			TokenService:          tokenService,
+			AuditService:          auditService,
+			UploadService:         uploadService,
 		}, nil
 	case "memory":
+		actionService := service.NewActionService(memory.NewActionRepository())
 		return Container{
 			QueryService: service.NewQueryService(
 				memory.NewTeamSpaceRepository(),
 				memory.NewProjectRepository(),
 				memory.NewDocumentRepository(),
 			),
-			VersionQueryService:  service.NewVersionQueryService(memory.NewVersionRepository()),
-			FlowQueryService:     service.NewFlowQueryService(memory.NewFlowRepository()),
-			HandoverQueryService: service.NewHandoverQueryService(memory.NewHandoverRepository()),
-			TaskService:          service.NewTaskService(publisher),
-			ActionService:        actionService,
-			TokenService:         tokenService,
-			AuditService:         auditService,
-			UploadService:        uploadService,
+			VersionQueryService:   service.NewVersionQueryService(memory.NewVersionRepository()),
+			VersionCommandService: service.NewVersionCommandService(memory.NewVersionRepository()),
+			FlowQueryService:      service.NewFlowQueryService(memory.NewFlowRepository()),
+			HandoverQueryService:  service.NewHandoverQueryService(memory.NewHandoverRepository()),
+			TaskService:           service.NewTaskService(publisher),
+			ActionService:         actionService,
+			TokenService:          tokenService,
+			AuditService:          auditService,
+			UploadService:         uploadService,
 		}, nil
 	default:
+		actionService := service.NewActionService(memory.NewActionRepository())
 		return Container{
 			QueryService: service.NewQueryService(
 				memory.NewTeamSpaceRepository(),
 				memory.NewProjectRepository(),
 				memory.NewDocumentRepository(),
 			),
-			VersionQueryService:  service.NewVersionQueryService(memory.NewVersionRepository()),
-			FlowQueryService:     service.NewFlowQueryService(memory.NewFlowRepository()),
-			HandoverQueryService: service.NewHandoverQueryService(memory.NewHandoverRepository()),
-			TaskService:          service.NewTaskService(publisher),
-			ActionService:        actionService,
-			TokenService:         tokenService,
-			AuditService:         auditService,
-			UploadService:        uploadService,
+			VersionQueryService:   service.NewVersionQueryService(memory.NewVersionRepository()),
+			VersionCommandService: service.NewVersionCommandService(memory.NewVersionRepository()),
+			FlowQueryService:      service.NewFlowQueryService(memory.NewFlowRepository()),
+			HandoverQueryService:  service.NewHandoverQueryService(memory.NewHandoverRepository()),
+			TaskService:           service.NewTaskService(publisher),
+			ActionService:         actionService,
+			TokenService:          tokenService,
+			AuditService:          auditService,
+			UploadService:         uploadService,
 		}, nil
 	}
 }

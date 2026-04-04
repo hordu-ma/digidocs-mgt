@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 
+	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 )
 
@@ -20,6 +21,10 @@ type VersionReader interface {
 	GetVersion(ctx context.Context, versionID string) (*query.VersionDetail, error)
 }
 
+type VersionWriter interface {
+	CreateVersion(ctx context.Context, input command.VersionCreateInput) (map[string]any, error)
+}
+
 type FlowReader interface {
 	ListFlows(ctx context.Context, documentID string) ([]query.FlowItem, error)
 }
@@ -27,6 +32,12 @@ type FlowReader interface {
 type HandoverReader interface {
 	ListHandovers(ctx context.Context) ([]query.HandoverItem, error)
 	GetHandover(ctx context.Context, handoverID string) (*query.HandoverItem, error)
+}
+
+type ActionWriter interface {
+	CreateFlowRecord(ctx context.Context, input command.FlowActionInput) (map[string]any, error)
+	CreateHandover(ctx context.Context, input command.HandoverCreateInput) (map[string]any, error)
+	ApplyHandover(ctx context.Context, input command.HandoverActionInput) (map[string]any, error)
 }
 
 type DocumentReader interface {

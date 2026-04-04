@@ -7,6 +7,15 @@ type FlowActionInput struct {
 	ToUserID   string
 }
 
+type VersionCreateInput struct {
+	DocumentID       string
+	FileName         string
+	FileSize         int64
+	CommitMessage    string
+	StorageObjectKey string
+	StorageProvider  string
+}
+
 type HandoverCreateInput struct {
 	TargetUserID   string
 	ReceiverUserID string
