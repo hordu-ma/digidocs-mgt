@@ -13,17 +13,18 @@ import (
 )
 
 type Container struct {
-	DB                    *sql.DB
-	QueryService          service.QueryService
-	VersionQueryService   service.VersionQueryService
-	VersionCommandService service.VersionCommandService
-	FlowQueryService      service.FlowQueryService
-	HandoverQueryService  service.HandoverQueryService
-	TaskService           service.TaskService
-	ActionService         service.ActionService
-	TokenService          service.TokenService
-	AuditService          service.AuditService
-	UploadService         service.UploadService
+	DB                     *sql.DB
+	QueryService           service.QueryService
+	VersionQueryService    service.VersionQueryService
+	VersionCommandService  service.VersionCommandService
+	VersionWorkflowService service.VersionWorkflowService
+	FlowQueryService       service.FlowQueryService
+	HandoverQueryService   service.HandoverQueryService
+	TaskService            service.TaskService
+	ActionService          service.ActionService
+	TokenService           service.TokenService
+	AuditService           service.AuditService
+	UploadService          service.UploadService
 }
 
 func BuildContainer(cfg config.Config) (Container, error) {
@@ -48,15 +49,16 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				pgrepo.NewProjectRepository(postgresDB),
 				pgrepo.NewDocumentRepository(postgresDB),
 			),
-			VersionQueryService:   service.NewVersionQueryService(pgrepo.NewVersionRepository(postgresDB)),
-			VersionCommandService: service.NewVersionCommandService(pgrepo.NewVersionRepository(postgresDB)),
-			FlowQueryService:      service.NewFlowQueryService(pgrepo.NewFlowRepository(postgresDB)),
-			HandoverQueryService:  service.NewHandoverQueryService(pgrepo.NewHandoverRepository(postgresDB)),
-			TaskService:           service.NewTaskService(publisher),
-			ActionService:         actionService,
-			TokenService:          tokenService,
-			AuditService:          auditService,
-			UploadService:         uploadService,
+			VersionQueryService:    service.NewVersionQueryService(pgrepo.NewVersionRepository(postgresDB)),
+			VersionCommandService:  service.NewVersionCommandService(pgrepo.NewVersionRepository(postgresDB)),
+			VersionWorkflowService: service.NewVersionWorkflowService(pgrepo.NewVersionWorkflow(postgresDB)),
+			FlowQueryService:       service.NewFlowQueryService(pgrepo.NewFlowRepository(postgresDB)),
+			HandoverQueryService:   service.NewHandoverQueryService(pgrepo.NewHandoverRepository(postgresDB)),
+			TaskService:            service.NewTaskService(publisher),
+			ActionService:          actionService,
+			TokenService:           tokenService,
+			AuditService:           auditService,
+			UploadService:          uploadService,
 		}, nil
 	case "memory":
 		actionService := service.NewActionService(memory.NewActionRepository())
@@ -66,15 +68,16 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				memory.NewProjectRepository(),
 				memory.NewDocumentRepository(),
 			),
-			VersionQueryService:   service.NewVersionQueryService(memory.NewVersionRepository()),
-			VersionCommandService: service.NewVersionCommandService(memory.NewVersionRepository()),
-			FlowQueryService:      service.NewFlowQueryService(memory.NewFlowRepository()),
-			HandoverQueryService:  service.NewHandoverQueryService(memory.NewHandoverRepository()),
-			TaskService:           service.NewTaskService(publisher),
-			ActionService:         actionService,
-			TokenService:          tokenService,
-			AuditService:          auditService,
-			UploadService:         uploadService,
+			VersionQueryService:    service.NewVersionQueryService(memory.NewVersionRepository()),
+			VersionCommandService:  service.NewVersionCommandService(memory.NewVersionRepository()),
+			VersionWorkflowService: service.NewVersionWorkflowService(memory.NewVersionWorkflow()),
+			FlowQueryService:       service.NewFlowQueryService(memory.NewFlowRepository()),
+			HandoverQueryService:   service.NewHandoverQueryService(memory.NewHandoverRepository()),
+			TaskService:            service.NewTaskService(publisher),
+			ActionService:          actionService,
+			TokenService:           tokenService,
+			AuditService:           auditService,
+			UploadService:          uploadService,
 		}, nil
 	default:
 		actionService := service.NewActionService(memory.NewActionRepository())
@@ -84,15 +87,16 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				memory.NewProjectRepository(),
 				memory.NewDocumentRepository(),
 			),
-			VersionQueryService:   service.NewVersionQueryService(memory.NewVersionRepository()),
-			VersionCommandService: service.NewVersionCommandService(memory.NewVersionRepository()),
-			FlowQueryService:      service.NewFlowQueryService(memory.NewFlowRepository()),
-			HandoverQueryService:  service.NewHandoverQueryService(memory.NewHandoverRepository()),
-			TaskService:           service.NewTaskService(publisher),
-			ActionService:         actionService,
-			TokenService:          tokenService,
-			AuditService:          auditService,
-			UploadService:         uploadService,
+			VersionQueryService:    service.NewVersionQueryService(memory.NewVersionRepository()),
+			VersionCommandService:  service.NewVersionCommandService(memory.NewVersionRepository()),
+			VersionWorkflowService: service.NewVersionWorkflowService(memory.NewVersionWorkflow()),
+			FlowQueryService:       service.NewFlowQueryService(memory.NewFlowRepository()),
+			HandoverQueryService:   service.NewHandoverQueryService(memory.NewHandoverRepository()),
+			TaskService:            service.NewTaskService(publisher),
+			ActionService:          actionService,
+			TokenService:           tokenService,
+			AuditService:           auditService,
+			UploadService:          uploadService,
 		}, nil
 	}
 }

@@ -24,9 +24,8 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	documentHandler := handlers.NewDocumentHandler(container.QueryService)
 	versionHandler := handlers.NewVersionHandler(
 		container.UploadService,
-		container.AuditService,
 		container.VersionQueryService,
-		container.VersionCommandService,
+		container.VersionWorkflowService,
 	)
 
 	mux.HandleFunc("GET /healthz", systemHandler.Healthz)

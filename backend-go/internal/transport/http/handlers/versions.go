@@ -10,23 +10,20 @@ import (
 )
 
 type VersionHandler struct {
-	uploadService  service.UploadService
-	auditService   service.AuditService
-	queryService   service.VersionQueryService
-	commandService service.VersionCommandService
+	uploadService   service.UploadService
+	queryService    service.VersionQueryService
+	workflowService service.VersionWorkflowService
 }
 
 func NewVersionHandler(
 	uploadService service.UploadService,
-	auditService service.AuditService,
 	queryService service.VersionQueryService,
-	commandService service.VersionCommandService,
+	workflowService service.VersionWorkflowService,
 ) VersionHandler {
 	return VersionHandler{
-		uploadService:  uploadService,
-		auditService:   auditService,
-		queryService:   queryService,
-		commandService: commandService,
+		uploadService:   uploadService,
+		queryService:    queryService,
+		workflowService: workflowService,
 	}
 }
 
@@ -52,7 +49,7 @@ func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	versionData, err := h.commandService.Create(r.Context(), command.VersionCreateInput{
+	versionData, err := h.workflowService.CreateUploadedVersion(r.Context(), command.VersionCreateInput{
 		DocumentID:       documentID,
 		FileName:         header.Filename,
 		FileSize:         header.Size,
@@ -64,12 +61,6 @@ func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create version record")
 		return
 	}
-
-	_ = h.auditService.Record(r.Context(), "replace_version", "", documentID, map[string]any{
-		"file_name":  header.Filename,
-		"object_key": result.ObjectKey,
-		"provider":   result.Provider,
-	})
 
 	versionData["storage"] = result
 	versionData["status"] = "uploaded"

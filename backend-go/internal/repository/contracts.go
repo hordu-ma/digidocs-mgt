@@ -25,6 +25,10 @@ type VersionWriter interface {
 	CreateVersion(ctx context.Context, input command.VersionCreateInput) (map[string]any, error)
 }
 
+type VersionWorkflow interface {
+	CreateUploadedVersion(ctx context.Context, input command.VersionCreateInput) (map[string]any, error)
+}
+
 type FlowReader interface {
 	ListFlows(ctx context.Context, documentID string) ([]query.FlowItem, error)
 }

@@ -71,6 +71,7 @@
   - 为 `versions / flows / handovers` 补齐 memory repository 与 query/action service
   - 为 `versions / flows / handovers` 接入 postgres repository 读链
   - 为 `flow / handover / version upload` 接入 repository 写链骨架
+  - 为 `version upload -> documents.current_version_id/current_status -> audit_events` 接入事务工作流骨架
 - Docker 网络内真实数据库链路验证
   - 宿主机直连 PostgreSQL 仍异常
   - 改走 compose 网络内联调路径
