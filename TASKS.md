@@ -128,6 +128,21 @@ Go 主业务迁移与协作环境固化阶段
   - `auth_service_test.go`：登录成功、用户不存在、密码错误、仓库层错误传播（4 用例）
   - `action_service_test.go`：ApplyFlow/CreateHandover/UpdateHandoverItems/ApplyHandover 委托验证与错误传播（5 用例）
   - `dashboard_query_service_test.go`：Overview/RecentFlows/RiskDocuments 委托验证与错误传播（4 用例）
+- 完成前端 Element Plus 按需引入
+  - 配置 `unplugin-vue-components` + `unplugin-auto-import` + `ElementPlusResolver`
+  - 移除全局 `app.use(ElementPlus)` 和各 .vue 文件的手动组件导入
+  - JS bundle 从 1,041 KB 降至 470 KB（减少 55%）
+- 完成 Python Worker 真实队列消费链路
+  - Go 内存队列改为实际存储消息，新增 `queue.Consumer` 接口和 `Poll()` 方法
+  - Go 新增 `GET /api/v1/internal/poll-tasks` 内部端点（共享密钥鉴权）
+  - Python Worker `run_forever()` 改为 HTTP 轮询消费 → 处理 → 回写
+  - `CallbackClient` 改为真实 HTTP POST 回写
+  - 新增 `TaskPollerClient` 轮询客户端
+  - 新增 2 个 Python 测试用例（共 3 个通过）
+- 完成前端写操作 UI
+  - `DocumentDetailView`：根据文档当前状态动态展示流转操作按钮（开始处理/转交/定稿/归档/取消归档）
+  - `AssistantView`：接入真实 `POST /assistant/ask` API，提交问题后展示排队状态
+  - `HandoversView`：新增「创建交接」按钮和 Dialog 表单，调用 `POST /handovers`
 
 ## 进行中
 
@@ -143,12 +158,12 @@ Go 主业务迁移与协作环境固化阶段
 - ~~跑通 Alembic 初始迁移~~ ✅ 已完成
 - ~~将占位 API 改为真实数据库读写~~ ✅ 已完成
 - ~~前端页面接入真实后端 API~~ ✅ 已完成
-- **Python Worker 实现真实队列消费**，`run_forever()` 当前为空循环占位，需对接 Redis/内存队列并驱动真实任务处理
+- ~~Python Worker 实现真实队列消费~~ ✅ 已完成
 - 增加文档上传与版本管理服务层
 - 增加流转状态机服务层
 - 增加毕业交接服务层
 - ~~将 JWT 用户 ID 透传至所有审计事件写入~~ ✅ 已完成
-- **Python CallbackClient / OpenClawClient 实现真实 HTTP 调用**，当前两个客户端均返回硬编码 dict，无任何网络请求
+- ~~Python CallbackClient / OpenClawClient 实现真实 HTTP 调用~~ ✅ CallbackClient 已完成，OpenClawClient 待对接真实服务
 - 增加更完整的审计事件过滤条件与统计聚合
 - ~~增加 dashboard 聚合相关基础测试~~ ✅ 已完成
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
@@ -157,7 +172,7 @@ Go 主业务迁移与协作环境固化阶段
 - ~~增加基础测试~~ ✅ 已完成
 - 增加更细粒度的 smoke test 和分层验证矩阵
 - 将 smoke 验证进一步细化到关键业务闭环接口
-- **前端 Element Plus 改为按需引入**以减小 bundle 体积（当前打包产物 >500 KB，需配置 `unplugin-vue-components` + `unplugin-auto-import`）
+- ~~前端 Element Plus 改为按需引入~~ ✅ 已完成（JS bundle 从 1,041 KB 降至 470 KB）
 
 ## 更新规则
 

@@ -10,6 +10,7 @@ class Settings:
     openclaw_api_key: str = "replace-me"
     callback_base_url: str = "http://localhost:8080"
     callback_token: str = "replace-me"
+    poll_interval: int = 5
 
 
 def load_settings() -> Settings:
@@ -20,6 +21,7 @@ def load_settings() -> Settings:
         openclaw_api_key=os.getenv("OPENCLAW_API_KEY", "replace-me"),
         callback_base_url=os.getenv("CALLBACK_BASE_URL", "http://localhost:8080"),
         callback_token=os.getenv("CALLBACK_TOKEN", "replace-me"),
+        poll_interval=int(os.getenv("POLL_INTERVAL", "5")),
     )
 
 

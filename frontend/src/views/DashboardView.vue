@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ElCard, ElTable, ElTableColumn, ElTag } from "element-plus";
 import { onMounted, ref } from "vue";
 
 import AppLayout from "@/components/AppLayout.vue";

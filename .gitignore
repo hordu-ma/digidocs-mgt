@@ -9,6 +9,10 @@ __pycache__/
 node_modules/
 dist/
 
+# unplugin auto-generated
+auto-imports.d.ts
+components.d.ts
+
 # Local env
 .env
 .DS_Store

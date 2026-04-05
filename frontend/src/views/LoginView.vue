@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ElButton, ElCard, ElForm, ElFormItem, ElInput, ElMessage } from "element-plus";
+import { ElMessage } from "element-plus";
 import { reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 
@@ -35,7 +35,8 @@ async function submit() {
     });
     void router.push("/dashboard");
   } catch (err: any) {
-    const msg = err.response?.data?.error?.message ?? "登录失败，请检查用户名和密码";
+    const msg =
+      err.response?.data?.error?.message ?? "登录失败，请检查用户名和密码";
     ElMessage.error(msg);
   } finally {
     loading.value = false;
@@ -43,12 +44,13 @@ async function submit() {
 }
 </script>
 
-
 <template>
   <div class="login-page">
     <ElCard class="login-card">
       <div class="login-title">课题组文档资产平台</div>
-      <div class="login-subtitle">成员协作、交接沉淀、负责人总览、OpenClaw 助手</div>
+      <div class="login-subtitle">
+        成员协作、交接沉淀、负责人总览、OpenClaw 助手
+      </div>
       <ElForm label-position="top" @submit.prevent="submit">
         <ElFormItem label="用户名">
           <ElInput v-model="form.username" />
@@ -56,7 +58,9 @@ async function submit() {
         <ElFormItem label="密码">
           <ElInput v-model="form.password" show-password type="password" />
         </ElFormItem>
-        <ElButton type="primary" style="width: 100%" @click="submit">登录</ElButton>
+        <ElButton type="primary" style="width: 100%" @click="submit"
+          >登录</ElButton
+        >
       </ElForm>
     </ElCard>
   </div>

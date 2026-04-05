@@ -1,13 +1,4 @@
 <script setup lang="ts">
-import {
-  ElButton,
-  ElCard,
-  ElInput,
-  ElPagination,
-  ElTable,
-  ElTableColumn,
-  ElTag,
-} from "element-plus";
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 

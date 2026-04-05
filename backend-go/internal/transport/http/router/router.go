@@ -19,7 +19,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	flowHandler := handlers.NewFlowHandler(container.FlowQueryService, container.ActionService)
 	handoverHandler := handlers.NewHandoverHandler(container.HandoverQueryService, container.ActionService)
 	dashboardHandler := handlers.NewDashboardHandler(container.DashboardQueryService)
-	internalWorkerHandler := handlers.NewInternalWorkerHandler(cfg)
+	internalWorkerHandler := handlers.NewInternalWorkerHandler(cfg, container.QueueConsumer)
 	teamSpaceHandler := handlers.NewTeamSpaceHandler(container.QueryService)
 	projectHandler := handlers.NewProjectHandler(container.QueryService)
 	documentHandler := handlers.NewDocumentHandler(container.QueryService)
@@ -40,6 +40,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.HandleFunc("POST "+cfg.APIV1Prefix+"/auth/login", authHandler.Login)
 	// Worker callback uses its own shared-secret token, not user JWT.
 	mux.HandleFunc("POST "+cfg.APIV1Prefix+"/internal/worker-results", internalWorkerHandler.ReceiveResult)
+	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/poll-tasks", internalWorkerHandler.PollTasks)
 
 	// --- Protected routes (JWT required) ---
 	mux.Handle("GET "+cfg.APIV1Prefix+"/auth/me", protect(authHandler.Me))

@@ -5,6 +5,7 @@ import (
 
 	"digidocs-mgt/backend-go/internal/config"
 	"digidocs-mgt/backend-go/internal/db"
+	"digidocs-mgt/backend-go/internal/queue"
 	memqueue "digidocs-mgt/backend-go/internal/queue/memory"
 	"digidocs-mgt/backend-go/internal/repository/memory"
 	pgrepo "digidocs-mgt/backend-go/internal/repository/postgres"
@@ -14,6 +15,7 @@ import (
 
 type Container struct {
 	DB                     *sql.DB
+	QueueConsumer          queue.Consumer
 	QueryService           service.QueryService
 	AuditQueryService      service.AuditQueryService
 	DashboardQueryService  service.DashboardQueryService
@@ -47,7 +49,8 @@ func BuildContainer(cfg config.Config) (Container, error) {
 		authService := service.NewAuthService(pgrepo.NewUserAuthRepository(postgresDB), tokenService)
 
 		return Container{
-			DB: postgresDB,
+			DB:            postgresDB,
+			QueueConsumer: publisher,
 			QueryService: service.NewQueryService(
 				pgrepo.NewTeamSpaceRepository(postgresDB),
 				pgrepo.NewProjectRepository(postgresDB),
@@ -71,6 +74,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 		actionService := service.NewActionService(memory.NewActionRepository())
 		authService := service.NewAuthService(memory.NewUserAuthRepository(), tokenService)
 		return Container{
+			QueueConsumer: publisher,
 			QueryService: service.NewQueryService(
 				memory.NewTeamSpaceRepository(),
 				memory.NewProjectRepository(),

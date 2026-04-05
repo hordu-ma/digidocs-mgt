@@ -1,13 +1,6 @@
 <script setup lang="ts">
-import {
-  ElCard,
-  ElDescriptions,
-  ElDescriptionsItem,
-  ElTable,
-  ElTableColumn,
-  ElTag,
-} from "element-plus";
-import { onMounted, ref } from "vue";
+import { ElMessage } from "element-plus";
+import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
@@ -19,6 +12,7 @@ const documentID = route.params.id as string;
 const doc = ref<any>(null);
 const versions = ref<any[]>([]);
 const flows = ref<any[]>([]);
+const actionLoading = ref(false);
 
 const statusLabel: Record<string, string> = {
   draft: "草稿",
@@ -29,7 +23,26 @@ const statusLabel: Record<string, string> = {
   archived: "已归档",
 };
 
-onMounted(async () => {
+// Map current status → available flow actions
+const flowActions: Record<string, { action: string; label: string; endpoint: string }[]> = {
+  draft: [{ action: "mark_in_progress", label: "开始处理", endpoint: "mark-in-progress" }],
+  in_progress: [
+    { action: "transfer", label: "转交", endpoint: "transfer" },
+    { action: "finalize", label: "定稿", endpoint: "finalize" },
+  ],
+  pending_handover: [
+    { action: "accept_transfer", label: "接受转交", endpoint: "accept-transfer" },
+  ],
+  finalized: [{ action: "archive", label: "归档", endpoint: "archive" }],
+  archived: [{ action: "unarchive", label: "取消归档", endpoint: "unarchive" }],
+};
+
+const availableActions = computed(() => {
+  const status = doc.value?.current_status;
+  return status ? (flowActions[status] ?? []) : [];
+});
+
+async function loadData() {
   const [docRes, versionsRes, flowsRes] = await Promise.all([
     api.get(`/documents/${documentID}`),
     api.get(`/documents/${documentID}/versions`),
@@ -38,7 +51,23 @@ onMounted(async () => {
   doc.value = docRes.data?.data ?? null;
   versions.value = versionsRes.data?.data ?? [];
   flows.value = flowsRes.data?.data ?? [];
-});
+}
+
+async function applyFlowAction(endpoint: string, label: string) {
+  actionLoading.value = true;
+  try {
+    await api.post(`/documents/${documentID}/flow/${endpoint}`);
+    ElMessage.success(`${label}成功`);
+    await loadData();
+  } catch (err: any) {
+    const msg = err.response?.data?.error?.message ?? `${label}失败`;
+    ElMessage.error(msg);
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+onMounted(loadData);
 </script>
 
 <template>
@@ -60,6 +89,15 @@ onMounted(async () => {
             doc.description || "-"
           }}</ElDescriptionsItem>
         </ElDescriptions>
+        <div v-if="availableActions.length > 0" class="action-bar">
+          <ElButton
+            v-for="act in availableActions"
+            :key="act.action"
+            type="primary"
+            :loading="actionLoading"
+            @click="applyFlowAction(act.endpoint, act.label)"
+          >{{ act.label }}</ElButton>
+        </div>
       </ElCard>
 
       <ElCard class="page-card">
@@ -107,6 +145,12 @@ onMounted(async () => {
 
 .summary-text {
   color: #31465e;
+}
+
+.action-bar {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
 }
 
 .tag-row {

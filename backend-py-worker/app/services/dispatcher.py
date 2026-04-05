@@ -1,15 +1,20 @@
+import logging
 import time
 
 from app.clients.callback_client import CallbackClient
 from app.clients.openclaw_client import OpenClawClient
+from app.clients.task_poller import TaskPollerClient
 from app.core.config import settings
 from app.tasks.contracts import TaskResult, WorkerTask
+
+logger = logging.getLogger(__name__)
 
 
 class WorkerDispatcher:
     def __init__(self) -> None:
         self.openclaw_client = OpenClawClient()
         self.callback_client = CallbackClient()
+        self.poller = TaskPollerClient()
 
     def describe_startup(self) -> None:
         print(
@@ -19,8 +24,16 @@ class WorkerDispatcher:
 
     def run_forever(self) -> None:
         self.describe_startup()
+        logger.info("entering poll loop (interval=%ds)", settings.poll_interval)
         while True:
-            time.sleep(60)
+            try:
+                tasks = self.poller.poll()
+                for task in tasks:
+                    logger.info("processing task=%s request_id=%s", task.task_type, task.request_id)
+                    self.handle_and_callback(task)
+            except Exception:
+                logger.exception("poll loop error")
+            time.sleep(settings.poll_interval)
 
     def handle_task(self, task: WorkerTask) -> TaskResult:
         if task.task_type == "assistant.ask":

@@ -1,20 +1,42 @@
 <script setup lang="ts">
-import { ElButton, ElCard, ElInput, ElTimeline, ElTimelineItem } from "element-plus";
+import { ElMessage } from "element-plus";
 import { ref } from "vue";
 
 import AppLayout from "@/components/AppLayout.vue";
+import api from "@/api";
 
 const question = ref("课题A 最近一个月有哪些文档在流转？");
-const timeline = [
-  {
-    title: "问答结果",
-    content: "最近一个月共有 6 份文档发生流转，主要集中在申报材料目录。",
-  },
-  {
-    title: "建议",
-    content: "建议优先处理超过 30 天未更新的阶段报告。",
-  },
-];
+const loading = ref(false);
+const timeline = ref<{ title: string; content: string }[]>([]);
+
+async function submitQuestion() {
+  if (!question.value.trim()) {
+    ElMessage.warning("请输入问题");
+    return;
+  }
+
+  loading.value = true;
+  try {
+    const res = await api.post("/assistant/ask", { question: question.value });
+    const data = res.data?.data;
+    timeline.value = [
+      {
+        title: "已提交",
+        content: `问题「${data?.question ?? question.value}」已提交至 AI 助手（request_id: ${data?.request_id ?? "-"}）`,
+      },
+      {
+        title: "状态",
+        content: data?.answer ? data.answer : "任务已排队，结果将在后台处理完成后更新。",
+      },
+    ];
+    ElMessage.success("问题已提交");
+  } catch (err: any) {
+    const msg = err.response?.data?.error?.message ?? "提交失败";
+    ElMessage.error(msg);
+  } finally {
+    loading.value = false;
+  }
+}
 </script>
 
 <template>
@@ -23,13 +45,17 @@ const timeline = [
       <ElCard class="page-card">
         <template #header>OpenClaw 助手</template>
         <ElInput v-model="question" :rows="4" type="textarea" />
-        <ElButton type="primary" style="margin-top: 16px">发起问答</ElButton>
+        <ElButton type="primary" :loading="loading" style="margin-top: 16px" @click="submitQuestion">发起问答</ElButton>
       </ElCard>
 
       <ElCard class="page-card">
         <template #header>结果与建议</template>
         <ElTimeline>
-          <ElTimelineItem v-for="item in timeline" :key="item.title" :timestamp="item.title">
+          <ElTimelineItem
+            v-for="item in timeline"
+            :key="item.title"
+            :timestamp="item.title"
+          >
             {{ item.content }}
           </ElTimelineItem>
         </ElTimeline>

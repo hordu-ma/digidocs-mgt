@@ -7,15 +7,17 @@ import (
 
 	"digidocs-mgt/backend-go/internal/config"
 	"digidocs-mgt/backend-go/internal/domain/task"
+	"digidocs-mgt/backend-go/internal/queue"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
 )
 
 type InternalWorkerHandler struct {
-	cfg config.Config
+	cfg      config.Config
+	consumer queue.Consumer
 }
 
-func NewInternalWorkerHandler(cfg config.Config) InternalWorkerHandler {
-	return InternalWorkerHandler{cfg: cfg}
+func NewInternalWorkerHandler(cfg config.Config, consumer queue.Consumer) InternalWorkerHandler {
+	return InternalWorkerHandler{cfg: cfg, consumer: consumer}
 }
 
 func (h InternalWorkerHandler) ReceiveResult(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +37,21 @@ func (h InternalWorkerHandler) ReceiveResult(w http.ResponseWriter, r *http.Requ
 		"request_id": result.RequestID,
 		"status":     result.Status,
 	})
+}
+
+// PollTasks returns up to 10 pending task messages from the queue.
+func (h InternalWorkerHandler) PollTasks(w http.ResponseWriter, r *http.Request) {
+	if !h.authorized(r) {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid worker callback token")
+		return
+	}
+
+	messages := h.consumer.Poll(r.Context(), 10)
+	if messages == nil {
+		messages = []task.Message{}
+	}
+
+	response.WriteData(w, http.StatusOK, messages)
 }
 
 func (h InternalWorkerHandler) authorized(r *http.Request) bool {

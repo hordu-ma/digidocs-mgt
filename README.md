@@ -219,5 +219,9 @@ docker compose up -d postgres redis minio
 - 已完成前后端联调验证（Vite proxy → backend-go → PostgreSQL 全链路通过）
 - 已修复 `DocumentDetail` API 返回 `current_owner` 含 display_name（与 `DocumentListItem` 对齐）
 - 已清理 TASKS.md，将已完成的大量"进行中"子项归档至"已完成"
+- 已完成 Go 后端核心业务服务层单元测试（auth/action/dashboard，共 13 个用例）
+- 已完成前端 Element Plus 按需引入（JS bundle 从 1,041 KB 降至 470 KB）
+- 已完成 Python Worker 真实队列消费链路（Go 内存队列 → HTTP polling → 处理 → 回写）
+- 已完成前端写操作 UI（文档流转操作、AI 助手问答提交、交接单创建）
 
 详细任务状态持续维护在 [TASKS.md](/home/liguoma/code-repos/digidocs-mgt/TASKS.md)。
