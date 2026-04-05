@@ -211,5 +211,10 @@ docker compose up -d postgres redis minio
 - 已执行 `make smoke`，当前容器存在但宿主机 `18081/healthz` 不可达，脚本按非严格模式跳过
 - 已完成 `AGENTS.md` 会话启动清单、状态账本同步规则与验证约束增强
 - 已完成 [Harness Engineering 学习笔记](/home/liguoma/code-repos/digidocs-mgt/docs/Harness Engineering 学习笔记.md) 初版
+- 已完成数据库种子数据创建与加载（`backend-go/sql/seed.sql`）
+- 已完成 JWT 用户 ID 透传至所有审计事件写入（middleware → handlers → repositories）
+- 已完成前端四个页面接入真实后端 API（仪表盘、文档列表、文档详情、交接单）
+- 已修复宿主机 Docker 端口转发问题（Tailscale 路由表与 Docker 网桥冲突）
+- 已通过宿主机验证所有 API 端点：login、auth/me、documents、dashboard、versions、flows、handovers
 
 详细任务状态持续维护在 [TASKS.md](/home/liguoma/code-repos/digidocs-mgt/TASKS.md)。

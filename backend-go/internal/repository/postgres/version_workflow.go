@@ -77,7 +77,7 @@ func (w VersionWorkflow) CreateUploadedVersion(ctx context.Context, input comman
 		newID(),
 		input.DocumentID,
 		versionID,
-		systemUserID(),
+		actorOrSystem(input.ActorID),
 		string(extraData),
 		time.Now().UTC(),
 	); err != nil {

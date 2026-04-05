@@ -6,6 +6,7 @@ import (
 
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/service"
+	"digidocs-mgt/backend-go/internal/transport/http/middleware"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
 )
 
@@ -56,6 +57,7 @@ func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		CommitMessage:    r.FormValue("commit_message"),
 		StorageObjectKey: result.ObjectKey,
 		StorageProvider:  result.Provider,
+		ActorID:          middleware.UserIDFromContext(r.Context()),
 	})
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create version record")

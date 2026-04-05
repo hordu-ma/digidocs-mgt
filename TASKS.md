@@ -80,6 +80,23 @@ Go 主业务迁移与协作环境固化阶段
   - 修复 `newID()` 随机数失败时返回零值 UUID（改为 panic）
   - 删除与标准库冲突的自定义 `max()` 函数
   - 访问日志补充 HTTP 响应状态码记录
+- 完成数据库种子数据与 PostgreSQL 端到端验证
+  - 创建 `backend-go/sql/seed.sql`（5 用户、2 团队空间、3 项目、5 文件夹、7 文档、8 版本、4 流转记录、9 审计事件）
+  - 已在 Docker 容器内加载种子数据并验证
+- 完成 JWT 用户 ID 透传至审计事件写入
+  - `auth.go` 中间件解析 Claims 注入请求上下文
+  - `handlers/flows.go`、`handlers/handovers.go`、`handlers/versions.go` 从上下文提取 ActorID
+  - `postgres/action_repository.go`、`postgres/version_repository.go`、`postgres/version_workflow.go` 使用真实 ActorID 写入 audit_events / flow_records / handovers
+- 完成前端页面接入真实后端 API
+  - `DashboardView.vue` 接入 `/dashboard/overview`、`/dashboard/recent-flows`、`/dashboard/risk-documents`
+  - `DocumentsView.vue` 接入 `/documents`，增加分页和搜索
+  - `DocumentDetailView.vue` 接入 `/documents/{id}`、`/documents/{id}/versions`、`/documents/{id}/flows`
+  - `HandoversView.vue` 接入 `/handovers`
+- 完成宿主机 Docker 端口转发问题排查与修复
+  - 根因：Tailscale 路由表 52 与 Docker 网桥 172.18.0.0/16 冲突
+  - 修复：添加高优先级 ip rule 确保 Docker 子网走 main 路由表
+  - UFW 增加 Docker 网桥接口入站规则
+  - 已验证所有 API 端点从宿主机可达
 
 ## 进行中
 
@@ -116,11 +133,10 @@ Go 主业务迁移与协作环境固化阶段
   - 为 `dashboard/overview`、`dashboard/recent-flows`、`dashboard/risk-documents` 接入真实聚合查询
   - 为 `flow / handover` 接口增加非法状态跳转校验和 `400 invalid_transition` 响应
 - Docker 网络内真实数据库链路验证
-  - 宿主机直连 PostgreSQL 仍异常
-  - 改走 compose 网络内联调路径
-  - 宿主机访问 `18081` 仍待单独排查
   - 已通过 Docker 网络内 Alembic 路径完成 PostgreSQL 初始 schema 初始化
   - 已验证 `dashboard/overview` 与 `audit-events` 在容器网络内可正常返回
+  - 已修复宿主机 Docker 端口转发问题（Tailscale 路由冲突）
+  - 宿主机可达 `18081/healthz` 已验证通过
 - `backend-py-worker/` 职责收口
   - 明确 Worker 任务类型
   - 从旧 Python Web API 中抽离 AI 能力边界
@@ -128,22 +144,22 @@ Go 主业务迁移与协作环境固化阶段
   - 待在本机执行 `./scripts/codex/install-project-skills.sh`
   - 待按实际使用反馈继续补 `backend-go` / `worker` / `verify` skill 内容
 - 联调 smoke 验证
-  - 待排查宿主机 `18081/healthz` 不可达问题
+  - 宿主机 `18081/healthz` 已修复（Tailscale 路由冲突解决）
 
 ## 待办
 
 - 跑通 Alembic 初始迁移
 - 将占位 API 改为真实数据库读写
-- **前端页面接入真实后端 API**（仪表盘 / 文档列表 / 文档详情 / 交接单），当前页面全部使用硬编码 mock 数据
+- ~~前端页面接入真实后端 API~~ ✅ 已完成
 - **Python Worker 实现真实队列消费**，`run_forever()` 当前为空循环占位，需对接 Redis/内存队列并驱动真实任务处理
 - 增加文档上传与版本管理服务层
 - 增加流转状态机服务层
 - 增加毕业交接服务层
-- **将 JWT 用户 ID 透传至所有审计事件写入**，当前所有审计记录 `user_id` 固定为系统占位 ID，需从请求上下文中读取真实登录用户
+- ~~将 JWT 用户 ID 透传至所有审计事件写入~~ ✅ 已完成
 - **Python CallbackClient / OpenClawClient 实现真实 HTTP 调用**，当前两个客户端均返回硬编码 dict，无任何网络请求
 - 增加更完整的审计事件过滤条件与统计聚合
 - 增加 dashboard 聚合相关基础测试
-- 补充数据库种子数据与真实业务链路联调
+- ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
 - 增加 OpenClaw 客户端真实调用
 - 增加群晖 NAS 适配器
 - 增加基础测试

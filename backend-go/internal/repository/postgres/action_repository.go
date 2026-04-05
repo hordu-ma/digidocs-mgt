@@ -88,7 +88,7 @@ func (r ActionRepository) CreateFlowRecord(ctx context.Context, input command.Fl
 		toStatus,
 		input.Action,
 		input.Note,
-		systemUserID(),
+		actorOrSystem(input.ActorID),
 		now,
 	)
 	if err != nil {
@@ -120,6 +120,7 @@ func (r ActionRepository) CreateFlowRecord(ctx context.Context, input command.Fl
 		input.DocumentID,
 		"",
 		mappedAuditAction(input.Action),
+		input.ActorID,
 		map[string]any{
 			"note":       input.Note,
 			"to_user_id": nextOwnerID,
@@ -178,7 +179,7 @@ func (r ActionRepository) CreateHandover(ctx context.Context, input command.Hand
 		input.ReceiverUserID,
 		input.ProjectID,
 		input.Remark,
-		systemUserID(),
+		actorOrSystem(input.ActorID),
 		now,
 	)
 	if err != nil {
@@ -191,6 +192,7 @@ func (r ActionRepository) CreateHandover(ctx context.Context, input command.Hand
 		"",
 		"",
 		"handover_generate",
+		input.ActorID,
 		map[string]any{
 			"handover_id":      id,
 			"target_user_id":   input.TargetUserID,
@@ -269,6 +271,7 @@ func (r ActionRepository) UpdateHandoverItems(
 		"",
 		"",
 		"admin_update",
+		input.ActorID,
 		map[string]any{
 			"handover_id": input.HandoverID,
 			"item_count":  len(input.Items),
@@ -368,6 +371,7 @@ func (r ActionRepository) ApplyHandover(ctx context.Context, input command.Hando
 		"",
 		"",
 		mappedHandoverAuditAction(input.Action),
+		input.ActorID,
 		map[string]any{
 			"handover_id": input.HandoverID,
 			"note":        input.Note,
@@ -403,11 +407,17 @@ func insertAuditEvent(
 	documentID string,
 	versionID string,
 	actionType string,
+	actorID string,
 	extra map[string]any,
 ) error {
 	extraData, err := json.Marshal(extra)
 	if err != nil {
 		return err
+	}
+
+	userID := actorID
+	if userID == "" {
+		userID = systemUserID()
 	}
 
 	_, err = db.ExecContext(
@@ -439,7 +449,7 @@ func insertAuditEvent(
 		newID(),
 		documentID,
 		versionID,
-		systemUserID(),
+		userID,
 		actionType,
 		string(extraData),
 		nowUTC(),
@@ -575,6 +585,13 @@ func handoverActionToUpdate(action string) (string, string) {
 
 func systemUserID() string {
 	return "00000000-0000-0000-0000-000000000001"
+}
+
+func actorOrSystem(actorID string) string {
+	if actorID == "" {
+		return systemUserID()
+	}
+	return actorID
 }
 
 func nowUTC() time.Time {

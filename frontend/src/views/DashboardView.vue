@@ -1,17 +1,38 @@
 <script setup lang="ts">
 import { ElCard, ElTable, ElTableColumn, ElTag } from "element-plus";
+import { onMounted, ref } from "vue";
 
 import AppLayout from "@/components/AppLayout.vue";
+import api from "@/api";
 
-const recentFlows = [
-  { title: "课题申报书", from: "张三", to: "李四", status: "待交接" },
-  { title: "阶段汇报PPT", from: "王五", to: "赵六", status: "处理中" },
-];
+const overview = ref({
+  document_total: 0,
+  status_counts: {} as Record<string, number>,
+  handover_pending_count: 0,
+  risk_document_count: 0,
+});
+const recentFlows = ref<any[]>([]);
+const riskDocs = ref<any[]>([]);
 
-const riskDocs = [
-  { title: "实验记录-2025秋", message: "超过 30 天未更新" },
-  { title: "中期报告", message: "尚未归档且责任人未确认" },
-];
+const statusLabel: Record<string, string> = {
+  draft: "草稿",
+  in_progress: "处理中",
+  pending_handover: "待交接",
+  handed_over: "已交接",
+  finalized: "定稿",
+  archived: "已归档",
+};
+
+onMounted(async () => {
+  const [overviewRes, flowsRes, riskRes] = await Promise.all([
+    api.get("/dashboard/overview"),
+    api.get("/dashboard/recent-flows"),
+    api.get("/dashboard/risk-documents"),
+  ]);
+  overview.value = overviewRes.data?.data ?? overview.value;
+  recentFlows.value = flowsRes.data?.data ?? [];
+  riskDocs.value = riskRes.data?.data ?? [];
+});
 </script>
 
 <template>
@@ -27,19 +48,21 @@ const riskDocs = [
       <section class="kpi-grid">
         <ElCard class="page-card kpi-card">
           <div class="kpi-label">文档总量</div>
-          <div class="kpi-value">128</div>
+          <div class="kpi-value">{{ overview.document_total }}</div>
         </ElCard>
         <ElCard class="page-card kpi-card">
           <div class="kpi-label">处理中</div>
-          <div class="kpi-value">32</div>
+          <div class="kpi-value">
+            {{ overview.status_counts?.in_progress ?? 0 }}
+          </div>
         </ElCard>
         <ElCard class="page-card kpi-card">
           <div class="kpi-label">待交接</div>
-          <div class="kpi-value">6</div>
+          <div class="kpi-value">{{ overview.handover_pending_count }}</div>
         </ElCard>
         <ElCard class="page-card kpi-card">
           <div class="kpi-label">风险文档</div>
-          <div class="kpi-value">7</div>
+          <div class="kpi-value">{{ overview.risk_document_count }}</div>
         </ElCard>
       </section>
 
@@ -48,22 +71,32 @@ const riskDocs = [
           <template #header>近期流转</template>
           <ElTable :data="recentFlows" style="width: 100%">
             <ElTableColumn prop="title" label="文档" />
-            <ElTableColumn prop="from" label="来源" />
-            <ElTableColumn prop="to" label="目标" />
-            <ElTableColumn label="状态">
+            <ElTableColumn prop="action" label="操作" />
+            <ElTableColumn label="状态变更">
               <template #default="{ row }">
-                <ElTag>{{ row.status }}</ElTag>
+                <ElTag
+                  >{{ statusLabel[row.from_status] ?? row.from_status }} →
+                  {{ statusLabel[row.to_status] ?? row.to_status }}</ElTag
+                >
               </template>
             </ElTableColumn>
+            <ElTableColumn prop="created_at" label="时间" />
           </ElTable>
         </ElCard>
 
         <ElCard class="page-card">
           <template #header>风险提示</template>
           <div class="risk-list">
-            <div v-for="item in riskDocs" :key="item.title" class="risk-item">
+            <div
+              v-for="item in riskDocs"
+              :key="item.document_id"
+              class="risk-item"
+            >
               <div class="risk-title">{{ item.title }}</div>
-              <div class="risk-message">{{ item.message }}</div>
+              <div class="risk-message">{{ item.risk_message }}</div>
+            </div>
+            <div v-if="riskDocs.length === 0" class="risk-item">
+              <div class="risk-message">暂无风险文档</div>
             </div>
           </div>
         </ElCard>

@@ -1,63 +1,72 @@
 <script setup lang="ts">
-import { ElButton, ElCard, ElSelect, ElOption, ElSteps, ElStep, ElTable, ElTableColumn } from "element-plus";
-import { ref } from "vue";
+import {
+  ElButton,
+  ElCard,
+  ElEmpty,
+  ElTable,
+  ElTableColumn,
+  ElTag,
+} from "element-plus";
+import { onMounted, ref } from "vue";
 
 import AppLayout from "@/components/AppLayout.vue";
+import api from "@/api";
 
-const member = ref("");
-const rows = [
-  { title: "实验记录", selected: "是", status: "处理中" },
-  { title: "汇报PPT", selected: "是", status: "定稿" },
-];
+const handovers = ref<any[]>([]);
+
+const statusLabel: Record<string, string> = {
+  generated: "已生成",
+  pending_confirm: "待确认",
+  completed: "已完成",
+  cancelled: "已取消",
+};
+
+onMounted(async () => {
+  const res = await api.get("/handovers");
+  handovers.value = res.data?.data ?? [];
+});
 </script>
 
 <template>
   <AppLayout>
-    <div class="page-shell handover-grid">
-      <ElCard class="page-card">
-        <template #header>发起毕业交接</template>
-        <ElSelect v-model="member" placeholder="选择成员" style="width: 100%">
-          <ElOption label="张三" value="zhangsan" />
-          <ElOption label="李四" value="lisi" />
-        </ElSelect>
-        <ElButton type="primary" style="margin-top: 16px">生成候选清单</ElButton>
-      </ElCard>
+    <div class="page-shell">
+      <div class="page-header">
+        <div>
+          <h1>毕业交接</h1>
+          <p>管理课题组人员毕业交接流程，确保文档资产完整移交。</p>
+        </div>
+      </div>
 
       <ElCard class="page-card">
-        <template #header>交接状态</template>
-        <ElSteps :active="2" finish-status="success">
-          <ElStep title="生成交接单" />
-          <ElStep title="接收确认" />
-          <ElStep title="完成更新" />
-        </ElSteps>
-      </ElCard>
-
-      <ElCard class="page-card handover-table">
-        <template #header>候选文档</template>
-        <ElTable :data="rows">
-          <ElTableColumn prop="title" label="文档" />
-          <ElTableColumn prop="selected" label="是否纳入" />
-          <ElTableColumn prop="status" label="当前状态" />
+        <template #header>交接记录</template>
+        <ElTable
+          v-if="handovers.length > 0"
+          :data="handovers"
+          style="width: 100%"
+        >
+          <ElTableColumn prop="id" label="交接单 ID" width="320" />
+          <ElTableColumn prop="target_user_id" label="交接人" />
+          <ElTableColumn prop="receiver_user_id" label="接收人" />
+          <ElTableColumn label="状态">
+            <template #default="{ row }">
+              <ElTag>{{ statusLabel[row.status] ?? row.status }}</ElTag>
+            </template>
+          </ElTableColumn>
+          <ElTableColumn prop="remark" label="备注" />
         </ElTable>
+        <ElEmpty v-else description="暂无交接记录" />
       </ElCard>
     </div>
   </AppLayout>
 </template>
 
 <style scoped>
-.handover-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
+h1 {
+  margin: 0;
+  font-size: 32px;
 }
 
-.handover-table {
-  grid-column: 1 / -1;
-}
-
-@media (max-width: 900px) {
-  .handover-grid {
-    grid-template-columns: 1fr;
-  }
+p {
+  color: #61748d;
 }
 </style>

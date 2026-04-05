@@ -133,7 +133,7 @@ func (r VersionRepository) CreateVersion(ctx context.Context, input command.Vers
 		input.StorageProvider,
 		input.StorageObjectKey,
 		input.CommitMessage,
-		systemUserID(),
+		actorOrSystem(input.ActorID),
 		nowUTC(),
 	)
 	if err != nil {

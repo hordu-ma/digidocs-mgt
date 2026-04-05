@@ -5,6 +5,7 @@ type FlowActionInput struct {
 	Action     string
 	Note       string
 	ToUserID   string
+	ActorID    string
 }
 
 type VersionCreateInput struct {
@@ -14,6 +15,7 @@ type VersionCreateInput struct {
 	CommitMessage    string
 	StorageObjectKey string
 	StorageProvider  string
+	ActorID          string
 }
 
 type HandoverCreateInput struct {
@@ -21,6 +23,7 @@ type HandoverCreateInput struct {
 	ReceiverUserID string
 	ProjectID      string
 	Remark         string
+	ActorID        string
 }
 
 type HandoverItemInput struct {
@@ -32,6 +35,7 @@ type HandoverItemInput struct {
 type HandoverItemUpdateInput struct {
 	HandoverID string
 	Items      []HandoverItemInput
+	ActorID    string
 }
 
 type HandoverActionInput struct {
@@ -39,4 +43,5 @@ type HandoverActionInput struct {
 	Action     string
 	Note       string
 	Reason     string
+	ActorID    string
 }

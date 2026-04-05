@@ -7,6 +7,7 @@ import (
 
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/service"
+	"digidocs-mgt/backend-go/internal/transport/http/middleware"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
 )
 
@@ -37,6 +38,7 @@ func (h HandoverHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ReceiverUserID: stringValue(payload["receiver_user_id"]),
 		ProjectID:      stringValue(payload["project_id"]),
 		Remark:         stringValue(payload["remark"]),
+		ActorID:        middleware.UserIDFromContext(r.Context()),
 	})
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create handover")
@@ -97,6 +99,7 @@ func (h HandoverHandler) UpdateItems(w http.ResponseWriter, r *http.Request) {
 	data, err := h.actionService.UpdateHandoverItems(r.Context(), command.HandoverItemUpdateInput{
 		HandoverID: r.PathValue("handoverID"),
 		Items:      items,
+		ActorID:    middleware.UserIDFromContext(r.Context()),
 	})
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update handover items")
@@ -129,6 +132,7 @@ func (h HandoverHandler) writeAction(w http.ResponseWriter, r *http.Request, act
 		Action:     action,
 		Note:       stringValue(payload["note"]),
 		Reason:     stringValue(payload["reason"]),
+		ActorID:    middleware.UserIDFromContext(r.Context()),
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidTransition) {

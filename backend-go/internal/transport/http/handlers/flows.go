@@ -7,6 +7,7 @@ import (
 
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/service"
+	"digidocs-mgt/backend-go/internal/transport/http/middleware"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
 )
 
@@ -69,6 +70,7 @@ func (h FlowHandler) writeAction(w http.ResponseWriter, r *http.Request, action 
 		Action:     action,
 		Note:       stringValue(payload["note"]),
 		ToUserID:   stringValue(payload["to_user_id"]),
+		ActorID:    middleware.UserIDFromContext(r.Context()),
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidTransition) {
