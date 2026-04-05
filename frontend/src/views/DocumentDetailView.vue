@@ -49,7 +49,7 @@ onMounted(async () => {
         <ElDescriptions v-if="doc" :column="2" border>
           <ElDescriptionsItem label="标题">{{ doc.title }}</ElDescriptionsItem>
           <ElDescriptionsItem label="当前责任人">{{
-            doc.current_owner_id
+            doc.current_owner?.display_name ?? "-"
           }}</ElDescriptionsItem>
           <ElDescriptionsItem label="状态"
             ><ElTag>{{

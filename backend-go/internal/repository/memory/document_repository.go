@@ -52,11 +52,14 @@ func (r DocumentRepository) GetDocument(ctx context.Context, documentID string) 
 	_ = ctx
 
 	return &query.DocumentDetail{
-		ID:             documentID,
-		Title:          "课题申报书",
-		Description:    "Go 迁移阶段的内存仓储占位数据",
-		CurrentStatus:  "draft",
-		CurrentOwnerID: "00000000-0000-0000-0000-000000000001",
-		IsArchived:     false,
+		ID:          documentID,
+		Title:       "课题申报书",
+		Description: "Go 迁移阶段的内存仓储占位数据",
+		CurrentStatus: "draft",
+		CurrentOwner: &query.UserSummary{
+			ID:          "00000000-0000-0000-0000-000000000001",
+			DisplayName: "系统管理员",
+		},
+		IsArchived: false,
 	}, nil
 }

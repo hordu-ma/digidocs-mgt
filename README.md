@@ -216,5 +216,8 @@ docker compose up -d postgres redis minio
 - 已完成前端四个页面接入真实后端 API（仪表盘、文档列表、文档详情、交接单）
 - 已修复宿主机 Docker 端口转发问题（Tailscale 路由表与 Docker 网桥冲突）
 - 已通过宿主机验证所有 API 端点：login、auth/me、documents、dashboard、versions、flows、handovers
+- 已完成前后端联调验证（Vite proxy → backend-go → PostgreSQL 全链路通过）
+- 已修复 `DocumentDetail` API 返回 `current_owner` 含 display_name（与 `DocumentListItem` 对齐）
+- 已清理 TASKS.md，将已完成的大量"进行中"子项归档至"已完成"
 
 详细任务状态持续维护在 [TASKS.md](/home/liguoma/code-repos/digidocs-mgt/TASKS.md)。

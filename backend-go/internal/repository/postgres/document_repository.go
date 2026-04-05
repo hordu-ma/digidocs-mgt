@@ -137,21 +137,24 @@ func (r DocumentRepository) ListDocuments(
 
 func (r DocumentRepository) GetDocument(ctx context.Context, documentID string) (*query.DocumentDetail, error) {
 	var item query.DocumentDetail
+	var owner query.UserSummary
 
 	if err := r.db.QueryRowContext(
 		ctx,
 		`
 		SELECT
-			id::text,
-			title,
-			COALESCE(description, ''),
-			current_status::text,
-			current_owner_id::text,
-			COALESCE(current_version_id::text, ''),
-			is_archived
-		FROM documents
-		WHERE id::text = $1
-		  AND is_deleted = false
+			d.id::text,
+			d.title,
+			COALESCE(d.description, ''),
+			d.current_status::text,
+			u.id::text,
+			u.display_name,
+			COALESCE(d.current_version_id::text, ''),
+			d.is_archived
+		FROM documents d
+		LEFT JOIN users u ON u.id = d.current_owner_id
+		WHERE d.id::text = $1
+		  AND d.is_deleted = false
 		`,
 		documentID,
 	).Scan(
@@ -159,7 +162,8 @@ func (r DocumentRepository) GetDocument(ctx context.Context, documentID string) 
 		&item.Title,
 		&item.Description,
 		&item.CurrentStatus,
-		&item.CurrentOwnerID,
+		&owner.ID,
+		&owner.DisplayName,
 		&item.CurrentVersionID,
 		&item.IsArchived,
 	); err != nil {
@@ -169,5 +173,6 @@ func (r DocumentRepository) GetDocument(ctx context.Context, documentID string) 
 		return nil, err
 	}
 
+	item.CurrentOwner = &owner
 	return &item, nil
 }

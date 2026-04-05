@@ -129,13 +129,13 @@ type DocumentListItem struct {
 }
 
 type DocumentDetail struct {
-	ID               string `json:"id"`
-	Title            string `json:"title"`
-	Description      string `json:"description,omitempty"`
-	CurrentStatus    string `json:"current_status"`
-	CurrentOwnerID   string `json:"current_owner_id"`
-	CurrentVersionID string `json:"current_version_id,omitempty"`
-	IsArchived       bool   `json:"is_archived"`
+	ID               string       `json:"id"`
+	Title            string       `json:"title"`
+	Description      string       `json:"description,omitempty"`
+	CurrentStatus    string       `json:"current_status"`
+	CurrentOwner     *UserSummary `json:"current_owner,omitempty"`
+	CurrentVersionID string       `json:"current_version_id,omitempty"`
+	IsArchived       bool         `json:"is_archived"`
 }
 
 type DocumentListFilter struct {

@@ -97,59 +97,47 @@ Go 主业务迁移与协作环境固化阶段
   - 修复：添加高优先级 ip rule 确保 Docker 子网走 main 路由表
   - UFW 增加 Docker 网桥接口入站规则
   - 已验证所有 API 端点从宿主机可达
+- 完成环境可运行化
+  - 后端依赖安装、数据库迁移执行、后端服务启动验证
+- 完成 Go-Python 混合迁移方案制定
+  - 目标架构、目录结构草案与分阶段迁移清单
+- 完成 `backend-go/` 主业务基础设施全量补齐
+  - 数据库连接与配置、API v1 路由骨架、认证与统一错误结构
+  - 文档/项目/团队空间接口迁移、`handler → service → repository` 查询链路
+  - postgres repository 查询/写链骨架、装配入口与错误映射
+  - `projects/{id}/folders/tree`、`assistant` 路由迁移、Worker 回写入口
+  - `auth/login` 请求体解析、版本上传接口与存储服务
+  - `versions / flows / handovers / dashboard` 路由骨架与 memory/postgres repository
+  - 事务工作流骨架（version upload → documents 联动 → audit_events）
+  - `audit-events` 查询接口与 summary 聚合
+  - `flow` 动作 documents 状态/责任人联动、`flow / handover` 审计落库
+  - `handovers/{id}/items` 持久化写链、`handover complete` 文档联动
+  - `dashboard` 三个聚合接口真实查询
+  - `flow / handover` 非法状态跳转校验
+- 完成 Docker 网络内真实数据库链路验证
+  - Alembic 初始 schema 初始化
+  - 容器内 `dashboard/overview` 与 `audit-events` 烟测通过
+  - 宿主机 Docker 端口转发修复（Tailscale 路由冲突）
+  - `18081/healthz` 宿主机可达验证通过
+- 完成联调 smoke 验证
+  - `make smoke` 宿主机 `18081/healthz` 已修复通过
+- 完成前后端联调验证
+  - Vite dev server 代理至后端，所有页面 API 端点验证通过
+  - 修复 `DocumentDetail` API 返回 `current_owner`（含 display_name）替代原 `current_owner_id`
 
 ## 进行中
 
-- 环境可运行化
-  - 后端依赖安装确认
-  - 数据库迁移执行
-  - 后端服务启动验证
-- Go-Python 混合迁移方案制定
-  - 完成目标架构、目录结构草案
-  - 完成分阶段迁移清单
-- `backend-go/` 主业务基础设施补齐
-  - 数据库连接与配置设计
-  - API v1 模块路由骨架
-  - 认证与统一错误结构
-  - 文档、项目、团队空间占位接口迁移
-  - 查询链路改为 `handler -> service -> repository`
-  - 补齐 `postgres repository` 查询骨架
-  - 增加 `postgres` 装配入口与基础错误映射
-  - 增加 `projects/{id}/folders/tree` 查询链路
-  - 增加 `assistant` 路由迁移占位与任务投递骨架
-  - 增加 Worker 结果回写入口与简单鉴权
-  - `auth/login` 按请求体解析
-  - 增加版本上传接口、存储服务和审计落点
-  - 迁入 `versions / flows / handovers / dashboard` 路由骨架
-  - 为 `versions / flows / handovers` 补齐 memory repository 与 query/action service
-  - 为 `versions / flows / handovers` 接入 postgres repository 读链
-  - 为 `flow / handover / version upload` 接入 repository 写链骨架
-  - 为 `version upload -> documents.current_version_id/current_status -> audit_events` 接入事务工作流骨架
-  - 增加 `audit-events` Go 查询接口与 summary 聚合
-  - 为 `flow` 动作接入 `documents.current_status/current_owner_id` 联动更新
-  - 为 `flow / handover` 写路径接入 `audit_events` 落库
-  - 为 `handovers/{id}/items` 接入持久化写链
-  - 为 `handover complete` 接入选中文档责任人和状态联动
-  - 为 `dashboard/overview`、`dashboard/recent-flows`、`dashboard/risk-documents` 接入真实聚合查询
-  - 为 `flow / handover` 接口增加非法状态跳转校验和 `400 invalid_transition` 响应
-- Docker 网络内真实数据库链路验证
-  - 已通过 Docker 网络内 Alembic 路径完成 PostgreSQL 初始 schema 初始化
-  - 已验证 `dashboard/overview` 与 `audit-events` 在容器网络内可正常返回
-  - 已修复宿主机 Docker 端口转发问题（Tailscale 路由冲突）
-  - 宿主机可达 `18081/healthz` 已验证通过
 - `backend-py-worker/` 职责收口
   - 明确 Worker 任务类型
   - 从旧 Python Web API 中抽离 AI 能力边界
 - Codex 项目技能运行时接入
   - 待在本机执行 `./scripts/codex/install-project-skills.sh`
   - 待按实际使用反馈继续补 `backend-go` / `worker` / `verify` skill 内容
-- 联调 smoke 验证
-  - 宿主机 `18081/healthz` 已修复（Tailscale 路由冲突解决）
 
 ## 待办
 
-- 跑通 Alembic 初始迁移
-- 将占位 API 改为真实数据库读写
+- ~~跑通 Alembic 初始迁移~~ ✅ 已完成
+- ~~将占位 API 改为真实数据库读写~~ ✅ 已完成
 - ~~前端页面接入真实后端 API~~ ✅ 已完成
 - **Python Worker 实现真实队列消费**，`run_forever()` 当前为空循环占位，需对接 Redis/内存队列并驱动真实任务处理
 - 增加文档上传与版本管理服务层
