@@ -124,6 +124,10 @@ Go 主业务迁移与协作环境固化阶段
 - 完成前后端联调验证
   - Vite dev server 代理至后端，所有页面 API 端点验证通过
   - 修复 `DocumentDetail` API 返回 `current_owner`（含 display_name）替代原 `current_owner_id`
+- 完成 Go 后端核心业务服务层单元测试
+  - `auth_service_test.go`：登录成功、用户不存在、密码错误、仓库层错误传播（4 用例）
+  - `action_service_test.go`：ApplyFlow/CreateHandover/UpdateHandoverItems/ApplyHandover 委托验证与错误传播（5 用例）
+  - `dashboard_query_service_test.go`：Overview/RecentFlows/RiskDocuments 委托验证与错误传播（4 用例）
 
 ## 进行中
 
@@ -146,11 +150,11 @@ Go 主业务迁移与协作环境固化阶段
 - ~~将 JWT 用户 ID 透传至所有审计事件写入~~ ✅ 已完成
 - **Python CallbackClient / OpenClawClient 实现真实 HTTP 调用**，当前两个客户端均返回硬编码 dict，无任何网络请求
 - 增加更完整的审计事件过滤条件与统计聚合
-- 增加 dashboard 聚合相关基础测试
+- ~~增加 dashboard 聚合相关基础测试~~ ✅ 已完成
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
 - 增加 OpenClaw 客户端真实调用
 - 增加群晖 NAS 适配器
-- 增加基础测试
+- ~~增加基础测试~~ ✅ 已完成
 - 增加更细粒度的 smoke test 和分层验证矩阵
 - 将 smoke 验证进一步细化到关键业务闭环接口
 - **前端 Element Plus 改为按需引入**以减小 bundle 体积（当前打包产物 >500 KB，需配置 `unplugin-vue-components` + `unplugin-auto-import`）
