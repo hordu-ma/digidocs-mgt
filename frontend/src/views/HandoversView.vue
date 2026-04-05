@@ -92,13 +92,22 @@ onMounted(fetchHandovers);
       <ElDialog v-model="showDialog" title="创建交接单" width="480px">
         <ElForm label-position="top">
           <ElFormItem label="交接人 ID">
-            <ElInput v-model="form.target_user_id" placeholder="即将离开的成员用户 ID" />
+            <ElInput
+              v-model="form.target_user_id"
+              placeholder="即将离开的成员用户 ID"
+            />
           </ElFormItem>
           <ElFormItem label="接收人 ID">
-            <ElInput v-model="form.receiver_user_id" placeholder="接手文档的成员用户 ID" />
+            <ElInput
+              v-model="form.receiver_user_id"
+              placeholder="接手文档的成员用户 ID"
+            />
           </ElFormItem>
           <ElFormItem label="课题 ID（可选）">
-            <ElInput v-model="form.project_id" placeholder="限定交接范围的课题 ID" />
+            <ElInput
+              v-model="form.project_id"
+              placeholder="限定交接范围的课题 ID"
+            />
           </ElFormItem>
           <ElFormItem label="备注">
             <ElInput v-model="form.remark" type="textarea" :rows="2" />
@@ -106,7 +115,9 @@ onMounted(fetchHandovers);
         </ElForm>
         <template #footer>
           <ElButton @click="showDialog = false">取消</ElButton>
-          <ElButton type="primary" :loading="formLoading" @click="submitCreate">确认创建</ElButton>
+          <ElButton type="primary" :loading="formLoading" @click="submitCreate"
+            >确认创建</ElButton
+          >
         </template>
       </ElDialog>
     </div>

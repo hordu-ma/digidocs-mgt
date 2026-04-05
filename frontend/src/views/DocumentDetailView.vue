@@ -24,14 +24,27 @@ const statusLabel: Record<string, string> = {
 };
 
 // Map current status → available flow actions
-const flowActions: Record<string, { action: string; label: string; endpoint: string }[]> = {
-  draft: [{ action: "mark_in_progress", label: "开始处理", endpoint: "mark-in-progress" }],
+const flowActions: Record<
+  string,
+  { action: string; label: string; endpoint: string }[]
+> = {
+  draft: [
+    {
+      action: "mark_in_progress",
+      label: "开始处理",
+      endpoint: "mark-in-progress",
+    },
+  ],
   in_progress: [
     { action: "transfer", label: "转交", endpoint: "transfer" },
     { action: "finalize", label: "定稿", endpoint: "finalize" },
   ],
   pending_handover: [
-    { action: "accept_transfer", label: "接受转交", endpoint: "accept-transfer" },
+    {
+      action: "accept_transfer",
+      label: "接受转交",
+      endpoint: "accept-transfer",
+    },
   ],
   finalized: [{ action: "archive", label: "归档", endpoint: "archive" }],
   archived: [{ action: "unarchive", label: "取消归档", endpoint: "unarchive" }],
@@ -96,7 +109,8 @@ onMounted(loadData);
             type="primary"
             :loading="actionLoading"
             @click="applyFlowAction(act.endpoint, act.label)"
-          >{{ act.label }}</ElButton>
+            >{{ act.label }}</ElButton
+          >
         </div>
       </ElCard>
 

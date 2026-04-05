@@ -26,7 +26,9 @@ async function submitQuestion() {
       },
       {
         title: "状态",
-        content: data?.answer ? data.answer : "任务已排队，结果将在后台处理完成后更新。",
+        content: data?.answer
+          ? data.answer
+          : "任务已排队，结果将在后台处理完成后更新。",
       },
     ];
     ElMessage.success("问题已提交");
@@ -45,7 +47,13 @@ async function submitQuestion() {
       <ElCard class="page-card">
         <template #header>OpenClaw 助手</template>
         <ElInput v-model="question" :rows="4" type="textarea" />
-        <ElButton type="primary" :loading="loading" style="margin-top: 16px" @click="submitQuestion">发起问答</ElButton>
+        <ElButton
+          type="primary"
+          :loading="loading"
+          style="margin-top: 16px"
+          @click="submitQuestion"
+          >发起问答</ElButton
+        >
       </ElCard>
 
       <ElCard class="page-card">

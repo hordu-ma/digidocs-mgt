@@ -31,7 +31,6 @@
 │   ├── adr/
 │   │   └── 001-go-python-hybrid.md
 │   └── Harness Engineering 学习笔记.md
-├── SKILLS/
 ├── backend/
 ├── backend-go/
 ├── backend-py-worker/
@@ -55,16 +54,11 @@
 
 ### 后端
 
-- Go（迁移中，承接主业务后端）
-- Python 3.12
-- Python Worker（迁移中，承接 AI 与文档处理任务）
-- FastAPI
-- SQLAlchemy 2.x
-- Alembic
-- Celery
-- Redis
-- PostgreSQL
-- uv
+- Go 1.26（主业务后端，标准库 net/http + database/sql）
+- Python 3.12（Worker，承接 AI 与文档处理任务）
+- PostgreSQL 17
+- Alembic（数据库迁移）
+- uv（Python 依赖管理）
 
 ### 前端
 
@@ -89,7 +83,7 @@
 - 优先走薄业务层自研，不重复造通用底座。
 - 涉及群晖 NAS 和 OpenClaw 的调用，必须统一经由适配层/客户端模块，不允许散落在业务代码中。
 - `TASKS.md` 作为执行账本，`README.md` 作为阶段快照；两者阶段判断必须保持一致。
-- 项目级 Codex 可执行 skills 维护在 `ops/codex/skills/`，人类可读专项说明保留在 `SKILLS/`。
+- 项目级 Codex 可执行 skills 统一维护在 `ops/codex/skills/`。
 - 新机器或新会话接力开发时，优先运行 `./scripts/codex/doctor.sh` 做环境体检。
 - 若需让 Codex 在运行时发现项目技能，执行 `./scripts/codex/install-project-skills.sh`。
 

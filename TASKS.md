@@ -11,7 +11,7 @@ Go 主业务迁移与协作环境固化阶段
 - 完成 API 设计文档正式版
 - 初始化后端骨架
 - 初始化前端骨架
-- 初始化协作文件：`README.md`、`AGENTS.md`、`SKILLS/`
+- 初始化协作文件：`README.md`、`AGENTS.md`
 - 完成 `backend-go/` 最小骨架落库
   - 服务入口与配置加载
   - 基础路由与健康检查
@@ -143,6 +143,10 @@ Go 主业务迁移与协作环境固化阶段
   - `DocumentDetailView`：根据文档当前状态动态展示流转操作按钮（开始处理/转交/定稿/归档/取消归档）
   - `AssistantView`：接入真实 `POST /assistant/ask` API，提交问题后展示排队状态
   - `HandoversView`：新增「创建交接」按钮和 Dialog 表单，调用 `POST /handovers`
+- 清理冗余 `SKILLS/` 目录
+  - 旧 FastAPI 技能文档已过时、前端和集成层约束已被 `ops/codex/skills/` 覆盖
+  - 移除 `AGENTS.md`、`README.md` 中的 `SKILLS/` 引用
+  - 更新 README 技术栈描述（移除 FastAPI/Celery/Redis 等旧后端条目）
 
 ## 进行中
 

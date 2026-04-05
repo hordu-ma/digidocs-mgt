@@ -22,20 +22,17 @@
 4. `README.md`
 5. `TASKS.md`
 6. `ops/codex/skills/` 下的项目级可执行技能
-7. `SKILLS/` 下的专项技能文档
 
 如果实现与这些文档冲突，先更新文档再改代码，禁止静默偏离设计。
 
 ## 3. 目录职责
 
 - `backend/`
-  - FastAPI、SQLAlchemy、Alembic、Celery 相关实现
+  - 旧 FastAPI 后端（已冻结，主业务已迁移至 `backend-go/`）
 - `frontend/`
   - Vue 3 前端实现
-- `SKILLS/`
-  - 面向本项目的专项开发技能、约束和操作清单
 - `ops/codex/skills/`
-  - 面向 Codex 运行时的项目级可执行技能
+  - 项目级可执行技能与约束
 - `scripts/codex/`
   - 项目级 Codex 安装、体检与辅助脚本
 - `docs/`
@@ -82,7 +79,7 @@
 - 仓库内项目级 Codex 技能统一放在 `ops/codex/skills/`
 - 技能索引维护在 `ops/codex/skills/index.yaml`
 - 如需让 Codex 在运行时发现这些项目技能，应执行 `./scripts/codex/install-project-skills.sh`
-- `SKILLS/` 目录继续保留为面向项目成员的人类可读专项说明；可执行 skill 以 `ops/codex/skills/` 为准
+- 项目技能统一以 `ops/codex/skills/` 为准
 
 ## 5.3 状态账本同步规则
 
