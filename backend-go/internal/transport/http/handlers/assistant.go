@@ -129,6 +129,31 @@ func (h AssistantHandler) GetRequest(w http.ResponseWriter, r *http.Request) {
 	response.WriteData(w, http.StatusOK, item)
 }
 
+func (h AssistantHandler) ListRequests(w http.ResponseWriter, r *http.Request) {
+	page := parseIntOrDefault(r.URL.Query().Get("page"), 1)
+	pageSize := parseIntOrDefault(r.URL.Query().Get("page_size"), 20)
+
+	items, total, err := h.service.ListRequests(r.Context(), query.AssistantRequestFilter{
+		RequestType: r.URL.Query().Get("request_type"),
+		RelatedType: r.URL.Query().Get("related_type"),
+		RelatedID:   r.URL.Query().Get("related_id"),
+		Status:      r.URL.Query().Get("status"),
+		Keyword:     r.URL.Query().Get("keyword"),
+		Page:        page,
+		PageSize:    pageSize,
+	})
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list assistant requests")
+		return
+	}
+
+	response.WriteWithMeta(w, http.StatusOK, items, query.PaginationMeta{
+		Page:     page,
+		PageSize: pageSize,
+		Total:    total,
+	})
+}
+
 func (h AssistantHandler) ListSuggestions(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListSuggestions(r.Context(), query.AssistantSuggestionFilter{
 		RelatedType:    r.URL.Query().Get("related_type"),

@@ -787,7 +787,8 @@
 - Python Worker 通过 OpenClaw Gateway 的 OpenAI 兼容接口 `POST /v1/chat/completions` 调用 AI 能力。
 - Worker 只读取本系统暴露的受控内部上下文，不直接访问业务数据库。
 - 当前摘要能力优先基于结构化业务上下文；若尚未提供文档正文，则结果属于“元数据级摘要”。
-- 当前最小正文抽取支持：`txt`、`md`、`csv`、`json`、`docx`。
+- 当前正文抽取支持：`txt`、`md`、`csv`、`json`、`docx`、`pdf`。
+- 图片与扫描 PDF OCR 依赖 Worker 主机安装 `tesseract`；若缺失则返回明确错误。
 
 ### 9.1 发起问答
 
@@ -835,12 +836,59 @@
     "id": "uuid",
     "request_type": "assistant.ask",
     "status": "completed",
+    "question": "课题A 最近一个月有哪些文档在流转？",
+    "source_scope": {
+      "project_id": "uuid",
+      "document_id": null
+    },
     "error_message": "",
     "output": {
       "answer": "最近一个月共有 4 份文档发生流转……"
     },
+    "model": "openclaw/default",
+    "upstream_request_id": "chatcmpl_xxx",
+    "processing_duration_ms": 2140,
     "created_at": "2026-04-06T09:00:00Z",
     "completed_at": "2026-04-06T09:00:03Z"
+  }
+}
+```
+
+### 9.1.2 查询问答历史列表
+
+`GET /api/v1/assistant/requests`
+
+查询参数：
+
+- `request_type`
+- `status`
+- `keyword`
+- `related_type`
+- `related_id`
+- `page`
+- `page_size`
+
+响应体：
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "request_type": "assistant.ask",
+      "status": "completed",
+      "question": "课题A 最近一个月有哪些文档在流转？",
+      "model": "openclaw/default",
+      "upstream_request_id": "chatcmpl_xxx",
+      "processing_duration_ms": 2140,
+      "created_at": "2026-04-06T09:00:00Z",
+      "completed_at": "2026-04-06T09:00:03Z"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "page_size": 20,
+    "total": 1
   }
 }
 ```

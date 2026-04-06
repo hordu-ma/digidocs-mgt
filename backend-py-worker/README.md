@@ -39,4 +39,5 @@ docker compose --profile app up -d backend-py-worker
 
 - 当前 OpenClaw 对接使用官方 Gateway 的 OpenAI 兼容 HTTP 接口。
 - 当前文档摘要和交接摘要优先消费“结构化业务上下文”；如果缺少正文内容，结果会明确标注为元数据级摘要。
-- `document.extract_text` 仍未接入实际正文抽取链路，当前会返回失败状态，避免误导为已具备全文摘要能力。
+- `document.extract_text` 已支持 `txt / md / csv / json / docx / pdf` 文本抽取。
+- 若 Worker 主机存在 `tesseract`，还可进一步支持图片 OCR 与扫描 PDF OCR；若不存在，会返回明确的运行时错误提示。

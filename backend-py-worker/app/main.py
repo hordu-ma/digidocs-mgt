@@ -1,5 +1,12 @@
+import logging
+
 from .core.config import settings
 from .services.dispatcher import WorkerDispatcher
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 
 
 def main() -> None:

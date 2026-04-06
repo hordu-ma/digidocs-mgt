@@ -55,6 +55,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.Handle("GET "+cfg.APIV1Prefix+"/auth/me", protect(authHandler.Me))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/logout", protect(authHandler.Logout))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/assistant/ask", protect(assistantHandler.Ask))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/assistant/requests", protect(assistantHandler.ListRequests))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/assistant/requests/{requestID}", protect(assistantHandler.GetRequest))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/assistant/documents/{documentID}/summarize", protect(assistantHandler.SummarizeDocument))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/assistant/handovers/{handoverID}/summarize", protect(assistantHandler.SummarizeHandover))

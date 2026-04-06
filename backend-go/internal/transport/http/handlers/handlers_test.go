@@ -393,6 +393,59 @@ func TestAssistant_GetRequest_ReturnsWorkerOutput(t *testing.T) {
 	}
 }
 
+func TestAssistant_ListRequests_WithFilters(t *testing.T) {
+	handler, token := testServer(t)
+
+	queueRec := httptest.NewRecorder()
+	handler.ServeHTTP(queueRec, authedRequest("POST", "/api/v1/assistant/ask", jsonBody(map[string]any{
+		"question": "请总结项目进度",
+		"scope": map[string]any{
+			"project_id": "project-1",
+		},
+	}), token))
+	queueResult := parseResponse(t, queueRec)
+	queueData, _ := queueResult["data"].(map[string]any)
+	requestID, _ := queueData["request_id"].(string)
+	if requestID == "" {
+		t.Fatal("expected request_id")
+	}
+
+	callbackRec := httptest.NewRecorder()
+	handler.ServeHTTP(callbackRec, workerRequest("POST", "/api/v1/internal/worker-results", jsonBody(map[string]any{
+		"request_id": requestID,
+		"status":     "completed",
+		"output": map[string]any{
+			"answer":     "这是 AI 回答",
+			"model":      "openclaw/default",
+			"request_id": "chatcmpl_test_1",
+		},
+	})))
+	if callbackRec.Code != http.StatusOK {
+		t.Fatalf("callback status = %d, want 200; body = %s", callbackRec.Code, callbackRec.Body.String())
+	}
+
+	listRec := httptest.NewRecorder()
+	handler.ServeHTTP(listRec, authedRequest("GET", "/api/v1/assistant/requests?request_type=assistant.ask&status=completed&keyword=项目&page=1&page_size=10", nil, token))
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("list status = %d, want 200; body = %s", listRec.Code, listRec.Body.String())
+	}
+	result := parseResponse(t, listRec)
+	items, _ := result["data"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items len = %d, want 1", len(items))
+	}
+	first, _ := items[0].(map[string]any)
+	if first["question"] != "请总结项目进度" {
+		t.Fatalf("question = %v, want 请总结项目进度", first["question"])
+	}
+	if first["model"] != "openclaw/default" {
+		t.Fatalf("model = %v, want openclaw/default", first["model"])
+	}
+	if first["upstream_request_id"] != "chatcmpl_test_1" {
+		t.Fatalf("upstream_request_id = %v, want chatcmpl_test_1", first["upstream_request_id"])
+	}
+}
+
 // --- Handovers ---
 
 func TestHandovers_List(t *testing.T) {

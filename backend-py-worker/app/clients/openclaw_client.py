@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -12,6 +14,8 @@ from typing import cast
 from ..core.config import settings
 
 type ObjectDict = dict[str, object]
+
+logger = logging.getLogger(__name__)
 
 
 class OpenClawClientError(RuntimeError):
@@ -195,6 +199,8 @@ class OpenClawClient:
         if self.backend_model:
             request.add_header("x-openclaw-model", self.backend_model)
 
+        started_at = time.perf_counter()
+        logger.info("calling openclaw path=%s model=%s", path, payload.get("model", self.model))
         try:
             with cast(
                 HTTPResponse, urllib.request.urlopen(request, timeout=self.timeout_seconds)
@@ -202,10 +208,22 @@ class OpenClawClient:
                 body = response.read().decode()
         except urllib.error.HTTPError as exc:
             error_body = exc.read().decode(errors="ignore")
+            logger.warning(
+                "openclaw http error path=%s status=%s duration_ms=%d",
+                path,
+                exc.code,
+                int((time.perf_counter() - started_at) * 1000),
+            )
             raise OpenClawClientError(
                 f"OpenClaw HTTP {exc.code}: {error_body or exc.reason}"
             ) from exc
         except Exception as exc:
+            logger.warning(
+                "openclaw request failed path=%s duration_ms=%d error=%s",
+                path,
+                int((time.perf_counter() - started_at) * 1000),
+                exc,
+            )
             raise OpenClawClientError(f"OpenClaw 请求失败: {exc}") from exc
 
         try:
@@ -215,6 +233,13 @@ class OpenClawClient:
         parsed_dict = _as_object_dict(parsed)
         if parsed_dict is None:
             raise OpenClawClientError("OpenClaw 返回结构不是对象")
+        logger.info(
+            "openclaw response ok path=%s duration_ms=%d response_id=%s model=%s",
+            path,
+            int((time.perf_counter() - started_at) * 1000),
+            parsed_dict.get("id", ""),
+            parsed_dict.get("model", self.model),
+        )
         return parsed_dict
 
 

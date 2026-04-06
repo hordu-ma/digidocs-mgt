@@ -333,27 +333,104 @@ func (r AssistantRepository) ListSuggestions(
 	return items, rows.Err()
 }
 
-func (r AssistantRepository) GetAssistantRequest(
+func (r AssistantRepository) ListAssistantRequests(
 	ctx context.Context,
-	requestID string,
-) (*query.AssistantRequestItem, error) {
-	var item query.AssistantRequestItem
-	var relatedType sql.NullString
-	var relatedID sql.NullString
-	var outputText string
-	var errorMessage sql.NullString
-	var completedAt sql.NullString
+	filter query.AssistantRequestFilter,
+) ([]query.AssistantRequestItem, int, error) {
+	page := filter.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := filter.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
 
-	if err := r.db.QueryRowContext(
+	var total int
+	err := r.db.QueryRowContext(
+		ctx,
+		`
+		SELECT COUNT(*)
+		FROM assistant_requests
+		WHERE ($1 = '' OR request_type = $1)
+		  AND ($2 = '' OR COALESCE(related_type, '') = $2)
+		  AND ($3 = '' OR COALESCE(related_id::text, '') = $3)
+		  AND ($4 = '' OR status = $4)
+		  AND ($5 = '' OR COALESCE(payload->>'question', '') ILIKE '%' || $5 || '%')
+		`,
+		filter.RequestType,
+		filter.RelatedType,
+		filter.RelatedID,
+		filter.Status,
+		filter.Keyword,
+	).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.QueryContext(
 		ctx,
 		`
 		SELECT
 			id::text,
 			request_type,
-			related_type,
-			related_id::text,
+			COALESCE(related_type, ''),
+			COALESCE(related_id::text, ''),
 			status,
-			error_message,
+			COALESCE(error_message, ''),
+			COALESCE(payload::text, '{}'),
+			COALESCE(output::text, '{}'),
+			TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+			TO_CHAR(completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+		FROM assistant_requests
+		WHERE ($1 = '' OR request_type = $1)
+		  AND ($2 = '' OR COALESCE(related_type, '') = $2)
+		  AND ($3 = '' OR COALESCE(related_id::text, '') = $3)
+		  AND ($4 = '' OR status = $4)
+		  AND ($5 = '' OR COALESCE(payload->>'question', '') ILIKE '%' || $5 || '%')
+		ORDER BY created_at DESC
+		LIMIT $6 OFFSET $7
+		`,
+		filter.RequestType,
+		filter.RelatedType,
+		filter.RelatedID,
+		filter.Status,
+		filter.Keyword,
+		pageSize,
+		offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	items := make([]query.AssistantRequestItem, 0)
+	for rows.Next() {
+		item, err := scanAssistantRequestItem(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, item)
+	}
+	return items, total, rows.Err()
+}
+
+func (r AssistantRepository) GetAssistantRequest(
+	ctx context.Context,
+	requestID string,
+) (*query.AssistantRequestItem, error) {
+	row := r.db.QueryRowContext(
+		ctx,
+		`
+		SELECT
+			id::text,
+			request_type,
+			COALESCE(related_type, ''),
+			COALESCE(related_id::text, ''),
+			status,
+			COALESCE(error_message, ''),
+			COALESCE(payload::text, '{}'),
 			COALESCE(output::text, '{}'),
 			TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
 			TO_CHAR(completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
@@ -361,29 +438,14 @@ func (r AssistantRepository) GetAssistantRequest(
 		WHERE id::text = $1
 		`,
 		requestID,
-	).Scan(
-		&item.ID,
-		&item.RequestType,
-		&relatedType,
-		&relatedID,
-		&item.Status,
-		&errorMessage,
-		&outputText,
-		&item.CreatedAt,
-		&completedAt,
-	); err != nil {
+	)
+	item, err := scanAssistantRequestItem(row)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, service.ErrNotFound
 		}
 		return nil, err
 	}
-
-	item.RelatedType = relatedType.String
-	item.RelatedID = relatedID.String
-	item.ErrorMessage = errorMessage.String
-	item.CompletedAt = completedAt.String
-	item.Output = map[string]any{}
-	_ = json.Unmarshal([]byte(outputText), &item.Output)
 	return &item, nil
 }
 
@@ -511,6 +573,54 @@ func parseRFC3339(value string) time.Time {
 	return parsed
 }
 
+type assistantRequestScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanAssistantRequestItem(scanner assistantRequestScanner) (query.AssistantRequestItem, error) {
+	var item query.AssistantRequestItem
+	var payloadText string
+	var outputText string
+	if err := scanner.Scan(
+		&item.ID,
+		&item.RequestType,
+		&item.RelatedType,
+		&item.RelatedID,
+		&item.Status,
+		&item.ErrorMessage,
+		&payloadText,
+		&outputText,
+		&item.CreatedAt,
+		&item.CompletedAt,
+	); err != nil {
+		return query.AssistantRequestItem{}, err
+	}
+
+	payload := map[string]any{}
+	_ = json.Unmarshal([]byte(payloadText), &payload)
+	item.Question = stringValue(payload["question"])
+	item.SourceScope = extractScopeFromPayload(payload)
+
+	item.Output = map[string]any{}
+	_ = json.Unmarshal([]byte(outputText), &item.Output)
+	if scope, ok := item.Output["source_scope"].(map[string]any); ok {
+		item.SourceScope = clonePayload(scope)
+	}
+	item.Model = stringValue(item.Output["model"])
+	item.UpstreamRequestID = stringValue(item.Output["request_id"])
+	if usage, ok := item.Output["usage"].(map[string]any); ok {
+		item.Usage = clonePayload(usage)
+	}
+	if item.CreatedAt != "" && item.CompletedAt != "" {
+		createdAt, createdErr := time.Parse(time.RFC3339, item.CreatedAt)
+		completedAt, completedErr := time.Parse(time.RFC3339, item.CompletedAt)
+		if createdErr == nil && completedErr == nil {
+			item.ProcessingDurationMs = completedAt.Sub(createdAt).Milliseconds()
+		}
+	}
+	return item, nil
+}
+
 type assistantRequestRecord struct {
 	RequestID   string
 	RequestType string
@@ -624,6 +734,23 @@ func stringifyScope(payload map[string]any) string {
 		return ""
 	}
 	return string(raw)
+}
+
+func extractScopeFromPayload(payload map[string]any) map[string]any {
+	if scope, ok := payload["scope"].(map[string]any); ok {
+		return clonePayload(scope)
+	}
+	result := map[string]any{}
+	if projectID := stringValue(payload["project_id"]); projectID != "" {
+		result["project_id"] = projectID
+	}
+	if documentID := stringValue(payload["document_id"]); documentID != "" {
+		result["document_id"] = documentID
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }
 
 func clonePayload(payload map[string]any) map[string]any {

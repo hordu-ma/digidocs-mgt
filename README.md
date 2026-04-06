@@ -102,10 +102,12 @@
 - Python Worker 当前通过 `POST /v1/chat/completions` 调用 OpenClaw Gateway。
 - Worker 先从 Go 主后端读取受控内部上下文，再把结构化上下文提交给 OpenClaw。
 - 当前已落地的内部上下文范围：项目总览、文档详情/版本/流转、交接单详情。
-- 当前已支持最小正文抽取：`txt`、`md`、`csv`、`json`、`docx`。
+- 当前已支持正文抽取：`txt`、`md`、`csv`、`json`、`docx`、`pdf`。
+- 当前已支持图片 / 扫描 PDF OCR，但要求 Worker 主机存在 `tesseract`；若缺失会返回明确错误而非伪成功。
 - `openclaw status` 返回 Gateway 正常，不等于 OpenAI 兼容 HTTP 端点已启用；部署前仍需单独验证 `GET /v1/models`。
 - 假设/待确认：若 p14s 上 OpenClaw Gateway 未启用 OpenAI 兼容 HTTP 端点，需要先在网关配置中显式开启。
-- 当前限制：`pdf`、图片 OCR、扫描件仍未接入真实正文抽取链路，因此这些文件的摘要结果仍可能退化为结构化业务上下文摘要。
+- 当前已补 Assistant 问答历史列表与筛选接口，前端助手页可直接回看历史请求并查看模型、OpenClaw 响应 ID 与耗时。
+- 当前限制：图片 / 扫描 PDF 的 OCR 依赖 Worker 主机安装 `tesseract`；若未安装，AI 摘要仍会退化为结构化业务上下文摘要。
 
 ## 开发命令约定
 
@@ -244,5 +246,8 @@ docker compose up -d postgres
 - 已补 `.github/INDEX.md` 与 GitHub 协作资产入口校验
 - 已完成 p14s/Linux compose 首轮部署适配（Worker 宿主机 OpenClaw 访问改用 `host-gateway`）
 - 已修复 `backend-go` 运行镜像未携带 `migrations/` 导致容器内自动迁移失效的问题
+- 已完成 Assistant 问答历史列表 / 筛选与 Markdown 结果展示首轮接线
+- 已完成 PDF 正文抽取与 AI 可观测性首轮补强（模型、上游响应 ID、耗时、Worker 日志）
+- 已将 `make smoke` 扩展到 `assistant.ask -> completed` 的 AI 闭环验证
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

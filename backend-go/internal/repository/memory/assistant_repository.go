@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -102,17 +103,61 @@ func (r *AssistantRepository) GetAssistantRequest(
 	if !ok {
 		return nil, service.ErrNotFound
 	}
-	return &query.AssistantRequestItem{
-		ID:           req.RequestID,
-		RequestType:  req.RequestType,
-		RelatedType:  req.RelatedType,
-		RelatedID:    req.RelatedID,
-		Status:       req.Status,
-		ErrorMessage: req.Error,
-		Output:       clonePayload(req.Output),
-		CreatedAt:    req.CreatedAt,
-		CompletedAt:  req.CompletedAt,
-	}, nil
+	item := buildAssistantRequestItem(req)
+	return &item, nil
+}
+
+func (r *AssistantRepository) ListAssistantRequests(
+	_ context.Context,
+	filter query.AssistantRequestFilter,
+) ([]query.AssistantRequestItem, int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	items := make([]query.AssistantRequestItem, 0)
+	keyword := strings.ToLower(strings.TrimSpace(filter.Keyword))
+	for _, req := range r.requests {
+		if filter.RequestType != "" && req.RequestType != filter.RequestType {
+			continue
+		}
+		if filter.RelatedType != "" && req.RelatedType != filter.RelatedType {
+			continue
+		}
+		if filter.RelatedID != "" && req.RelatedID != filter.RelatedID {
+			continue
+		}
+		if filter.Status != "" && req.Status != filter.Status {
+			continue
+		}
+		item := buildAssistantRequestItem(req)
+		if keyword != "" && !strings.Contains(strings.ToLower(item.Question), keyword) {
+			continue
+		}
+		items = append(items, item)
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].CreatedAt > items[j].CreatedAt
+	})
+
+	total := len(items)
+	page := filter.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := filter.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	start := (page - 1) * pageSize
+	if start >= total {
+		return []query.AssistantRequestItem{}, total, nil
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+	return items[start:end], total, nil
 }
 
 func (r *AssistantRepository) GetLatestDocumentExtractedText(
@@ -337,6 +382,55 @@ func clonePayload(payload map[string]any) map[string]any {
 		cloned[k] = v
 	}
 	return cloned
+}
+
+func buildAssistantRequestItem(req assistantRequestRecord) query.AssistantRequestItem {
+	item := query.AssistantRequestItem{
+		ID:           req.RequestID,
+		RequestType:  req.RequestType,
+		RelatedType:  req.RelatedType,
+		RelatedID:    req.RelatedID,
+		Status:       req.Status,
+		Question:     stringValue(req.Payload["question"]),
+		SourceScope:  extractScope(req.Payload, req.Output),
+		ErrorMessage: req.Error,
+		Output:       clonePayload(req.Output),
+		CreatedAt:    req.CreatedAt,
+		CompletedAt:  req.CompletedAt,
+	}
+	item.Model = stringValue(req.Output["model"])
+	item.UpstreamRequestID = stringValue(req.Output["request_id"])
+	if usage, ok := req.Output["usage"].(map[string]any); ok {
+		item.Usage = clonePayload(usage)
+	}
+	if item.CreatedAt != "" && item.CompletedAt != "" {
+		createdAt, createdErr := time.Parse(time.RFC3339, item.CreatedAt)
+		completedAt, completedErr := time.Parse(time.RFC3339, item.CompletedAt)
+		if createdErr == nil && completedErr == nil {
+			item.ProcessingDurationMs = completedAt.Sub(createdAt).Milliseconds()
+		}
+	}
+	return item
+}
+
+func extractScope(payload map[string]any, output map[string]any) map[string]any {
+	if scope, ok := output["source_scope"].(map[string]any); ok {
+		return clonePayload(scope)
+	}
+	if scope, ok := payload["scope"].(map[string]any); ok {
+		return clonePayload(scope)
+	}
+	result := map[string]any{}
+	if projectID := stringValue(payload["project_id"]); projectID != "" {
+		result["project_id"] = projectID
+	}
+	if documentID := stringValue(payload["document_id"]); documentID != "" {
+		result["document_id"] = documentID
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }
 
 func floatValue(value any) (float64, bool) {

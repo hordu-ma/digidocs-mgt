@@ -109,6 +109,35 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
     else
       require_or_skip "GET /audit-events/summary -> $as_status (expected 200)"
     fi
+
+    # POST /assistant/ask + poll /assistant/requests/{id}
+    ask_resp=$(curl -sS --max-time 10 -X POST "$backend_url/api/v1/assistant/ask" \
+      -H "$auth_header" \
+      -H 'Content-Type: application/json' \
+      -d '{"question":"请用一句话确认 smoke 已打通 AI 链路","scope":{"project_id":null,"document_id":null}}' 2>/dev/null)
+    request_id=$(echo "$ask_resp" | grep -o '"request_id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+    if [[ -n "$request_id" ]]; then
+      echo "[OK] POST /assistant/ask queued request_id=$request_id"
+      final_status=""
+      final_body=""
+      for _ in 1 2 3 4 5 6 7 8; do
+        final_body=$(curl -sS --max-time 10 -H "$auth_header" "$backend_url/api/v1/assistant/requests/$request_id" 2>/dev/null)
+        final_status=$(echo "$final_body" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
+        if [[ "$final_status" == "completed" || "$final_status" == "failed" ]]; then
+          break
+        fi
+        sleep 2
+      done
+
+      if [[ "$final_status" == "completed" ]]; then
+        echo "[OK] GET /assistant/requests/$request_id -> completed"
+      else
+        require_or_skip "GET /assistant/requests/$request_id -> ${final_status:-unknown}; body=$final_body"
+      fi
+    else
+      require_or_skip "POST /assistant/ask did not return request_id"
+    fi
   else
     require_or_skip "auth/login did not return a token (seed data may not be loaded)"
   fi

@@ -64,6 +64,13 @@ func (s AssistantService) GetRequest(
 	return s.repo.GetAssistantRequest(ctx, requestID)
 }
 
+func (s AssistantService) ListRequests(
+	ctx context.Context,
+	filter query.AssistantRequestFilter,
+) ([]query.AssistantRequestItem, int, error) {
+	return s.repo.ListAssistantRequests(ctx, filter)
+}
+
 func (s AssistantService) GetLatestDocumentExtractedText(
 	ctx context.Context,
 	documentID string,

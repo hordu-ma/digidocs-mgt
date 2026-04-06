@@ -76,6 +76,15 @@ Go 主业务迁移与协作环境固化阶段
   - 部署说明补充 `GET /v1/models` 前置检查，避免把 Gateway 存活误判为兼容 HTTP 已就绪
 - 修复 `backend-go` 容器内自动迁移缺口
   - 运行镜像补充 `migrations/` 目录，避免长驻环境因镜像缺少 SQL 文件而无法自动补迁移
+- 完成正文抽取能力扩展
+  - Worker 已支持 `pdf` 文本抽取
+  - Worker 已支持图片 / 扫描 PDF OCR 链路；若主机缺少 `tesseract` 会返回明确依赖错误
+- 完成 Assistant 问答历史与筛选首轮接线
+  - 新增 `GET /api/v1/assistant/requests` 列表接口，支持 `request_type/status/keyword` 筛选
+  - 助手页新增历史面板，可回看模型、OpenClaw 响应 ID 与耗时
+- 完成 AI 链路可观测性与 p14s 烟测收口首轮补强
+  - Worker 日志补充 OpenClaw 请求/响应与任务完成日志
+  - `scripts/codex/smoke-local.sh` 已覆盖 `assistant.ask -> completed` 闭环
 - 完成代码审查与安全修复（一期）
   - JWT 改为真实 HMAC-SHA256 签名，淘汰伪造 base64 token
   - login 接入 bcrypt 密码校验与独立 AuthService
@@ -344,12 +353,11 @@ Go 主业务迁移与协作环境固化阶段
   - API/配置：新增可用 skill 列表配置与服务端开关；不同业务动作显式绑定允许调用的 skill 集合
   - 验证：补充测试覆盖 skill 白名单、非法 skill 拒绝、跨 scope 越权拦截、输出归一化与审计字段落库
 - p14s 部署准备
-  - 确认 OpenClaw Gateway 已启用 `GET /v1/models` 与 `POST /v1/chat/completions`
-  - 当前 p14s 已确认 `openclaw gateway`/Control UI 在 `127.0.0.1:18789` 正常，但尚未暴露兼容 `v1` HTTP 端点
-  - 固化 p14s 上的 `.env`，确认 `OPENCLAW_BASE_URL` / `OPENCLAW_API_KEY` / `CALLBACK_BASE_URL`
+  - 已确认 OpenClaw Gateway 已启用 `GET /v1/models` 与 `POST /v1/chat/completions`
+  - 已固化 p14s 上的 `.env`，确认 `OPENCLAW_BASE_URL` / `OPENCLAW_API_KEY` / `CALLBACK_BASE_URL`
   - 选择部署方式：`docker compose` 或 `systemd + 反向代理`
   - 配置 TLS / 反向代理 / 防火墙，仅暴露前端入口
-  - 进行一次真实端到端烟测
+  - 进行一次更正式的长驻形态端到端烟测（当前 `make smoke` 已覆盖 AI 闭环）
 - 群晖 DS925+ 部署准备
   - 创建 `DigiDocs` 共享目录与最小权限服务账号
   - 验证 DSM / File Station API 连通性与证书策略

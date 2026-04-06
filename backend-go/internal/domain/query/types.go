@@ -195,14 +195,30 @@ type AssistantSuggestionFilter struct {
 	SuggestionType string
 }
 
+type AssistantRequestFilter struct {
+	RequestType string
+	RelatedType string
+	RelatedID   string
+	Status      string
+	Keyword     string
+	Page        int
+	PageSize    int
+}
+
 type AssistantRequestItem struct {
-	ID           string         `json:"id"`
-	RequestType  string         `json:"request_type"`
-	RelatedType  string         `json:"related_type,omitempty"`
-	RelatedID    string         `json:"related_id,omitempty"`
-	Status       string         `json:"status"`
-	ErrorMessage string         `json:"error_message,omitempty"`
-	Output       map[string]any `json:"output,omitempty"`
-	CreatedAt    string         `json:"created_at"`
-	CompletedAt  string         `json:"completed_at,omitempty"`
+	ID                   string         `json:"id"`
+	RequestType          string         `json:"request_type"`
+	RelatedType          string         `json:"related_type,omitempty"`
+	RelatedID            string         `json:"related_id,omitempty"`
+	Status               string         `json:"status"`
+	Question             string         `json:"question,omitempty"`
+	SourceScope          map[string]any `json:"source_scope,omitempty"`
+	ErrorMessage         string         `json:"error_message,omitempty"`
+	Output               map[string]any `json:"output,omitempty"`
+	Model                string         `json:"model,omitempty"`
+	UpstreamRequestID    string         `json:"upstream_request_id,omitempty"`
+	Usage                map[string]any `json:"usage,omitempty"`
+	CreatedAt            string         `json:"created_at"`
+	CompletedAt          string         `json:"completed_at,omitempty"`
+	ProcessingDurationMs int64          `json:"processing_duration_ms,omitempty"`
 }

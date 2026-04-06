@@ -158,6 +158,13 @@ class WorkerDispatcher:
 
     def handle_and_callback(self, task: WorkerTask) -> ObjectDict:
         result = self.handle_task(task)
+        logger.info(
+            "task finished request_id=%s status=%s upstream=%s model=%s",
+            result.request_id,
+            result.status,
+            result.output.get("request_id") if isinstance(result.output, dict) else None,
+            result.output.get("model") if isinstance(result.output, dict) else None,
+        )
         return self.callback_client.submit_result(result)
 
     def _build_context(
