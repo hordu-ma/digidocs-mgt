@@ -53,6 +53,9 @@ func (r AuditRepository) ListAuditEvents(
 			COALESCE(ae.version_id::text, ''),
 			COALESCE(ae.user_id::text, ''),
 			ae.action_type::text,
+			COALESCE(ae.request_id, ''),
+			COALESCE(host(ae.ip_address), ''),
+			COALESCE(ae.terminal_info, ''),
 			TO_CHAR(ae.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
 		FROM audit_events ae
 		LEFT JOIN documents d ON d.id = ae.document_id
@@ -88,6 +91,9 @@ func (r AuditRepository) ListAuditEvents(
 			&item.VersionID,
 			&item.UserID,
 			&item.ActionType,
+			&item.RequestID,
+			&item.IPAddress,
+			&item.TerminalInfo,
 			&item.CreatedAt,
 		); err != nil {
 			return nil, 0, err

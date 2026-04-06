@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"sync/atomic"
 	"time"
+
+	"digidocs-mgt/backend-go/internal/shared"
 )
 
 var requestCounter uint64
@@ -17,7 +19,8 @@ func RequestID(next http.Handler) http.Handler {
 		}
 
 		w.Header().Set("X-Request-Id", requestID)
-		next.ServeHTTP(w, r)
+		ctx := shared.WithRequestID(r.Context(), requestID)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 

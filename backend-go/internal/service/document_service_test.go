@@ -62,6 +62,26 @@ func (m *mockDocStorage) GetObject(_ context.Context, _ string) (*storage.GetObj
 	return nil, errors.New("not implemented in mock")
 }
 
+func (m *mockDocStorage) DeleteObject(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *mockDocStorage) Stat(_ context.Context, _ string) (*storage.FileInfo, error) {
+	return nil, errors.New("not implemented in mock")
+}
+
+func (m *mockDocStorage) ListDir(_ context.Context, _ string) ([]storage.FileInfo, error) {
+	return nil, errors.New("not implemented in mock")
+}
+
+func (m *mockDocStorage) CreateFolder(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *mockDocStorage) CreateShareLink(_ context.Context, _ string, _ int) (*storage.ShareLinkResult, error) {
+	return nil, errors.New("not implemented in mock")
+}
+
 type mockDocVersionWorkflow struct {
 	result map[string]any
 	err    error

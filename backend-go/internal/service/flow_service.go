@@ -37,6 +37,9 @@ func (s FlowService) ApplyAction(ctx context.Context, input command.FlowActionIn
 	if input.Action == "transfer" && input.ToUserID == "" {
 		return nil, fmt.Errorf("%w: to_user_id is required for transfer", ErrValidation)
 	}
+	if input.Action == "transfer" && input.ToUserID == input.ActorID {
+		return nil, fmt.Errorf("%w: cannot transfer to yourself", ErrValidation)
+	}
 	if input.ActorID == "" {
 		return nil, fmt.Errorf("%w: actor_id is required", ErrValidation)
 	}

@@ -212,6 +212,32 @@ Go 主业务迁移与协作环境固化阶段
   - 生产环境（APP_ENV=production）启动时校验 JWT_SECRET / WORKER_CALLBACK_TOKEN 不得使用默认值
   - 文件上传白名单校验（pdf/docx/xlsx/pptx/doc/xls/ppt/txt/md/csv/png/jpg/jpeg）
   - 统一上传大小常量 `shared.MaxUploadSize`
+- 完成群晖 File Station 存储适配器
+  - 扩展 `storage.Provider` 接口：新增 `DeleteObject`、`Stat`、`ListDir`、`CreateFolder`、`CreateShareLink` 方法
+  - 新增 `storage.FileInfo` 和 `storage.ShareLinkResult` 类型
+  - `PutObjectInput` 新增 `Overwrite` 和 `CreatePaths` 字段（零值兼容现有调用方）
+  - 实现 `storage/synology/provider.go`：完整对接 DSM Web API（SYNO.API.Auth + SYNO.FileStation.*）
+    - 会话管理：登录获取 sid、自动缓存、过期自动重新认证
+    - 上传：multipart POST 到 SYNO.FileStation.Upload，支持自动创建父目录
+    - 下载：GET SYNO.FileStation.Download，直接流式返回文件内容
+    - 删除：SYNO.FileStation.Delete（含递归）
+    - 元数据：SYNO.FileStation.List.getinfo（含文件大小和修改时间）
+    - 目录列表：SYNO.FileStation.List（含 size/time 附加信息）
+    - 创建目录：SYNO.FileStation.CreateFolder（含 force_parent 自动创建父目录）
+    - 共享链接：SYNO.FileStation.Sharing.create（支持设置过期天数）
+  - 更新 `storage/memory/provider.go`：实现所有新接口方法（含目录跟踪、子树删除、ListDir）
+  - 更新 `config.go`：新增 `StorageBackend`、`SynologyHost/Port/HTTPS/Account/Password/SharePath` 配置项
+  - 更新 `bootstrap/container.go`：根据 `STORAGE_BACKEND` 自动选择 memory 或 synology 存储后端
+  - 更新 `.env.example`：新增群晖相关环境变量
+  - 更新 `docs/项目定义与技术架构.md`：将对象存储从 MinIO 改为群晖 File Station API
+  - 已通过 `go build ./...` 和 `go test ./...` 全量验证
+- 完成架构统一清理（MinIO/Redis/独立业务主机残留清除）
+  - `docker-compose.yml`：移除 `minio` 和 `redis` 服务（均未使用）；移除 `minio_data` 卷；`backend-go` 新增群晖环境变量透传；清理无效 `depends_on`
+  - `.env.example`（根目录）：移除 MinIO 环境变量段，新增群晖存储配置段
+  - `README.md`：移除所有 MinIO / Redis 引用；更新技术栈和 docker compose 命令
+  - `docs/项目定义与技术架构.md`：§11 部署结构从 3 台硬件改为 2 台（DGX Spark + 群晖 DS925+）；§11.3 合并管理平台主服务到 DGX Spark；移除 §11.5 独立业务主机；§12.1 后端从 FastAPI 改为 Go 1.26 + Python Worker；§12.5 从 Redis+Celery 改为 Go 内存队列 + Python Worker；§13 运行单元更新；§14 从 FastAPI 改为 Go；§18.2 从 Celery 改为 Python Worker；§30.6 从 MinIOStorageProvider 改为已实现的 SynologyStorageProvider
+  - `scripts/codex/smoke-local.sh`：移除 `digidocs-minio` 和 `digidocs-redis` 容器检查
+  - 已通过 `go build ./...`、`go test ./...`、`docker compose config` 验证
 
 ## 进行中
 
@@ -237,7 +263,7 @@ Go 主业务迁移与协作环境固化阶段
 - ~~增加 dashboard 聚合相关基础测试~~ ✅ 已完成
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
 - 增加 OpenClaw 客户端真实调用
-- 增加群晖 NAS 适配器
+- ~~增加群晖 NAS 适配器~~ ✅ 已完成
 - ~~增加基础测试~~ ✅ 已完成
 - ~~增加更细粒度的 smoke test 和分层验证矩阵~~ ✅ 已完成（smoke-local.sh 已覆盖业务端点）
 - ~~将 smoke 验证进一步细化到关键业务闭环接口~~ ✅ 已完成

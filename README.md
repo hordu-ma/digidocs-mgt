@@ -70,9 +70,8 @@
 
 ### 外部系统
 
-- Synology DSM / File Station Web API
-- DGX Spark 上部署的 OpenClaw 服务
-- MinIO 作为首期默认对象存储实现
+- Synology DS925+ DSM / File Station Web API（文件存储）
+- DGX Spark 上部署的 OpenClaw 服务（AI 能力层）
 
 ## 协作规范
 
@@ -132,7 +131,7 @@ npm run dev
 ### 编排
 
 ```bash
-docker compose up -d postgres redis minio
+docker compose up -d postgres
 ```
 
 启动容器内联调路径：
@@ -181,7 +180,7 @@ cd backend-go
 cd ../frontend
 npm install
 cd ..
-docker compose up -d postgres redis minio
+docker compose up -d postgres
 ```
 
 ## 开发进度

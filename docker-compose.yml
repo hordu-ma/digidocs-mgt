@@ -11,25 +11,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  redis:
-    image: redis:8
-    container_name: digidocs-redis
-    ports:
-      - "16379:6379"
-
-  minio:
-    image: minio/minio:latest
-    container_name: digidocs-minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "19000:9000"
-      - "19001:9001"
-    volumes:
-      - minio_data:/data
-
   backend-go:
     build:
       context: ./backend-go
@@ -43,12 +24,17 @@ services:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/digidocs_mgt?sslmode=disable
       WORKER_CALLBACK_TOKEN: replace-me
       JWT_SECRET: dev-secret
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-memory}
+      SYNOLOGY_HOST: ${SYNOLOGY_HOST:-}
+      SYNOLOGY_PORT: ${SYNOLOGY_PORT:-5000}
+      SYNOLOGY_HTTPS: ${SYNOLOGY_HTTPS:-false}
+      SYNOLOGY_ACCOUNT: ${SYNOLOGY_ACCOUNT:-}
+      SYNOLOGY_PASSWORD: ${SYNOLOGY_PASSWORD:-}
+      SYNOLOGY_SHARE_PATH: ${SYNOLOGY_SHARE_PATH:-/DigiDocs}
     ports:
       - "18081:8080"
     depends_on:
       - postgres
-      - redis
-      - minio
     profiles:
       - app
 
@@ -65,10 +51,8 @@ services:
       CALLBACK_TOKEN: replace-me
     depends_on:
       - backend-go
-      - redis
     profiles:
       - app
 
 volumes:
   postgres_data:
-  minio_data:

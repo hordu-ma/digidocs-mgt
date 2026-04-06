@@ -59,12 +59,15 @@ type FlowItem struct {
 }
 
 type AuditEventItem struct {
-	ID         string `json:"id"`
-	DocumentID string `json:"document_id,omitempty"`
-	VersionID  string `json:"version_id,omitempty"`
-	UserID     string `json:"user_id,omitempty"`
-	ActionType string `json:"action_type"`
-	CreatedAt  string `json:"created_at"`
+	ID           string `json:"id"`
+	DocumentID   string `json:"document_id,omitempty"`
+	VersionID    string `json:"version_id,omitempty"`
+	UserID       string `json:"user_id,omitempty"`
+	ActionType   string `json:"action_type"`
+	RequestID    string `json:"request_id,omitempty"`
+	IPAddress    string `json:"ip_address,omitempty"`
+	TerminalInfo string `json:"terminal_info,omitempty"`
+	CreatedAt    string `json:"created_at"`
 }
 
 type AuditSummary struct {

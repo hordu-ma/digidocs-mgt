@@ -30,7 +30,7 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 echo '== compose services =='
-for container in digidocs-postgres digidocs-redis digidocs-minio; do
+for container in digidocs-postgres; do
   if container_running "$container"; then
     echo "[OK] $container running"
   else

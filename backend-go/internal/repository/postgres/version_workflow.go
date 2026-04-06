@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"digidocs-mgt/backend-go/internal/domain/command"
+	"digidocs-mgt/backend-go/internal/shared"
 )
 
 type VersionWorkflow struct {
@@ -58,6 +59,8 @@ func (w VersionWorkflow) CreateUploadedVersion(ctx context.Context, input comman
 		return nil, err
 	}
 
+	reqID := shared.RequestIDFromContext(ctx)
+
 	if _, err := tx.ExecContext(
 		ctx,
 		`
@@ -72,7 +75,7 @@ func (w VersionWorkflow) CreateUploadedVersion(ctx context.Context, input comman
 			extra_data,
 			created_at
 		)
-		VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'replace_version'::audit_action_type, NULL, 'backend-go', $5::jsonb, $6)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'replace_version'::audit_action_type, NULLIF($7, ''), 'backend-go', $5::jsonb, $6)
 		`,
 		newID(),
 		input.DocumentID,
@@ -80,6 +83,7 @@ func (w VersionWorkflow) CreateUploadedVersion(ctx context.Context, input comman
 		actorOrSystem(input.ActorID),
 		string(extraData),
 		time.Now().UTC(),
+		reqID,
 	); err != nil {
 		return nil, err
 	}

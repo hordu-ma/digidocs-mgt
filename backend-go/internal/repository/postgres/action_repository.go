@@ -11,6 +11,7 @@ import (
 
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/service"
+	"digidocs-mgt/backend-go/internal/shared"
 )
 
 type ActionRepository struct {
@@ -420,6 +421,8 @@ func insertAuditEvent(
 		userID = systemUserID()
 	}
 
+	reqID := shared.RequestIDFromContext(ctx)
+
 	_, err = db.ExecContext(
 		ctx,
 		`
@@ -440,7 +443,7 @@ func insertAuditEvent(
 			NULLIF($3, '')::uuid,
 			$4::uuid,
 			$5::audit_action_type,
-			NULL,
+			NULLIF($8, ''),
 			'backend-go',
 			$6::jsonb,
 			$7
@@ -453,6 +456,7 @@ func insertAuditEvent(
 		actionType,
 		string(extraData),
 		nowUTC(),
+		reqID,
 	)
 	return err
 }

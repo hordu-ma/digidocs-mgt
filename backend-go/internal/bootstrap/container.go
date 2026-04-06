@@ -13,7 +13,9 @@ import (
 	"digidocs-mgt/backend-go/internal/repository/memory"
 	pgrepo "digidocs-mgt/backend-go/internal/repository/postgres"
 	"digidocs-mgt/backend-go/internal/service"
+	"digidocs-mgt/backend-go/internal/storage"
 	memstorage "digidocs-mgt/backend-go/internal/storage/memory"
+	synostorage "digidocs-mgt/backend-go/internal/storage/synology"
 )
 
 type Container struct {
@@ -34,7 +36,7 @@ type Container struct {
 
 func BuildContainer(cfg config.Config) (Container, error) {
 	publisher := memqueue.NewPublisher()
-	storageProvider := memstorage.NewProvider()
+	storageProvider := buildStorageProvider(cfg)
 	tokenService := service.NewTokenService(cfg.JWTSecret)
 	auditService := service.NewAuditService()
 
@@ -119,4 +121,27 @@ func findMigrationsDir() string {
 	}
 
 	return ""
+}
+
+// buildStorageProvider returns the storage.Provider based on configuration.
+func buildStorageProvider(cfg config.Config) storage.Provider {
+	switch cfg.StorageBackend {
+	case "synology":
+		if cfg.SynologyHost == "" {
+			log.Fatal("FATAL: SYNOLOGY_HOST is required when STORAGE_BACKEND=synology")
+		}
+		log.Printf("[bootstrap] using Synology storage: %s:%d share=%s",
+			cfg.SynologyHost, cfg.SynologyPort, cfg.SynologySharePath)
+		return synostorage.NewProvider(synostorage.Config{
+			Host:      cfg.SynologyHost,
+			Port:      cfg.SynologyPort,
+			HTTPS:     cfg.SynologyHTTPS,
+			Account:   cfg.SynologyAccount,
+			Password:  cfg.SynologyPassword,
+			SharePath: cfg.SynologySharePath,
+		})
+	default:
+		log.Println("[bootstrap] using memory storage")
+		return memstorage.NewProvider()
+	}
 }

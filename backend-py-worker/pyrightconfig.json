@@ -3,6 +3,10 @@
   "venv": ".venv",
   "pythonVersion": "3.12",
   "typeCheckingMode": "basic",
+  "reportMissingTypeStubs": false,
+  "reportAny": false,
+  "reportUnannotatedClassAttribute": false,
+  "reportExplicitAny": false,
   "executionEnvironments": [
     { "root": ".", "extraPaths": ["."] }
   ]

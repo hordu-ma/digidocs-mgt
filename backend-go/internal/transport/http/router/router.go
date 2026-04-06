@@ -83,6 +83,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 
 	return middleware.Chain(
 		mux,
+		middleware.CORS(cfg.CORSAllowOrigins),
 		middleware.RequestID,
 		middleware.JSONContentType,
 		middleware.AccessLog,

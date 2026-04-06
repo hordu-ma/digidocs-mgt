@@ -82,6 +82,16 @@ func TestFlowService_ApplyAction_TransferMissingToUserID(t *testing.T) {
 	}
 }
 
+func TestFlowService_ApplyAction_TransferToSelf(t *testing.T) {
+	svc := NewFlowService(nil, &mockFlowActionWriter{})
+	_, err := svc.ApplyAction(context.Background(), command.FlowActionInput{
+		DocumentID: "doc-1", Action: "transfer", ActorID: "u-1", ToUserID: "u-1",
+	})
+	if !errors.Is(err, ErrValidation) {
+		t.Errorf("err = %v, want ErrValidation", err)
+	}
+}
+
 func TestFlowService_ApplyAction_MissingActorID(t *testing.T) {
 	svc := NewFlowService(nil, &mockFlowActionWriter{})
 	_, err := svc.ApplyAction(context.Background(), command.FlowActionInput{
