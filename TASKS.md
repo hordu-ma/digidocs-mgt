@@ -50,7 +50,7 @@ Go 主业务迁移与协作环境固化阶段
   - 增加 `scripts/codex/install-project-skills.sh`
   - 增加 `scripts/codex/doctor.sh`
   - 增强 `AGENTS.md` 的会话启动清单、状态同步规则和验证约束
-  - 新增 `docs/Harness Engineering 学习笔记.md`
+  - 新增 Harness Engineering 学习笔记（后续已迁移至 Obsidian）
 - 完成第二阶段统一验证入口
   - 增加 `Makefile`
   - 增加 `scripts/codex/check-doc-sync.sh`

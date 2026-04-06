@@ -48,7 +48,6 @@ scripts/codex/install-project-skills.sh
 scripts/codex/doctor.sh
 scripts/codex/report.sh
 scripts/codex/smoke-local.sh
-docs/Harness Engineering 学习笔记.md
 .github/INDEX.md
 .github/workflows/verify.yml
 .githooks/pre-commit

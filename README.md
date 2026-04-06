@@ -30,7 +30,6 @@
 │   ├── 异步任务消息契约.md
 │   ├── adr/
 │   │   └── 001-go-python-hybrid.md
-│   └── Harness Engineering 学习笔记.md
 ├── backend-go/
 ├── backend-py-worker/
 ├── docker-compose.yml
@@ -153,9 +152,9 @@ docker compose --profile app up -d backend-go backend-py-worker frontend
 
 部署前配置模板：
 
-- 本地开发模板：[.env.example](/Users/liguo/code-repos/digidocs-mgt/.env.example)
-- 生产部署模板：[.env.production.example](/Users/liguo/code-repos/digidocs-mgt/.env.production.example)
-- 部署说明：[部署准备与运行说明](/Users/liguo/code-repos/digidocs-mgt/docs/部署准备与运行说明.md)
+- 本地开发模板：[.env.example](.env.example)
+- 生产部署模板：[.env.production.example](.env.production.example)
+- 部署说明：[部署准备与运行说明](docs/部署准备与运行说明.md)
 
 ### Codex 协作环境
 
@@ -183,7 +182,6 @@ make verify
 - `.githooks/`：本地提交前和推送前门禁
 - `.github/INDEX.md`：GitHub 协作资产入口
 - `.github/workflows/verify.yml`：远端 GitHub Actions 验证门禁
-- `docs/Harness Engineering 学习笔记.md`：本项目的 Harness Engineering 学习文档
 
 ## 跨机器接力开发
 
@@ -219,7 +217,7 @@ docker compose up -d postgres
 - 已启用仓库本地 `.githooks`，并已跑通 `make status`
 - 已执行 `make smoke`，当前容器存在但宿主机 `18081/healthz` 不可达，脚本按非严格模式跳过
 - 已完成 `AGENTS.md` 会话启动清单、状态账本同步规则与验证约束增强
-- 已完成 [Harness Engineering 学习笔记](/home/liguoma/code-repos/digidocs-mgt/docs/Harness Engineering 学习笔记.md) 初版
+- 已完成 Harness Engineering 学习笔记初版（后续已迁移至 Obsidian）
 - 已完成数据库种子数据创建与加载（`backend-go/sql/seed.sql`）
 - 已完成 JWT 用户 ID 透传至所有审计事件写入（middleware → handlers → repositories）
 - 已完成前端四个页面接入真实后端 API（仪表盘、文档列表、文档详情、交接单）
@@ -239,4 +237,4 @@ docker compose up -d postgres
 - 已完成 P2 持久化任务消费与 AI 结果展示首轮修复（PostgreSQL 任务轮询、摘要结果回写、文档详情页 AI 建议展示）
 - 已补 `.github/INDEX.md` 与 GitHub 协作资产入口校验
 
-详细任务状态持续维护在 [TASKS.md](/home/liguoma/code-repos/digidocs-mgt/TASKS.md)。
+详细任务状态持续维护在 [TASKS.md](TASKS.md)。
