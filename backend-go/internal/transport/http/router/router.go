@@ -22,6 +22,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	internalWorkerHandler := handlers.NewInternalWorkerHandler(cfg, container.QueueConsumer, container.AssistantService)
 	internalAssistantContextHandler := handlers.NewInternalAssistantContextHandler(
 		cfg,
+		container.AssistantService,
 		container.DocumentService,
 		container.VersionService,
 		container.FlowService,
@@ -48,11 +49,13 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/assistant-context/projects/{projectID}", internalAssistantContextHandler.GetProjectContext)
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/assistant-context/documents/{documentID}", internalAssistantContextHandler.GetDocumentContext)
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/assistant-context/handovers/{handoverID}", internalAssistantContextHandler.GetHandoverContext)
+	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/assistant-assets/versions/{versionID}/download", internalAssistantContextHandler.DownloadVersionFile)
 
 	// --- Protected routes (JWT required) ---
 	mux.Handle("GET "+cfg.APIV1Prefix+"/auth/me", protect(authHandler.Me))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/logout", protect(authHandler.Logout))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/assistant/ask", protect(assistantHandler.Ask))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/assistant/requests/{requestID}", protect(assistantHandler.GetRequest))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/assistant/documents/{documentID}/summarize", protect(assistantHandler.SummarizeDocument))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/assistant/handovers/{handoverID}/summarize", protect(assistantHandler.SummarizeHandover))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/assistant/suggestions", protect(assistantHandler.ListSuggestions))

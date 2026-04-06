@@ -194,3 +194,15 @@ type AssistantSuggestionFilter struct {
 	Status         string
 	SuggestionType string
 }
+
+type AssistantRequestItem struct {
+	ID           string         `json:"id"`
+	RequestType  string         `json:"request_type"`
+	RelatedType  string         `json:"related_type,omitempty"`
+	RelatedID    string         `json:"related_id,omitempty"`
+	Status       string         `json:"status"`
+	ErrorMessage string         `json:"error_message,omitempty"`
+	Output       map[string]any `json:"output,omitempty"`
+	CreatedAt    string         `json:"created_at"`
+	CompletedAt  string         `json:"completed_at,omitempty"`
+}

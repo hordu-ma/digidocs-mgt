@@ -57,6 +57,20 @@ func (s AssistantService) ReceiveResult(ctx context.Context, result task.Result)
 	return s.repo.CompleteAssistantRequest(ctx, result)
 }
 
+func (s AssistantService) GetRequest(
+	ctx context.Context,
+	requestID string,
+) (*query.AssistantRequestItem, error) {
+	return s.repo.GetAssistantRequest(ctx, requestID)
+}
+
+func (s AssistantService) GetLatestDocumentExtractedText(
+	ctx context.Context,
+	documentID string,
+) (string, error) {
+	return s.repo.GetLatestDocumentExtractedText(ctx, documentID)
+}
+
 func (s AssistantService) ListSuggestions(
 	ctx context.Context,
 	filter query.AssistantSuggestionFilter,

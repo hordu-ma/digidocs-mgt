@@ -116,6 +116,19 @@ func (h AssistantHandler) SummarizeHandover(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+func (h AssistantHandler) GetRequest(w http.ResponseWriter, r *http.Request) {
+	item, err := h.service.GetRequest(r.Context(), r.PathValue("requestID"))
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.WriteError(w, http.StatusNotFound, "not_found", "assistant request not found")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to get assistant request")
+		return
+	}
+	response.WriteData(w, http.StatusOK, item)
+}
+
 func (h AssistantHandler) ListSuggestions(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListSuggestions(r.Context(), query.AssistantSuggestionFilter{
 		RelatedType:    r.URL.Query().Get("related_type"),

@@ -22,6 +22,9 @@ type assistantRequestRecord struct {
 	Payload     map[string]any
 	Status      string
 	Error       string
+	Output      map[string]any
+	CreatedAt   string
+	CompletedAt string
 }
 
 type AssistantRepository struct {
@@ -53,6 +56,8 @@ func (r *AssistantRepository) CreateAssistantRequest(
 		RelatedID:   message.RelatedID,
 		Payload:     payload,
 		Status:      "pending",
+		Output:      map[string]any{},
+		CreatedAt:   time.Now().UTC().Format(time.RFC3339),
 	}
 	return nil
 }
@@ -70,6 +75,8 @@ func (r *AssistantRepository) CompleteAssistantRequest(
 	}
 	req.Status = result.Status
 	req.Error = result.ErrorMessage
+	req.Output = clonePayload(result.Output)
+	req.CompletedAt = time.Now().UTC().Format(time.RFC3339)
 	r.requests[result.RequestID] = req
 
 	for id, item := range r.suggestions {
@@ -82,6 +89,62 @@ func (r *AssistantRepository) CompleteAssistantRequest(
 		r.suggestions[item.ID] = item
 	}
 	return nil
+}
+
+func (r *AssistantRepository) GetAssistantRequest(
+	_ context.Context,
+	requestID string,
+) (*query.AssistantRequestItem, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	req, ok := r.requests[requestID]
+	if !ok {
+		return nil, service.ErrNotFound
+	}
+	return &query.AssistantRequestItem{
+		ID:           req.RequestID,
+		RequestType:  req.RequestType,
+		RelatedType:  req.RelatedType,
+		RelatedID:    req.RelatedID,
+		Status:       req.Status,
+		ErrorMessage: req.Error,
+		Output:       clonePayload(req.Output),
+		CreatedAt:    req.CreatedAt,
+		CompletedAt:  req.CompletedAt,
+	}, nil
+}
+
+func (r *AssistantRepository) GetLatestDocumentExtractedText(
+	_ context.Context,
+	documentID string,
+) (string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	latestCreatedAt := ""
+	extractedText := ""
+	for _, req := range r.requests {
+		if req.RelatedID != documentID {
+			continue
+		}
+		if req.RequestType != string(task.TaskTypeDocumentExtractText) &&
+			req.RequestType != string(task.TaskTypeDocumentSummarize) {
+			continue
+		}
+		if req.Status != "completed" {
+			continue
+		}
+		text := stringValue(req.Output["extracted_text"])
+		if text == "" {
+			continue
+		}
+		if latestCreatedAt == "" || req.CompletedAt > latestCreatedAt {
+			latestCreatedAt = req.CompletedAt
+			extractedText = text
+		}
+	}
+	return extractedText, nil
 }
 
 func (r *AssistantRepository) ListSuggestions(

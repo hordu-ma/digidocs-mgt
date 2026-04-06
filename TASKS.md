@@ -168,6 +168,13 @@ Go 主业务迁移与协作环境固化阶段
   - `assistant.ask` / `document.summarize` / `handover.summarize` / `assistant.generate_suggestion` 接入真实 OpenClaw 客户端
   - 为 OpenClaw 客户端与内部上下文接口补充测试
   - 更新 `.env.example`、`README.md`、`docs/API设计.md`、`docs/异步任务消息契约.md`
+- 完成 Assistant 结果查询与最小正文抽取闭环
+  - 新增 `assistant_requests.output` 持久化字段与数据库迁移
+  - 新增 `GET /api/v1/assistant/requests/{request_id}` 查询 AI 请求状态与输出
+  - `AssistantView` 改为提交后轮询请求结果，显示真实回答或失败原因
+  - 新增 Worker 专用版本文件下载接口，供正文抽取使用
+  - Python Worker 已支持 `txt` / `md` / `csv` / `json` / `docx` 的最小正文抽取
+  - `document.summarize` 在缺少已抽取文本时会尝试内联抽取，再提交给 OpenClaw
 - 清理冗余 `SKILLS/` 目录
   - 旧 FastAPI 技能文档已过时、前端和集成层约束已被 `ops/codex/skills/` 覆盖
   - 移除 `AGENTS.md`、`README.md` 中的 `SKILLS/` 引用
@@ -284,8 +291,8 @@ Go 主业务迁移与协作环境固化阶段
 - ~~增加更完整的审计事件过滤条件与统计聚合~~ ✅ 已完成（过滤条件已补齐，统计聚合待后续细化）
 - ~~增加 dashboard 聚合相关基础测试~~ ✅ 已完成
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
-- 增加文档正文抽取与 AI 可授权内容引用链路
-- 增加 Assistant 问答结果查询接口与前端结果回显
+- 增加 `pdf` / 图片 OCR / 扫描件的正文抽取链路
+- 增加 Assistant 问答历史列表与筛选
 - ~~增加群晖 NAS 适配器~~ ✅ 已完成
 - ~~增加基础测试~~ ✅ 已完成
 - ~~增加更细粒度的 smoke test 和分层验证矩阵~~ ✅ 已完成（smoke-local.sh 已覆盖业务端点）

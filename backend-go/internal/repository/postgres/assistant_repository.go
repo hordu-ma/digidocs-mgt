@@ -13,6 +13,7 @@ import (
 	"digidocs-mgt/backend-go/internal/domain/task"
 	"digidocs-mgt/backend-go/internal/repository"
 	"digidocs-mgt/backend-go/internal/service"
+	"github.com/lib/pq"
 )
 
 type AssistantRepository struct {
@@ -42,6 +43,7 @@ func (r AssistantRepository) CreateAssistantRequest(
 			related_type,
 			related_id,
 			payload,
+			output,
 			status,
 			created_by,
 			created_at
@@ -52,6 +54,7 @@ func (r AssistantRepository) CreateAssistantRequest(
 			NULLIF($3, ''),
 			NULLIF($4, '')::uuid,
 			$5::jsonb,
+			'{}'::jsonb,
 			'pending',
 			NULLIF($6, '')::uuid,
 			$7
@@ -108,12 +111,14 @@ func (r AssistantRepository) CompleteAssistantRequest(
 		UPDATE assistant_requests
 		SET status = $2,
 		    error_message = NULLIF($3, ''),
-		    completed_at = $4
+		    output = $4::jsonb,
+		    completed_at = $5
 		WHERE id::text = $1
 		`,
 		result.RequestID,
 		result.Status,
 		result.ErrorMessage,
+		mustJSON(result.Output),
 		time.Now().UTC(),
 	); err != nil {
 		return err
@@ -208,6 +213,26 @@ func updateAssistantProjection(
 	}
 
 	switch request.RequestType {
+	case string(task.TaskTypeDocumentExtractText):
+		versionID := stringValue(request.Payload["version_id"])
+		if versionID == "" {
+			return nil
+		}
+		status := "failed"
+		if stringValue(result.Output["extracted_text"]) != "" {
+			status = "completed"
+		}
+		_, err := tx.ExecContext(
+			ctx,
+			`
+			UPDATE document_versions
+			SET extracted_text_status = $2
+			WHERE id::text = $1
+			`,
+			versionID,
+			status,
+		)
+		return err
 	case string(task.TaskTypeDocumentSummarize):
 		versionID := stringValue(request.Payload["version_id"])
 		if versionID == "" {
@@ -306,6 +331,95 @@ func (r AssistantRepository) ListSuggestions(
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+func (r AssistantRepository) GetAssistantRequest(
+	ctx context.Context,
+	requestID string,
+) (*query.AssistantRequestItem, error) {
+	var item query.AssistantRequestItem
+	var relatedType sql.NullString
+	var relatedID sql.NullString
+	var outputText string
+	var errorMessage sql.NullString
+	var completedAt sql.NullString
+
+	if err := r.db.QueryRowContext(
+		ctx,
+		`
+		SELECT
+			id::text,
+			request_type,
+			related_type,
+			related_id::text,
+			status,
+			error_message,
+			COALESCE(output::text, '{}'),
+			TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+			TO_CHAR(completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+		FROM assistant_requests
+		WHERE id::text = $1
+		`,
+		requestID,
+	).Scan(
+		&item.ID,
+		&item.RequestType,
+		&relatedType,
+		&relatedID,
+		&item.Status,
+		&errorMessage,
+		&outputText,
+		&item.CreatedAt,
+		&completedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, service.ErrNotFound
+		}
+		return nil, err
+	}
+
+	item.RelatedType = relatedType.String
+	item.RelatedID = relatedID.String
+	item.ErrorMessage = errorMessage.String
+	item.CompletedAt = completedAt.String
+	item.Output = map[string]any{}
+	_ = json.Unmarshal([]byte(outputText), &item.Output)
+	return &item, nil
+}
+
+func (r AssistantRepository) GetLatestDocumentExtractedText(
+	ctx context.Context,
+	documentID string,
+) (string, error) {
+	var outputText string
+	err := r.db.QueryRowContext(
+		ctx,
+		`
+		SELECT COALESCE(output::text, '{}')
+		FROM assistant_requests
+		WHERE request_type = ANY($1)
+		  AND related_type = 'document'
+		  AND related_id::text = $2
+		  AND status = 'completed'
+		ORDER BY completed_at DESC NULLS LAST, created_at DESC
+		LIMIT 1
+		`,
+		pq.Array([]string{
+			string(task.TaskTypeDocumentExtractText),
+			string(task.TaskTypeDocumentSummarize),
+		}),
+		documentID,
+	).Scan(&outputText)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+
+	payload := map[string]any{}
+	_ = json.Unmarshal([]byte(outputText), &payload)
+	return stringValue(payload["extracted_text"]), nil
 }
 
 func (r AssistantRepository) ConfirmSuggestion(
@@ -526,6 +640,17 @@ func clonePayload(payload map[string]any) map[string]any {
 func stringValue(value any) string {
 	raw, _ := value.(string)
 	return raw
+}
+
+func mustJSON(value map[string]any) string {
+	if value == nil {
+		return "{}"
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return "{}"
+	}
+	return string(raw)
 }
 
 func floatValue(value any) (float64, bool) {

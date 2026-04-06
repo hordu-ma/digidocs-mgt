@@ -26,6 +26,18 @@ class BackendContextClient:
     def get_handover_context(self, handover_id: str) -> dict[str, Any]:
         return self._fetch(f"/api/v1/internal/assistant-context/handovers/{handover_id}")
 
+    def download_version_file(self, version_id: str) -> tuple[dict[str, str], bytes]:
+        url = f"{self.base_url}/api/v1/internal/assistant-assets/versions/{version_id}/download"
+        req = urllib.request.Request(url, method="GET")
+        req.add_header("Authorization", f"Bearer {self.token}")
+
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            headers = {
+                "content_type": resp.headers.get("Content-Type", ""),
+                "content_disposition": resp.headers.get("Content-Disposition", ""),
+            }
+            return headers, resp.read()
+
     def _fetch(self, path: str) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
         req = urllib.request.Request(url, method="GET")

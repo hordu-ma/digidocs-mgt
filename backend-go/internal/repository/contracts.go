@@ -77,6 +77,8 @@ type UserAuthReader interface {
 type AssistantRepository interface {
 	CreateAssistantRequest(ctx context.Context, message task.Message, actorID string) error
 	CompleteAssistantRequest(ctx context.Context, result task.Result) error
+	GetAssistantRequest(ctx context.Context, requestID string) (*query.AssistantRequestItem, error)
+	GetLatestDocumentExtractedText(ctx context.Context, documentID string) (string, error)
 	ListSuggestions(ctx context.Context, filter query.AssistantSuggestionFilter) ([]query.AssistantSuggestionItem, error)
 	ConfirmSuggestion(ctx context.Context, suggestionID string, actorID string, note string) (map[string]any, error)
 	DismissSuggestion(ctx context.Context, suggestionID string, actorID string, reason string) (map[string]any, error)

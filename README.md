@@ -100,8 +100,9 @@
 - Python Worker 当前通过 `POST /v1/chat/completions` 调用 OpenClaw Gateway。
 - Worker 先从 Go 主后端读取受控内部上下文，再把结构化上下文提交给 OpenClaw。
 - 当前已落地的内部上下文范围：项目总览、文档详情/版本/流转、交接单详情。
+- 当前已支持最小正文抽取：`txt`、`md`、`csv`、`json`、`docx`。
 - 假设/待确认：若 p14s 上 OpenClaw Gateway 未启用 OpenAI 兼容 HTTP 端点，需要先在网关配置中显式开启。
-- 当前限制：尚未接入真实文档正文抽取链路，因此摘要结果仍以结构化业务上下文为主，不等同于全文摘要。
+- 当前限制：`pdf`、图片 OCR、扫描件仍未接入真实正文抽取链路，因此这些文件的摘要结果仍可能退化为结构化业务上下文摘要。
 
 ## 开发命令约定
 
@@ -219,6 +220,7 @@ docker compose up -d postgres
 - 已清理 TASKS.md，将已完成的大量"进行中"子项归档至"已完成"
 - 已完成 Go 后端核心业务服务层单元测试（auth/action/dashboard，共 13 个用例）
 - 已完成 OpenClaw Gateway 真实 HTTP 对接与 Worker 内部上下文桥接
+- 已完成 Assistant 问答结果查询闭环与最小正文抽取链路
 - 已完成前端 Element Plus 按需引入（JS bundle 从 1,041 KB 降至 470 KB）
 - 已完成 Python Worker 真实队列消费链路（Go/HTTP 轮询 → 处理 → 回写）
 - 已完成前端写操作 UI（文档流转操作、AI 助手问答提交、交接单创建）

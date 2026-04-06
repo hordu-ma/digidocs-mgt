@@ -351,6 +351,48 @@ func TestAssistant_ConfirmSuggestion(t *testing.T) {
 	}
 }
 
+func TestAssistant_GetRequest_ReturnsWorkerOutput(t *testing.T) {
+	handler, token := testServer(t)
+
+	queueRec := httptest.NewRecorder()
+	handler.ServeHTTP(queueRec, authedRequest("POST", "/api/v1/assistant/ask", jsonBody(map[string]any{
+		"question": "请总结当前状态",
+		"scope": map[string]any{
+			"project_id": "project-1",
+		},
+	}), token))
+	queueResult := parseResponse(t, queueRec)
+	queueData, _ := queueResult["data"].(map[string]any)
+	requestID, _ := queueData["request_id"].(string)
+	if requestID == "" {
+		t.Fatal("expected request_id")
+	}
+
+	callbackRec := httptest.NewRecorder()
+	handler.ServeHTTP(callbackRec, workerRequest("POST", "/api/v1/internal/worker-results", jsonBody(map[string]any{
+		"request_id": requestID,
+		"status":     "completed",
+		"output": map[string]any{
+			"answer": "这是 AI 回答",
+		},
+	})))
+	if callbackRec.Code != http.StatusOK {
+		t.Fatalf("callback status = %d, want 200; body = %s", callbackRec.Code, callbackRec.Body.String())
+	}
+
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, authedRequest("GET", "/api/v1/assistant/requests/"+requestID, nil, token))
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get status = %d, want 200; body = %s", getRec.Code, getRec.Body.String())
+	}
+	result := parseResponse(t, getRec)
+	data, _ := result["data"].(map[string]any)
+	output, _ := data["output"].(map[string]any)
+	if output["answer"] != "这是 AI 回答" {
+		t.Fatalf("answer = %v, want 这是 AI 回答", output["answer"])
+	}
+}
+
 // --- Handovers ---
 
 func TestHandovers_List(t *testing.T) {

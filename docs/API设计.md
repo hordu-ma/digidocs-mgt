@@ -787,6 +787,7 @@
 - Python Worker 通过 OpenClaw Gateway 的 OpenAI 兼容接口 `POST /v1/chat/completions` 调用 AI 能力。
 - Worker 只读取本系统暴露的受控内部上下文，不直接访问业务数据库。
 - 当前摘要能力优先基于结构化业务上下文；若尚未提供文档正文，则结果属于“元数据级摘要”。
+- 当前最小正文抽取支持：`txt`、`md`、`csv`、`json`、`docx`。
 
 ### 9.1 发起问答
 
@@ -818,6 +819,28 @@
       "document_id": null
     },
     "generated_at": "2026-04-03T16:00:00Z"
+  }
+}
+```
+
+### 9.1.1 查询问答任务状态
+
+`GET /api/v1/assistant/requests/{request_id}`
+
+响应体：
+
+```json
+{
+  "data": {
+    "id": "uuid",
+    "request_type": "assistant.ask",
+    "status": "completed",
+    "error_message": "",
+    "output": {
+      "answer": "最近一个月共有 4 份文档发生流转……"
+    },
+    "created_at": "2026-04-06T09:00:00Z",
+    "completed_at": "2026-04-06T09:00:03Z"
   }
 }
 ```
@@ -934,7 +957,8 @@
       "current_status": "in_progress"
     },
     "versions": [],
-    "flows": []
+    "flows": [],
+    "extracted_text": "最近一次已抽取的正文内容"
   }
 }
 ```
@@ -959,6 +983,16 @@
   }
 }
 ```
+
+### 9.5.4 下载版本原始文件
+
+`GET /api/v1/internal/assistant-assets/versions/{version_id}/download`
+
+说明：
+
+- 仅供 Worker 使用；
+- 使用 Worker shared token 鉴权；
+- 返回版本原始文件流，供正文抽取器处理。
 
 ### 9.6 确认建议
 

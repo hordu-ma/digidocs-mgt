@@ -67,6 +67,17 @@ def test_handle_document_summarize_returns_completed(monkeypatch) -> None:
         lambda document_id: {"available": True, "scope": {"document_id": document_id}},
     )
     monkeypatch.setattr(
+        dispatcher.context_client,
+        "download_version_file",
+        lambda version_id: (
+            {
+                "content_type": "text/plain; charset=utf-8",
+                "content_disposition": 'attachment; filename="notes.txt"',
+            },
+            "摘要原文".encode(),
+        ),
+    )
+    monkeypatch.setattr(
         dispatcher.openclaw_client,
         "summarize_document",
         lambda request_id, payload, context: {
@@ -118,3 +129,32 @@ def test_handle_generate_suggestion_openclaw_error(monkeypatch) -> None:
 
     assert result.status == "failed"
     assert result.error_message == "boom"
+
+
+def test_handle_document_extract_text_task(monkeypatch) -> None:
+    dispatcher = WorkerDispatcher()
+
+    monkeypatch.setattr(
+        dispatcher.context_client,
+        "download_version_file",
+        lambda version_id: (
+            {
+                "content_type": "text/plain; charset=utf-8",
+                "content_disposition": 'attachment; filename="notes.txt"',
+            },
+            "第一行\n第二行".encode(),
+        ),
+    )
+
+    result = dispatcher.handle_task(
+        WorkerTask(
+            request_id="req-5",
+            task_type="document.extract_text",
+            related_type="document",
+            related_id="doc-3",
+            payload={"version_id": "ver-2"},
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.output["extracted_text"] == "第一行\n第二行"

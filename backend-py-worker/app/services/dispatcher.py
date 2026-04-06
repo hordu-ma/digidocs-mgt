@@ -7,6 +7,10 @@ from app.clients.callback_client import CallbackClient
 from app.clients.openclaw_client import OpenClawClient, OpenClawClientError
 from app.clients.task_poller import TaskPollerClient
 from app.core.config import settings
+from app.services.document_text_extractor import (
+    DocumentTextExtractionError,
+    extract_text,
+)
 from app.tasks.contracts import TaskResult, WorkerTask
 
 logger = logging.getLogger(__name__)
@@ -68,6 +72,13 @@ class WorkerDispatcher:
 
         if task.task_type == "document.summarize":
             context = self._build_context(task)
+            extracted_text = ""
+            try:
+                extracted_text = self._resolve_document_text(task, context)
+            except DocumentTextExtractionError as exc:
+                context["document_text_warning"] = str(exc)
+            if extracted_text:
+                context["document_text"] = extracted_text
             try:
                 output = self.openclaw_client.summarize_document(task.request_id, task.payload, context)
             except OpenClawClientError as exc:
@@ -76,6 +87,8 @@ class WorkerDispatcher:
                     status="failed",
                     error_message=str(exc),
                 )
+            if extracted_text:
+                output["extracted_text"] = extracted_text
             return TaskResult(
                 request_id=task.request_id,
                 status="completed",
@@ -115,10 +128,21 @@ class WorkerDispatcher:
             )
 
         if task.task_type == "document.extract_text":
+            try:
+                extracted_text = self._resolve_document_text(task, self._build_context(task))
+            except DocumentTextExtractionError as exc:
+                return TaskResult(
+                    request_id=task.request_id,
+                    status="failed",
+                    error_message=str(exc),
+                )
             return TaskResult(
                 request_id=task.request_id,
-                status="failed",
-                error_message="document.extract_text 尚未接入实际文档正文读取链路",
+                status="completed",
+                output={
+                    "task_type": "document.extract_text",
+                    "extracted_text": extracted_text,
+                },
             )
 
         return TaskResult(
@@ -164,6 +188,42 @@ class WorkerDispatcher:
 
         return context
 
+    def _resolve_document_text(
+        self,
+        task: WorkerTask,
+        context: dict[str, Any],
+    ) -> str:
+        document_context = context.get("document_context")
+        if isinstance(document_context, dict):
+            existing_text = _string_value(document_context.get("extracted_text"))
+            if existing_text:
+                return existing_text
+
+        version_id = _string_value(task.payload.get("version_id"))
+        if version_id == "":
+            raise DocumentTextExtractionError("缺少 version_id，无法抽取正文")
+
+        headers, content = self.context_client.download_version_file(version_id)
+        file_name = _extract_filename(
+            headers.get("content_disposition", ""),
+            fallback=_string_value(task.payload.get("file_name")) or f"{version_id}.bin",
+        )
+        extracted_text = extract_text(file_name, content)
+        if extracted_text == "":
+            raise DocumentTextExtractionError("未提取到有效正文内容")
+        return extracted_text
+
 
 def _string_value(value: Any) -> str:
     return value if isinstance(value, str) else ""
+
+
+def _extract_filename(content_disposition: str, fallback: str) -> str:
+    match = None
+    if content_disposition:
+        import re
+
+        match = re.search(r'filename="([^"]+)"', content_disposition)
+    if match:
+        return match.group(1)
+    return fallback

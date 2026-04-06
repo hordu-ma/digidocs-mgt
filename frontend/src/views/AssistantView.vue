@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
-import { ref } from "vue";
+import { onBeforeUnmount, ref } from "vue";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
@@ -8,6 +8,51 @@ import api from "@/api";
 const question = ref("课题A 最近一个月有哪些文档在流转？");
 const loading = ref(false);
 const timeline = ref<{ title: string; content: string }[]>([]);
+const activeRequestID = ref("");
+const submittedQuestion = ref("");
+let pollTimer: number | null = null;
+
+function stopPolling() {
+  if (pollTimer !== null) {
+    window.clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+}
+
+async function pollRequest(requestID: string) {
+  try {
+    const res = await api.get(`/assistant/requests/${requestID}`);
+    const data = res.data?.data;
+    const answer = data?.output?.answer;
+    timeline.value = [
+      {
+        title: "已提交",
+        content: `问题「${submittedQuestion.value}」已提交至 AI 助手（request_id: ${requestID}）`,
+      },
+      {
+        title: "状态",
+        content:
+          data?.status === "completed"
+            ? answer || "任务已完成，但未返回回答内容。"
+            : data?.status === "failed"
+              ? data?.error_message || "任务执行失败。"
+              : "任务仍在处理中，正在轮询最新状态。",
+      },
+    ];
+
+    if (data?.status === "completed" || data?.status === "failed") {
+      stopPolling();
+      return;
+    }
+
+    pollTimer = window.setTimeout(() => {
+      void pollRequest(requestID);
+    }, 2000);
+  } catch (err: any) {
+    stopPolling();
+    ElMessage.error(err.response?.data?.message ?? "查询 AI 任务状态失败");
+  }
+}
 
 async function submitQuestion() {
   if (!question.value.trim()) {
@@ -17,6 +62,7 @@ async function submitQuestion() {
 
   loading.value = true;
   try {
+    stopPolling();
     const res = await api.post("/assistant/ask", {
       question: question.value,
       scope: {
@@ -25,10 +71,12 @@ async function submitQuestion() {
       },
     });
     const data = res.data?.data;
+    activeRequestID.value = data?.request_id ?? "";
+    submittedQuestion.value = data?.question ?? question.value;
     timeline.value = [
       {
         title: "已提交",
-        content: `问题「${data?.question ?? question.value}」已提交至 AI 助手（request_id: ${data?.request_id ?? "-"}）`,
+        content: `问题「${submittedQuestion.value}」已提交至 AI 助手（request_id: ${data?.request_id ?? "-"}）`,
       },
       {
         title: "状态",
@@ -40,6 +88,9 @@ async function submitQuestion() {
               : "任务状态未知，请稍后刷新。",
       },
     ];
+    if (activeRequestID.value) {
+      await pollRequest(activeRequestID.value);
+    }
     ElMessage.success("问题已提交");
   } catch (err: any) {
     const msg = err.response?.data?.message ?? "提交失败";
@@ -48,6 +99,10 @@ async function submitQuestion() {
     loading.value = false;
   }
 }
+
+onBeforeUnmount(() => {
+  stopPolling();
+});
 </script>
 
 <template>

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 
 	"digidocs-mgt/backend-go/internal/config"
@@ -11,6 +13,7 @@ import (
 
 type InternalAssistantContextHandler struct {
 	cfg       config.Config
+	assistant service.AssistantService
 	documents service.DocumentService
 	versions  service.VersionService
 	flows     service.FlowService
@@ -20,6 +23,7 @@ type InternalAssistantContextHandler struct {
 
 func NewInternalAssistantContextHandler(
 	cfg config.Config,
+	assistant service.AssistantService,
 	documents service.DocumentService,
 	versions service.VersionService,
 	flows service.FlowService,
@@ -28,6 +32,7 @@ func NewInternalAssistantContextHandler(
 ) InternalAssistantContextHandler {
 	return InternalAssistantContextHandler{
 		cfg:       cfg,
+		assistant: assistant,
 		documents: documents,
 		versions:  versions,
 		flows:     flows,
@@ -65,13 +70,20 @@ func (h InternalAssistantContextHandler) GetDocumentContext(w http.ResponseWrite
 		return
 	}
 
+	extractedText, err := h.assistant.GetLatestDocumentExtractedText(r.Context(), documentID)
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to load extracted text context")
+		return
+	}
+
 	response.WriteData(w, http.StatusOK, map[string]any{
 		"scope": map[string]any{
 			"document_id": documentID,
 		},
-		"document": document,
-		"versions": versions,
-		"flows":    flows,
+		"document":       document,
+		"versions":       versions,
+		"flows":          flows,
+		"extracted_text": extractedText,
 	})
 }
 
@@ -134,4 +146,30 @@ func (h InternalAssistantContextHandler) GetHandoverContext(w http.ResponseWrite
 		},
 		"handover": handover,
 	})
+}
+
+func (h InternalAssistantContextHandler) DownloadVersionFile(w http.ResponseWriter, r *http.Request) {
+	if !workerAuthorized(r, h.cfg) {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid worker callback token")
+		return
+	}
+
+	ver, obj, err := h.versions.GetFile(r.Context(), r.PathValue("versionID"))
+	if err != nil {
+		if ver == nil {
+			response.WriteError(w, http.StatusNotFound, "not_found", "version not found")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to retrieve version file")
+		return
+	}
+	defer obj.Reader.Close()
+
+	w.Header().Set("Content-Type", contentTypeFromName(ver.FileName, obj.ContentType))
+	w.Header().Set("Content-Disposition", `attachment; filename="`+ver.FileName+`"`)
+	if obj.Size > 0 {
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", obj.Size))
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, obj.Reader)
 }
