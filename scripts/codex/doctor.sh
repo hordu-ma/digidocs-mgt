@@ -56,7 +56,7 @@ docs/Harness Engineering 学习笔记.md
 EOF
 
 echo '== progress sync =='
-if rg -n '当前开发进度|当前阶段|已完成|进行中|待办' README.md TASKS.md AGENTS.md >/dev/null 2>&1; then
+if grep -nE -- '当前开发进度|当前阶段|已完成|进行中|待办' README.md TASKS.md AGENTS.md >/dev/null 2>&1; then
   echo '[OK] progress markers found in README.md / TASKS.md / AGENTS.md'
 else
   echo '[MISS] expected progress markers not found'
