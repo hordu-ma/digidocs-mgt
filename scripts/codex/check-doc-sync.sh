@@ -28,7 +28,7 @@ require_pattern() {
   local pattern="$2"
   local label="$3"
 
-  if rg -q "$pattern" "$file"; then
+  if grep -Eq -- "$pattern" "$file"; then
     printf '[OK] %s\n' "$label"
   else
     printf '[MISS] %s\n' "$label"
