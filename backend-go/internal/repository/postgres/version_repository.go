@@ -100,6 +100,19 @@ func (r VersionRepository) GetVersion(ctx context.Context, versionID string) (*q
 func (r VersionRepository) CreateVersion(ctx context.Context, input command.VersionCreateInput) (map[string]any, error) {
 	id := newID()
 
+	if _, err := r.db.ExecContext(
+		ctx,
+		`
+		SELECT id
+		FROM documents
+		WHERE id::text = $1
+		FOR UPDATE
+		`,
+		input.DocumentID,
+	); err != nil {
+		return nil, err
+	}
+
 	var versionNo int
 	if err := r.db.QueryRowContext(
 		ctx,
@@ -107,7 +120,6 @@ func (r VersionRepository) CreateVersion(ctx context.Context, input command.Vers
 		SELECT COALESCE(MAX(version_no), 0) + 1
 		FROM document_versions
 		WHERE document_id::text = $1
-		FOR UPDATE
 		`,
 		input.DocumentID,
 	).Scan(&versionNo); err != nil {

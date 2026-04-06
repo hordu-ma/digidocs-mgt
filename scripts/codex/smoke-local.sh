@@ -7,6 +7,17 @@ cd "$ROOT_DIR"
 strict="${STRICT_SMOKE:-0}"
 backend_url="${BACKEND_BASE_URL:-http://127.0.0.1:18081}"
 status=0
+tmp_files=()
+
+cleanup() {
+  for file in "${tmp_files[@]:-}"; do
+    if [[ -n "$file" && -e "$file" ]]; then
+      rm -f "$file"
+    fi
+  done
+}
+
+trap cleanup EXIT
 
 require_or_skip() {
   local message="$1"
@@ -16,6 +27,27 @@ require_or_skip() {
   else
     echo "[SKIP] $message"
   fi
+}
+
+extract_json_string() {
+  local key="$1"
+  grep -o '"'"$key"'":"[^"]*"' | head -1 | cut -d'"' -f4 || true
+}
+
+extract_response_data_id() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import json,sys; data=json.load(sys.stdin).get("data"); print(data.get("id", "") if isinstance(data, dict) else "", end="")' 2>/dev/null || true
+    return
+  fi
+  extract_json_string id
+}
+
+extract_version_smoke_document_id() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import json,sys; data=json.load(sys.stdin).get("data") or []; print(next((item.get("id", "") for item in data if isinstance(item, dict) and item.get("current_version_no") is not None), ""), end="")' 2>/dev/null || true
+    return
+  fi
+  extract_json_string id
 }
 
 container_running() {
@@ -59,7 +91,7 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
   login_resp=$(curl -sS --max-time 5 -X POST "$backend_url/api/v1/auth/login" \
     -H 'Content-Type: application/json' \
     -d '{"username":"admin","password":"admin123"}' 2>/dev/null)
-  token=$(echo "$login_resp" | grep -o '"access_token":"[^"]*"' | head -1 | cut -d'"' -f4)
+  token=$(echo "$login_resp" | extract_json_string access_token)
 
   if [[ -n "$token" ]]; then
     echo "[OK] auth/login returned token"
@@ -110,12 +142,54 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
       require_or_skip "GET /audit-events/summary -> $as_status (expected 200)"
     fi
 
+    # POST /documents/{id}/versions + GET /versions/{id}/download|preview
+    documents_resp=$(curl -sS --max-time 5 -H "$auth_header" "$backend_url/api/v1/documents?page=1&page_size=5" 2>/dev/null)
+    document_id=$(echo "$documents_resp" | extract_version_smoke_document_id)
+
+    if [[ -n "$document_id" ]]; then
+      upload_tmp=$(mktemp)
+      tmp_files+=("$upload_tmp")
+      printf 'smoke second version\n' >"$upload_tmp"
+
+      version_resp=$(curl -sS --max-time 10 -X POST "$backend_url/api/v1/documents/$document_id/versions" \
+        -H "$auth_header" \
+        -F 'commit_message=smoke second upload' \
+        -F "file=@$upload_tmp;filename=smoke-v2.txt;type=text/plain" 2>/dev/null)
+      version_id=$(echo "$version_resp" | extract_response_data_id)
+
+      if [[ -n "$version_id" ]]; then
+        download_tmp=$(mktemp)
+        tmp_files+=("$download_tmp")
+        download_status=$(curl -sS -o "$download_tmp" -w '%{http_code}' --max-time 10 \
+          -H "$auth_header" "$backend_url/api/v1/versions/$version_id/download" 2>/dev/null)
+        if [[ "$download_status" == "200" && "$(cat "$download_tmp")" == 'smoke second version' ]]; then
+          echo "[OK] version upload/download -> $download_status"
+        else
+          require_or_skip "version upload/download smoke failed (status=$download_status version_id=$version_id)"
+        fi
+
+        preview_tmp=$(mktemp)
+        tmp_files+=("$preview_tmp")
+        preview_status=$(curl -sS -o "$preview_tmp" -w '%{http_code}' --max-time 10 \
+          -H "$auth_header" "$backend_url/api/v1/versions/$version_id/preview" 2>/dev/null)
+        if [[ "$preview_status" == "200" && "$(cat "$preview_tmp")" == 'smoke second version' ]]; then
+          echo "[OK] version preview -> $preview_status"
+        else
+          require_or_skip "version preview smoke failed (status=$preview_status version_id=$version_id)"
+        fi
+      else
+        require_or_skip "version smoke did not return expected version id"
+      fi
+    else
+      require_or_skip "document lookup failed; cannot run version smoke"
+    fi
+
     # POST /assistant/ask + poll /assistant/requests/{id}
     ask_resp=$(curl -sS --max-time 10 -X POST "$backend_url/api/v1/assistant/ask" \
       -H "$auth_header" \
       -H 'Content-Type: application/json' \
       -d '{"question":"请用一句话确认 smoke 已打通 AI 链路","scope":{"project_id":null,"document_id":null}}' 2>/dev/null)
-    request_id=$(echo "$ask_resp" | grep -o '"request_id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    request_id=$(echo "$ask_resp" | extract_json_string request_id)
 
     if [[ -n "$request_id" ]]; then
       echo "[OK] POST /assistant/ask queued request_id=$request_id"
@@ -123,7 +197,7 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
       final_body=""
       for _ in 1 2 3 4 5 6 7 8; do
         final_body=$(curl -sS --max-time 10 -H "$auth_header" "$backend_url/api/v1/assistant/requests/$request_id" 2>/dev/null)
-        final_status=$(echo "$final_body" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
+        final_status=$(echo "$final_body" | extract_json_string status)
         if [[ "$final_status" == "completed" || "$final_status" == "failed" ]]; then
           break
         fi
@@ -143,6 +217,144 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
   fi
 else
   echo "[SKIP] backend not reachable, skipping business endpoint smoke"
+fi
+
+if [[ "${RUN_SYNOLOGY_PREFLIGHT:-0}" == "1" || "${STORAGE_BACKEND:-}" == "synology" ]]; then
+  echo '== synology preflight =='
+  synology_scheme="http"
+  synology_port="${SYNOLOGY_PORT:-5000}"
+  if [[ "${SYNOLOGY_HTTPS:-false}" == "true" ]]; then
+    synology_scheme="https"
+    if [[ -z "${SYNOLOGY_PORT:-}" ]]; then
+      synology_port="5001"
+    fi
+  fi
+
+  if [[ -z "${SYNOLOGY_HOST:-}" || -z "${SYNOLOGY_ACCOUNT:-}" || -z "${SYNOLOGY_PASSWORD:-}" || -z "${SYNOLOGY_SHARE_PATH:-}" ]]; then
+    require_or_skip 'synology preflight requires SYNOLOGY_HOST/SYNOLOGY_ACCOUNT/SYNOLOGY_PASSWORD/SYNOLOGY_SHARE_PATH'
+  else
+    synology_base_url="$synology_scheme://$SYNOLOGY_HOST:$synology_port"
+    synology_curl_opts=(--silent --show-error --max-time 15)
+    if [[ "${SYNOLOGY_INSECURE_SKIP_VERIFY:-0}" == "1" ]]; then
+      synology_curl_opts+=(-k)
+    fi
+
+    info_resp=$(curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/query.cgi" \
+      --data-urlencode 'api=SYNO.API.Info' \
+      --data-urlencode 'version=1' \
+      --data-urlencode 'method=query' \
+      --data-urlencode 'query=SYNO.API.Auth,SYNO.FileStation.Upload,SYNO.FileStation.List,SYNO.FileStation.Download,SYNO.FileStation.CreateFolder,SYNO.FileStation.Sharing' 2>/dev/null || true)
+    if [[ "$info_resp" == *'"success":true'* ]]; then
+      echo '[OK] SYNO.API.Info reachable'
+    else
+      require_or_skip 'SYNO.API.Info query failed'
+    fi
+
+    login_resp=$(curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/auth.cgi" \
+      --data-urlencode 'api=SYNO.API.Auth' \
+      --data-urlencode 'version=3' \
+      --data-urlencode 'method=login' \
+      --data-urlencode "account=$SYNOLOGY_ACCOUNT" \
+      --data-urlencode "passwd=$SYNOLOGY_PASSWORD" \
+      --data-urlencode 'session=FileStation' \
+      --data-urlencode 'format=sid' 2>/dev/null || true)
+    synology_sid=$(echo "$login_resp" | extract_json_string sid)
+
+    if [[ -n "$synology_sid" ]]; then
+      echo '[OK] DSM/File Station login succeeded'
+      smoke_folder="${SYNOLOGY_SHARE_PATH%/}/_digidocs_smoke_$$"
+      smoke_parent=$(dirname "$smoke_folder")
+      smoke_name=$(basename "$smoke_folder")
+      smoke_file="${smoke_folder}/smoke.txt"
+
+      create_resp=$(curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/entry.cgi" \
+        --data-urlencode 'api=SYNO.FileStation.CreateFolder' \
+        --data-urlencode 'version=2' \
+        --data-urlencode 'method=create' \
+        --data-urlencode "folder_path=$smoke_parent" \
+        --data-urlencode "name=$smoke_name" \
+        --data-urlencode 'force_parent=true' \
+        --data-urlencode "_sid=$synology_sid" 2>/dev/null || true)
+      if [[ "$create_resp" == *'"success":true'* ]]; then
+        echo "[OK] created synology smoke folder $smoke_folder"
+      else
+        require_or_skip "failed to create synology smoke folder $smoke_folder"
+      fi
+
+      synology_tmp=$(mktemp)
+      tmp_files+=("$synology_tmp")
+      printf 'digidocs synology smoke\n' >"$synology_tmp"
+      upload_resp=$(curl "${synology_curl_opts[@]}" -X POST "$synology_base_url/webapi/entry.cgi" \
+        -F 'api=SYNO.FileStation.Upload' \
+        -F 'version=2' \
+        -F 'method=upload' \
+        -F "path=$smoke_folder" \
+        -F 'create_parents=true' \
+        -F 'overwrite=true' \
+        -F "_sid=$synology_sid" \
+        -F "file=@$synology_tmp;filename=smoke.txt;type=text/plain" 2>/dev/null || true)
+      if [[ "$upload_resp" == *'"success":true'* ]]; then
+        echo '[OK] synology upload succeeded'
+      else
+        require_or_skip 'synology upload failed'
+      fi
+
+      list_resp=$(curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/entry.cgi" \
+        --data-urlencode 'api=SYNO.FileStation.List' \
+        --data-urlencode 'version=2' \
+        --data-urlencode 'method=list' \
+        --data-urlencode "folder_path=$smoke_folder" \
+        --data-urlencode 'additional=["size","time"]' \
+        --data-urlencode "_sid=$synology_sid" 2>/dev/null || true)
+      if [[ "$list_resp" == *'smoke.txt'* ]]; then
+        echo '[OK] synology list/getinfo succeeded'
+      else
+        require_or_skip 'synology list/getinfo failed'
+      fi
+
+      share_resp=$(curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/entry.cgi" \
+        --data-urlencode 'api=SYNO.FileStation.Sharing' \
+        --data-urlencode 'version=3' \
+        --data-urlencode 'method=create' \
+        --data-urlencode "path=$smoke_file" \
+        --data-urlencode "_sid=$synology_sid" 2>/dev/null || true)
+      if [[ "$share_resp" == *'"url":'* ]]; then
+        echo '[OK] synology share link creation succeeded'
+      else
+        require_or_skip 'synology share link creation failed'
+      fi
+
+      synology_download=$(mktemp)
+      tmp_files+=("$synology_download")
+      download_status=$(curl "${synology_curl_opts[@]}" -o "$synology_download" -w '%{http_code}' --get "$synology_base_url/webapi/entry.cgi" \
+        --data-urlencode 'api=SYNO.FileStation.Download' \
+        --data-urlencode 'version=2' \
+        --data-urlencode 'method=download' \
+        --data-urlencode "path=$smoke_file" \
+        --data-urlencode 'mode=download' \
+        --data-urlencode "_sid=$synology_sid" 2>/dev/null || true)
+      if [[ "$download_status" == "200" && "$(cat "$synology_download")" == 'digidocs synology smoke' ]]; then
+        echo '[OK] synology download succeeded'
+      else
+        require_or_skip 'synology download failed'
+      fi
+
+      delete_resp=$(curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/entry.cgi" \
+        --data-urlencode 'api=SYNO.FileStation.Delete' \
+        --data-urlencode 'version=2' \
+        --data-urlencode 'method=delete' \
+        --data-urlencode "path=$smoke_folder" \
+        --data-urlencode 'recursive=true' \
+        --data-urlencode "_sid=$synology_sid" 2>/dev/null || true)
+      if [[ "$delete_resp" == *'"success":true'* ]]; then
+        echo '[OK] synology cleanup succeeded'
+      else
+        require_or_skip 'synology cleanup failed'
+      fi
+    else
+      require_or_skip 'DSM/File Station login failed'
+    fi
+  fi
 fi
 
 echo '== summary =='

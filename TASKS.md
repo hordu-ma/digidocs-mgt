@@ -294,6 +294,14 @@ Go 主业务迁移与协作环境固化阶段
   - `docs/项目定义与技术架构.md`：§11 部署结构从 3 台硬件改为 2 台（DGX Spark + 群晖 DS925+）；§11.3 合并管理平台主服务到 DGX Spark；移除 §11.5 独立业务主机；§12.1 后端从 FastAPI 改为 Go 1.26 + Python Worker；§12.5 从 Redis+Celery 改为 Go 内存队列 + Python Worker；§13 运行单元更新；§14 从 FastAPI 改为 Go；§18.2 从 Celery 改为 Python Worker；§30.6 从 MinIOStorageProvider 改为已实现的 SynologyStorageProvider
   - `scripts/codex/smoke-local.sh`：移除 `digidocs-minio` 和 `digidocs-redis` 容器检查
   - 已通过 `go build ./...`、`go test ./...`、`docker compose config` 验证
+- 完成群晖联调前置验收与版本链路 smoke 收口
+  - `scripts/codex/smoke-local.sh` 新增现有文档的版本上传、下载、预览闭环验证
+  - `scripts/codex/smoke-local.sh` 新增可选 `RUN_SYNOLOGY_PREFLIGHT=1` 直接 DSM / File Station API 验收
+  - `docs/部署准备与运行说明.md` 补充群晖前置验收、回滚方式与现场 checklist
+- 完成 Synology provider 契约测试与 memory 版本仓储联动补强
+  - 新增 `storage/synology/provider_test.go`，覆盖上传、重登录重试、下载、共享链接解析
+  - memory 版 `VersionRepository` / `VersionWorkflow` 改为共享状态，补齐上传后查询/下载/预览联动
+  - 补充 `VersionService` 与 handler 集成测试，覆盖下载、预览、内部助手文件下载链路
 
 ## 进行中
 
@@ -357,12 +365,13 @@ Go 主业务迁移与协作环境固化阶段
   - 已固化 p14s 上的 `.env`，确认 `OPENCLAW_BASE_URL` / `OPENCLAW_API_KEY` / `CALLBACK_BASE_URL`
   - 选择部署方式：`docker compose` 或 `systemd + 反向代理`
   - 配置 TLS / 反向代理 / 防火墙，仅暴露前端入口
-  - 进行一次更正式的长驻形态端到端烟测（当前 `make smoke` 已覆盖 AI 闭环）
+  - 进行一次更正式的长驻形态端到端烟测（当前 `make smoke` 已覆盖现有文档版本文件链路与 AI 闭环）
 - 群晖 DS925+ 部署准备
   - 创建 `DigiDocs` 共享目录与最小权限服务账号
   - 验证 DSM / File Station API 连通性与证书策略
   - 确认 PostgreSQL 运行位置、备份频率、恢复方式
   - 确认 p14s 与群晖之间网络可达与地址固定策略
+  - 在真实环境执行 `RUN_SYNOLOGY_PREFLIGHT=1 make smoke`
   - 进行一次真实上传 / 下载 / 创建目录 / 共享链接烟测
 - ~~增加群晖 NAS 适配器~~ ✅ 已完成
 - ~~增加基础测试~~ ✅ 已完成

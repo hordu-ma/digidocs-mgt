@@ -15,8 +15,10 @@ import (
 // --- mocks ---
 
 type mockStorageProvider struct {
-	result storage.PutObjectResult
-	err    error
+	result    storage.PutObjectResult
+	err       error
+	getObject *storage.GetObjectOutput
+	getErr    error
 }
 
 func (m *mockStorageProvider) PutObject(_ context.Context, _ storage.PutObjectInput) (storage.PutObjectResult, error) {
@@ -24,6 +26,12 @@ func (m *mockStorageProvider) PutObject(_ context.Context, _ storage.PutObjectIn
 }
 
 func (m *mockStorageProvider) GetObject(_ context.Context, _ string) (*storage.GetObjectOutput, error) {
+	if m.getErr != nil {
+		return nil, m.getErr
+	}
+	if m.getObject != nil {
+		return m.getObject, nil
+	}
 	return nil, errors.New("not implemented in mock")
 }
 
@@ -150,6 +158,54 @@ func TestVersionService_List_Delegates(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].ID != "v-1" {
 		t.Errorf("got = %v, want [{ID:v-1}]", got)
+	}
+}
+
+func TestVersionService_GetFile_OK(t *testing.T) {
+	output := &storage.GetObjectOutput{
+		Reader:      io.NopCloser(strings.NewReader("hello version")),
+		ContentType: "text/plain",
+		Size:        13,
+	}
+	reader := &mockVersionReader{item: &query.VersionDetail{
+		ID:               "v-1",
+		FileName:         "report.txt",
+		StorageObjectKey: "documents/doc-1/report.txt",
+	}}
+	svc := NewVersionService(&mockStorageProvider{getObject: output}, &mockVersionWorkflow{}, reader)
+
+	ver, obj, err := svc.GetFile(context.Background(), "v-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ver.ID != "v-1" {
+		t.Fatalf("version id = %s, want v-1", ver.ID)
+	}
+	if obj.ContentType != "text/plain" {
+		t.Fatalf("content type = %s, want text/plain", obj.ContentType)
+	}
+}
+
+func TestVersionService_GetFile_StorageError(t *testing.T) {
+	reader := &mockVersionReader{item: &query.VersionDetail{
+		ID:               "v-1",
+		FileName:         "report.txt",
+		StorageObjectKey: "documents/doc-1/report.txt",
+	}}
+	svc := NewVersionService(&mockStorageProvider{getErr: errors.New("storage down")}, &mockVersionWorkflow{}, reader)
+
+	ver, obj, err := svc.GetFile(context.Background(), "v-1")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if ver == nil || ver.ID != "v-1" {
+		t.Fatalf("version = %#v, want v-1", ver)
+	}
+	if obj != nil {
+		t.Fatal("expected nil object on storage error")
+	}
+	if !strings.Contains(err.Error(), "storage get failed") {
+		t.Fatalf("err = %v, want storage get failed", err)
 	}
 }
 

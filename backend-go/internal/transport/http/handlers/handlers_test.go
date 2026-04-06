@@ -187,6 +187,88 @@ func TestDocuments_Create_Multipart(t *testing.T) {
 	}
 }
 
+func TestVersions_UploadThenDownloadAndPreview(t *testing.T) {
+	handler, token := testServer(t)
+
+	var uploadBuf bytes.Buffer
+	uploadWriter := multipart.NewWriter(&uploadBuf)
+	uploadWriter.WriteField("commit_message", "smoke upload")
+	part, _ := uploadWriter.CreateFormFile("file", "smoke.txt")
+	_, _ = part.Write([]byte("hello version smoke"))
+	uploadWriter.Close()
+
+	uploadReq := httptest.NewRequest("POST", "/api/v1/documents/00000000-0000-0000-0000-000000000100/versions", &uploadBuf)
+	uploadReq.Header.Set("Authorization", "Bearer "+token)
+	uploadReq.Header.Set("Content-Type", uploadWriter.FormDataContentType())
+
+	uploadRec := httptest.NewRecorder()
+	handler.ServeHTTP(uploadRec, uploadReq)
+	if uploadRec.Code != http.StatusOK {
+		t.Fatalf("upload status = %d, want 200; body = %s", uploadRec.Code, uploadRec.Body.String())
+	}
+	uploadResult := parseResponse(t, uploadRec)
+	uploadData, _ := uploadResult["data"].(map[string]any)
+	versionID, _ := uploadData["id"].(string)
+	if versionID == "" {
+		t.Fatal("expected version id")
+	}
+
+	downloadRec := httptest.NewRecorder()
+	handler.ServeHTTP(downloadRec, authedRequest("GET", "/api/v1/versions/"+versionID+"/download", nil, token))
+	if downloadRec.Code != http.StatusOK {
+		t.Fatalf("download status = %d, want 200; body = %s", downloadRec.Code, downloadRec.Body.String())
+	}
+	if body := downloadRec.Body.String(); body != "hello version smoke" {
+		t.Fatalf("download body = %q, want hello version smoke", body)
+	}
+	if got := downloadRec.Header().Get("Content-Disposition"); !strings.Contains(got, "attachment") {
+		t.Fatalf("download content-disposition = %s, want attachment", got)
+	}
+
+	previewRec := httptest.NewRecorder()
+	handler.ServeHTTP(previewRec, authedRequest("GET", "/api/v1/versions/"+versionID+"/preview", nil, token))
+	if previewRec.Code != http.StatusOK {
+		t.Fatalf("preview status = %d, want 200; body = %s", previewRec.Code, previewRec.Body.String())
+	}
+	if body := previewRec.Body.String(); body != "hello version smoke" {
+		t.Fatalf("preview body = %q, want hello version smoke", body)
+	}
+	if got := previewRec.Header().Get("Content-Disposition"); !strings.Contains(got, "inline") {
+		t.Fatalf("preview content-disposition = %s, want inline", got)
+	}
+}
+
+func TestInternalAssistantContext_DownloadVersionFile(t *testing.T) {
+	handler, token := testServer(t)
+
+	var uploadBuf bytes.Buffer
+	uploadWriter := multipart.NewWriter(&uploadBuf)
+	part, _ := uploadWriter.CreateFormFile("file", "assistant.txt")
+	_, _ = part.Write([]byte("assistant asset"))
+	uploadWriter.Close()
+
+	uploadReq := httptest.NewRequest("POST", "/api/v1/documents/00000000-0000-0000-0000-000000000100/versions", &uploadBuf)
+	uploadReq.Header.Set("Authorization", "Bearer "+token)
+	uploadReq.Header.Set("Content-Type", uploadWriter.FormDataContentType())
+	uploadRec := httptest.NewRecorder()
+	handler.ServeHTTP(uploadRec, uploadReq)
+	uploadResult := parseResponse(t, uploadRec)
+	uploadData, _ := uploadResult["data"].(map[string]any)
+	versionID, _ := uploadData["id"].(string)
+	if versionID == "" {
+		t.Fatal("expected version id")
+	}
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, workerRequest("GET", "/api/v1/internal/assistant-assets/versions/"+versionID+"/download", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != "assistant asset" {
+		t.Fatalf("body = %q, want assistant asset", body)
+	}
+}
+
 // --- Unauthenticated Access ---
 
 func TestDocuments_Unauthenticated(t *testing.T) {
