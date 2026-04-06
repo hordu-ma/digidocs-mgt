@@ -48,7 +48,8 @@
 - 不允许把 OpenClaw 当成业务主账本。
   - 所有 AI 返回都作为附属结果存储。
 - 不允许在未经设计文档确认的情况下增加新状态或新角色。
-- 不允许跳过 Alembic 直接手工改数据库结构。
+- 不允许跳过仓库内迁移机制直接手工改数据库结构。
+  - 当前以后端 Go 侧 `backend-go/migrations/` 为准。
 - 不允许把“建议”和“确认后的正式动作”混在同一数据表字段里。
 
 ## 5. 代理执行顺序
@@ -97,7 +98,7 @@
 - 需要做本地容器联调烟测时，优先使用 `make smoke`
 - 子系统验证优先使用：
   - `cd backend-go && go test ./...`
-  - `cd backend-py-worker && .venv/bin/python -m pytest -q`
+  - `cd backend-py-worker && uv run pytest -q`
   - `cd frontend && npm run build`
 
 ## 5.5 冲突处理规则

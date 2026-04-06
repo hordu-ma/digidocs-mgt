@@ -263,7 +263,7 @@ Harness Engineering 不允许“大家都觉得项目在推进”，但没有一
 完成必须带最小验证证据，比如：
 
 - `go test ./...`
-- `.venv/bin/python -m pytest -q`
+- `uv run pytest -q`
 - `npm run build`
 - `./scripts/codex/doctor.sh`
 

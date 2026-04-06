@@ -143,6 +143,12 @@ Go 主业务迁移与协作环境固化阶段
   - `DocumentDetailView`：根据文档当前状态动态展示流转操作按钮（开始处理/转交/定稿/归档/取消归档）
   - `AssistantView`：接入真实 `POST /assistant/ask` API，提交问题后展示排队状态
   - `HandoversView`：新增「创建交接」按钮和 Dialog 表单，调用 `POST /handovers`
+- 完成 P0 文档/契约收口首轮修复
+  - `make verify` 的 Python Worker 验证改为 `uv run pytest -q`，消除对本地 `.venv` 路径的硬依赖
+  - `README.md` / `AGENTS.md` / 项目 skill 索引更新为 Go migrations + 当前验证命令
+  - 前端统一按后端真实错误结构读取 `message`
+  - 修复文档详情页 `transfer` 动作缺少 `to_user_id` 的前后端断裂
+  - 统一 `/assistant/ask` 为异步排队语义，并兼容 `scope.project_id/document_id` 输入
 - 清理冗余 `SKILLS/` 目录
   - 旧 FastAPI 技能文档已过时、前端和集成层约束已被 `ops/codex/skills/` 覆盖
   - 移除 `AGENTS.md`、`README.md` 中的 `SKILLS/` 引用

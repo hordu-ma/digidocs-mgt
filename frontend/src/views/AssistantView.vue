@@ -17,7 +17,13 @@ async function submitQuestion() {
 
   loading.value = true;
   try {
-    const res = await api.post("/assistant/ask", { question: question.value });
+    const res = await api.post("/assistant/ask", {
+      question: question.value,
+      scope: {
+        project_id: null,
+        document_id: null,
+      },
+    });
     const data = res.data?.data;
     timeline.value = [
       {
@@ -26,14 +32,17 @@ async function submitQuestion() {
       },
       {
         title: "状态",
-        content: data?.answer
-          ? data.answer
-          : "任务已排队，结果将在后台处理完成后更新。",
+        content:
+          data?.status === "queued"
+            ? "任务已排队，结果将在后台处理完成后更新。"
+            : data?.answer
+              ? data.answer
+              : "任务状态未知，请稍后刷新。",
       },
     ];
     ElMessage.success("问题已提交");
   } catch (err: any) {
-    const msg = err.response?.data?.error?.message ?? "提交失败";
+    const msg = err.response?.data?.message ?? "提交失败";
     ElMessage.error(msg);
   } finally {
     loading.value = false;

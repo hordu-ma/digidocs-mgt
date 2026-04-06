@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import type { UploadRawFile } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -71,11 +71,34 @@ async function loadData() {
 async function applyFlowAction(endpoint: string, label: string) {
   actionLoading.value = true;
   try {
-    await api.post(`/documents/${documentID}/flow/${endpoint}`);
+    const payload: Record<string, string> = {};
+    if (endpoint === "transfer") {
+      const { value } = await ElMessageBox.prompt(
+        "请输入接收人的用户 ID",
+        "转交文档",
+        {
+          confirmButtonText: "确认转交",
+          cancelButtonText: "取消",
+          inputPlaceholder: "目标用户 UUID",
+          inputValidator: (input) => {
+            if (!input?.trim()) {
+              return "接收人用户 ID 不能为空";
+            }
+            return true;
+          },
+        },
+      );
+      payload.to_user_id = value.trim();
+    }
+
+    await api.post(`/documents/${documentID}/flow/${endpoint}`, payload);
     ElMessage.success(`${label}成功`);
     await loadData();
   } catch (err: any) {
-    const msg = err.response?.data?.error?.message ?? `${label}失败`;
+    if (err === "cancel") {
+      return;
+    }
+    const msg = err.response?.data?.message ?? `${label}失败`;
     ElMessage.error(msg);
   } finally {
     actionLoading.value = false;

@@ -48,7 +48,7 @@ async function submitCreate() {
     showDialog.value = false;
     await fetchHandovers();
   } catch (err: any) {
-    const msg = err.response?.data?.error?.message ?? "创建失败";
+    const msg = err.response?.data?.message ?? "创建失败";
     ElMessage.error(msg);
   } finally {
     formLoading.value = false;

@@ -18,7 +18,7 @@ verify-go:
 	cd backend-go && go test ./...
 
 verify-worker:
-	cd backend-py-worker && .venv/bin/python -m pytest -q
+	cd backend-py-worker && uv run pytest -q
 
 verify-frontend:
 	cd frontend && npm run build

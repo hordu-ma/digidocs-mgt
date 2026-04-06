@@ -74,7 +74,7 @@ func (h FlowHandler) writeAction(w http.ResponseWriter, r *http.Request, action 
 			return
 		}
 		if errors.Is(err, service.ErrInvalidTransition) {
-			response.WriteError(w, http.StatusBadRequest, "invalid_transition", "invalid flow transition")
+			response.WriteError(w, http.StatusBadRequest, "invalid_status_transition", "invalid flow transition")
 			return
 		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to apply flow action")

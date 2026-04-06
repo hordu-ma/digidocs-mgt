@@ -31,6 +31,7 @@ func WriteError(w http.ResponseWriter, statusCode int, code string, message stri
 }
 
 func writeJSON(w http.ResponseWriter, statusCode int, payload Envelope) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(statusCode)
 
 	if err := json.NewEncoder(w).Encode(payload); err != nil {

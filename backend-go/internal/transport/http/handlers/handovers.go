@@ -139,7 +139,7 @@ func (h HandoverHandler) writeAction(w http.ResponseWriter, r *http.Request, act
 			return
 		}
 		if errors.Is(err, service.ErrInvalidTransition) {
-			response.WriteError(w, http.StatusBadRequest, "invalid_transition", "invalid handover transition")
+			response.WriteError(w, http.StatusBadRequest, "handover_status_invalid", "invalid handover transition")
 			return
 		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to apply handover action")

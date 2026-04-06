@@ -7,7 +7,7 @@
 ## 触发条件
 
 - 需求涉及 `backend-py-worker/`
-- 需求涉及 OpenClaw、异步任务、摘要、建议、回写结果、Celery
+- 需求涉及 OpenClaw、异步任务、摘要、建议、回写结果
 
 ## 必读信息源
 
@@ -28,7 +28,7 @@
 
 ```bash
 cd backend-py-worker
-.venv/bin/python -m pytest -q
+uv run pytest -q
 ```
 
 ## 完成检查

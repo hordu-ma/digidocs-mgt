@@ -205,7 +205,7 @@
 ### 6.2 Python
 
 - 保留现有 `Python 3.12`
-- 保留 Celery 或逐步过渡到与 Go 统一的 Redis 队列
+- 采用轻量 Worker 进程，避免把 Python 再扩张为第二套主业务入口
 - 保留轻量客户端封装与任务执行器
 
 ---
@@ -349,7 +349,7 @@
 | `backend/app/api/routes/assistant.py` | `backend-py-worker` + `backend-go` | Python 执行 AI，Go 提供聚合展示接口 |
 | `backend/app/services/assistant_client.py` | `backend-py-worker` | OpenClaw 客户端保留在 Python |
 | `backend/app/models/*` | `backend-go` 重新实现 | 表结构语义保留，代码重建 |
-| `backend/alembic/*` | 短期保留，长期迁至 `backend-go/migrations/` | 迁移工具逐步切换 |
+| `backend-go/migrations/*` | `backend-go` | 当前唯一正式迁移入口 |
 
 ---
 
@@ -375,9 +375,9 @@
 
 控制：
 
-- Alembic 到 Go migration 的切换要有明确交接点；
-- 切换前最后一次 Python migration 需要打标；
-- 后续 schema 变更统一走新体系。
+- Go migration 作为当前唯一正式 schema 入口；
+- 后续 schema 变更统一走 `backend-go/migrations/`；
+- 不再引入第二套迁移事实源。
 
 ### 风险 4：AI 结果越权写主账本
 

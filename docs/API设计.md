@@ -14,8 +14,7 @@
 ```json
 {
   "code": "forbidden",
-  "message": "You do not have permission.",
-  "details": null
+  "message": "You do not have permission."
 }
 ```
 
@@ -805,8 +804,13 @@
 {
   "data": {
     "request_id": "uuid",
-    "answer": "最近一个月共有 6 份文档发生流转，主要集中在申报材料目录。",
-    "source_scope": "project:uuid",
+    "question": "课题A 最近一个月有哪些文档在流转？",
+    "status": "queued",
+    "answer": "",
+    "source_scope": {
+      "project_id": "uuid",
+      "document_id": null
+    },
     "generated_at": "2026-04-03T16:00:00Z"
   }
 }
@@ -843,6 +847,11 @@
 
 `GET /api/v1/assistant/suggestions`
 
+当前实现说明（待后续补齐持久化与筛选逻辑）：
+
+- 当前返回空数组占位
+- 查询参数契约已预留，但尚未完成真实过滤与结果回读
+
 查询参数：
 
 - `related_type`
@@ -853,6 +862,11 @@
 ### 9.5 确认建议
 
 `POST /api/v1/assistant/suggestions/{suggestion_id}/confirm`
+
+当前实现说明（待后续补齐正式落库）：
+
+- 当前返回确认动作回执
+- 尚未真正修改 `assistant_suggestions` 状态
 
 请求体：
 
@@ -865,6 +879,11 @@
 ### 9.6 忽略建议
 
 `POST /api/v1/assistant/suggestions/{suggestion_id}/dismiss`
+
+当前实现说明（待后续补齐正式落库）：
+
+- 当前返回忽略动作回执
+- 尚未真正修改 `assistant_suggestions` 状态
 
 请求体：
 
@@ -963,4 +982,3 @@
 - 审计事件明细列表
 - 建议确认与忽略
 - 交接项编辑
-

@@ -54,7 +54,6 @@ skills:
       - assistant
       - openclaw
       - async-task
-      - celery
     sources:
       - docs/项目定义与技术架构.md
       - docs/数据库设计.md
@@ -63,9 +62,8 @@ skills:
       - TASKS.md
     owned_paths:
       - backend-py-worker/
-      - backend/
     verify_commands:
-      - "cd backend-py-worker && .venv/bin/python -m pytest -q"
+      - "cd backend-py-worker && uv run pytest -q"
     done_updates:
       - README.md
       - TASKS.md

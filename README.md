@@ -53,10 +53,10 @@
 
 ### 后端
 
-- Go 1.26（主业务后端，标准库 net/http + database/sql）
+- Go 1.25（主业务后端，标准库 net/http + database/sql）
 - Python 3.12（Worker，承接 AI 与文档处理任务）
 - PostgreSQL 17
-- Alembic（数据库迁移）
+- Go 内置 SQL migrations（`backend-go/migrations/`）
 - uv（Python 依赖管理）
 
 ### 前端
@@ -100,10 +100,8 @@
 ### 后端
 
 ```bash
-cd backend
-uv sync
-uv run alembic upgrade head
-uv run uvicorn app.main:app --reload
+cd backend-go
+go run ./cmd/api
 ```
 
 ### Go 主后端骨架
@@ -117,6 +115,7 @@ go run ./cmd/api
 
 ```bash
 cd backend-py-worker
+uv sync
 uv run python -m app.main
 ```
 
@@ -214,5 +213,6 @@ docker compose up -d postgres
 - 已完成前端 Element Plus 按需引入（JS bundle 从 1,041 KB 降至 470 KB）
 - 已完成 Python Worker 真实队列消费链路（Go 内存队列 → HTTP polling → 处理 → 回写）
 - 已完成前端写操作 UI（文档流转操作、AI 助手问答提交、交接单创建）
+- 已完成 P0 文档/契约收口首轮修复（验证命令、README/AGENTS 迁移描述、前后端错误读取、转交流程、AI 问答契约）
 
 详细任务状态持续维护在 [TASKS.md](/home/liguoma/code-repos/digidocs-mgt/TASKS.md)。

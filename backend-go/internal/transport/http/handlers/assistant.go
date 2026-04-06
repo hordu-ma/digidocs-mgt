@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"digidocs-mgt/backend-go/internal/domain/task"
 	"digidocs-mgt/backend-go/internal/service"
@@ -24,6 +25,18 @@ func (h AssistantHandler) Ask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	scope, _ := payload["scope"].(map[string]any)
+	projectID := stringValue(payload["project_id"])
+	documentID := stringValue(payload["document_id"])
+	if scope != nil {
+		if projectID == "" {
+			projectID = stringValue(scope["project_id"])
+		}
+		if documentID == "" {
+			documentID = stringValue(scope["document_id"])
+		}
+	}
+
 	message, err := h.taskService.Publish(
 		r.Context(),
 		task.TaskTypeAssistantAsk,
@@ -37,12 +50,14 @@ func (h AssistantHandler) Ask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.WriteData(w, http.StatusOK, map[string]any{
-		"request_id": message.RequestID,
-		"question":   payload["question"],
-		"answer":     "",
+		"request_id":   message.RequestID,
+		"question":     payload["question"],
+		"status":       "queued",
+		"answer":       "",
+		"generated_at": time.Now().UTC().Format(time.RFC3339),
 		"source_scope": map[string]any{
-			"project_id":  payload["project_id"],
-			"document_id": payload["document_id"],
+			"project_id":  projectID,
+			"document_id": documentID,
 		},
 	})
 }
