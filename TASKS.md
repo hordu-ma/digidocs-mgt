@@ -155,6 +155,12 @@ Go 主业务迁移与协作环境固化阶段
   - `assistant_suggestions` 支持真实查询、确认、忽略
   - memory / postgres 双实现同步补齐
   - 新增 handler 级集成测试，覆盖摘要任务回写后建议可查、建议确认动作
+- 完成 P2 持久化任务消费与 AI 结果展示首轮修复
+  - postgres 模式下改由 `assistant_requests` 持久化任务表驱动 Worker 轮询消费，不再依赖内存队列
+  - 文档摘要结果回写 `document_versions.summary_status / summary_text`
+  - 交接摘要结果回写 `graduation_handovers.ai_summary`
+  - `DocumentDetailView` 接入 AI 摘要生成、建议列表读取、确认/忽略动作
+  - `docs/项目定义与技术架构.md` / `README.md` 更新异步任务实现描述
 - 清理冗余 `SKILLS/` 目录
   - 旧 FastAPI 技能文档已过时、前端和集成层约束已被 `ops/codex/skills/` 覆盖
   - 移除 `AGENTS.md`、`README.md` 中的 `SKILLS/` 引用

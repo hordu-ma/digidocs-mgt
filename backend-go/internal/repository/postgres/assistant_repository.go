@@ -138,6 +138,10 @@ func (r AssistantRepository) CompleteAssistantRequest(
 		Status:      result.Status,
 		Error:       result.ErrorMessage,
 	}
+
+	if err := updateAssistantProjection(ctx, tx, request, result); err != nil {
+		return err
+	}
 	for _, item := range buildSuggestionItems(request, result) {
 		var confidence any
 		if item.Confidence != nil {
@@ -191,6 +195,54 @@ func (r AssistantRepository) CompleteAssistantRequest(
 	}
 
 	return tx.Commit()
+}
+
+func updateAssistantProjection(
+	ctx context.Context,
+	tx *sql.Tx,
+	request assistantRequestRecord,
+	result task.Result,
+) error {
+	if result.Status != "completed" {
+		return nil
+	}
+
+	switch request.RequestType {
+	case string(task.TaskTypeDocumentSummarize):
+		versionID := stringValue(request.Payload["version_id"])
+		if versionID == "" {
+			return nil
+		}
+		_, err := tx.ExecContext(
+			ctx,
+			`
+			UPDATE document_versions
+			SET summary_status = 'completed',
+			    summary_text = NULLIF($2, '')
+			WHERE id::text = $1
+			`,
+			versionID,
+			stringValue(result.Output["summary_text"]),
+		)
+		return err
+	case string(task.TaskTypeHandoverSummarize):
+		if request.RelatedID == "" {
+			return nil
+		}
+		_, err := tx.ExecContext(
+			ctx,
+			`
+			UPDATE graduation_handovers
+			SET ai_summary = NULLIF($2, '')
+			WHERE id::text = $1
+			`,
+			request.RelatedID,
+			stringValue(result.Output["summary_text"]),
+		)
+		return err
+	default:
+		return nil
+	}
 }
 
 func (r AssistantRepository) ListSuggestions(

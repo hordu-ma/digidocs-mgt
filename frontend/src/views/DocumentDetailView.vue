@@ -14,7 +14,9 @@ const documentID = route.params.id as string;
 const doc = ref<any>(null);
 const versions = ref<any[]>([]);
 const flows = ref<any[]>([]);
+const suggestions = ref<any[]>([]);
 const actionLoading = ref(false);
+const summaryLoading = ref(false);
 
 const statusLabel: Record<string, string> = {
   draft: "草稿",
@@ -58,14 +60,21 @@ const availableActions = computed(() => {
 });
 
 async function loadData() {
-  const [docRes, versionsRes, flowsRes] = await Promise.all([
+  const [docRes, versionsRes, flowsRes, suggestionsRes] = await Promise.all([
     api.get(`/documents/${documentID}`),
     api.get(`/documents/${documentID}/versions`),
     api.get(`/documents/${documentID}/flows`),
+    api.get("/assistant/suggestions", {
+      params: {
+        related_type: "document",
+        related_id: documentID,
+      },
+    }),
   ]);
   doc.value = docRes.data?.data ?? null;
   versions.value = versionsRes.data?.data ?? [];
   flows.value = flowsRes.data?.data ?? [];
+  suggestions.value = suggestionsRes.data?.data ?? [];
 }
 
 async function applyFlowAction(endpoint: string, label: string) {
@@ -197,6 +206,42 @@ async function submitUpload() {
   }
 }
 
+async function requestSummary() {
+  const versionID = doc.value?.current_version_id;
+  if (!versionID) {
+    ElMessage.warning("当前文档没有可摘要的版本");
+    return;
+  }
+
+  summaryLoading.value = true;
+  try {
+    await api.post(`/assistant/documents/${documentID}/summarize`, {
+      version_id: versionID,
+    });
+    ElMessage.success("摘要任务已提交");
+    await loadData();
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "摘要提交失败");
+  } finally {
+    summaryLoading.value = false;
+  }
+}
+
+async function updateSuggestionStatus(id: string, action: "confirm" | "dismiss") {
+  try {
+    await api.post(
+      `/assistant/suggestions/${id}/${action}`,
+      action === "confirm"
+        ? { note: "前端确认采纳" }
+        : { reason: "前端手动忽略" },
+    );
+    ElMessage.success(action === "confirm" ? "建议已确认" : "建议已忽略");
+    await loadData();
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "操作失败");
+  }
+}
+
 onMounted(loadData);
 </script>
 
@@ -251,7 +296,35 @@ onMounted(loadData);
 
       <ElCard class="page-card">
         <template #header>AI 摘要与建议</template>
-        <div class="summary-text">暂无 AI 摘要（OpenClaw 待接入）</div>
+        <div class="assistant-toolbar">
+          <ElButton type="primary" :loading="summaryLoading" @click="requestSummary">
+            生成摘要
+          </ElButton>
+        </div>
+        <div v-if="suggestions.length === 0" class="summary-text">
+          暂无 AI 摘要与建议
+        </div>
+        <div v-else class="suggestion-list">
+          <div v-for="item in suggestions" :key="item.id" class="suggestion-item">
+            <div class="suggestion-head">
+              <div class="suggestion-title">
+                {{ item.title || item.suggestion_type }}
+              </div>
+              <ElTag :type="item.status === 'pending' ? 'warning' : item.status === 'confirmed' ? 'success' : 'info'">
+                {{ item.status }}
+              </ElTag>
+            </div>
+            <div class="summary-text">{{ item.content }}</div>
+            <div v-if="item.status === 'pending'" class="suggestion-actions">
+              <ElButton size="small" type="success" @click="updateSuggestionStatus(item.id, 'confirm')">
+                确认
+              </ElButton>
+              <ElButton size="small" @click="updateSuggestionStatus(item.id, 'dismiss')">
+                忽略
+              </ElButton>
+            </div>
+          </div>
+        </div>
       </ElCard>
 
       <ElCard class="page-card">
@@ -340,6 +413,39 @@ onMounted(loadData);
 
 .summary-text {
   color: #31465e;
+}
+
+.assistant-toolbar {
+  margin-bottom: 12px;
+}
+
+.suggestion-list {
+  display: grid;
+  gap: 12px;
+}
+
+.suggestion-item {
+  padding: 14px;
+  border-radius: 12px;
+  background: #f7f9fc;
+}
+
+.suggestion-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.suggestion-title {
+  font-weight: 600;
+}
+
+.suggestion-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .action-bar {

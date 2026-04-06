@@ -10,6 +10,8 @@ import (
 	"digidocs-mgt/backend-go/internal/db"
 	"digidocs-mgt/backend-go/internal/queue"
 	memqueue "digidocs-mgt/backend-go/internal/queue/memory"
+	noopqueue "digidocs-mgt/backend-go/internal/queue/noop"
+	pgqueue "digidocs-mgt/backend-go/internal/queue/postgres"
 	"digidocs-mgt/backend-go/internal/repository/memory"
 	pgrepo "digidocs-mgt/backend-go/internal/repository/postgres"
 	"digidocs-mgt/backend-go/internal/service"
@@ -62,12 +64,12 @@ func BuildContainer(cfg config.Config) (Container, error) {
 
 		return Container{
 			DB:            postgresDB,
-			QueueConsumer: publisher,
+			QueueConsumer: pgqueue.NewConsumer(postgresDB),
 			QueryService: service.NewQueryService(
 				pgrepo.NewTeamSpaceRepository(postgresDB),
 				pgrepo.NewProjectRepository(postgresDB),
 			),
-			AssistantService:      service.NewAssistantService(publisher, pgrepo.NewAssistantRepository(postgresDB)),
+			AssistantService:      service.NewAssistantService(noopqueue.NewPublisher(), pgrepo.NewAssistantRepository(postgresDB)),
 			DocumentService:       service.NewDocumentService(docRepo, docRepo, storageProvider, versionWorkflow),
 			AuditQueryService:     service.NewAuditQueryService(pgrepo.NewAuditRepository(postgresDB)),
 			DashboardQueryService: service.NewDashboardQueryService(pgrepo.NewDashboardRepository(postgresDB)),

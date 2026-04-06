@@ -211,9 +211,10 @@ docker compose up -d postgres
 - 已清理 TASKS.md，将已完成的大量"进行中"子项归档至"已完成"
 - 已完成 Go 后端核心业务服务层单元测试（auth/action/dashboard，共 13 个用例）
 - 已完成前端 Element Plus 按需引入（JS bundle 从 1,041 KB 降至 470 KB）
-- 已完成 Python Worker 真实队列消费链路（Go 内存队列 → HTTP polling → 处理 → 回写）
+- 已完成 Python Worker 真实队列消费链路（Go/HTTP 轮询 → 处理 → 回写）
 - 已完成前端写操作 UI（文档流转操作、AI 助手问答提交、交接单创建）
 - 已完成 P0 文档/契约收口首轮修复（验证命令、README/AGENTS 迁移描述、前后端错误读取、转交流程、AI 问答契约）
 - 已完成 P1 AI 持久化闭环首轮修复（`assistant_requests` 落库、Worker 回调幂等更新、`assistant_suggestions` 查询/确认/忽略真实接线）
+- 已完成 P2 持久化任务消费与 AI 结果展示首轮修复（PostgreSQL 任务轮询、摘要结果回写、文档详情页 AI 建议展示）
 
 详细任务状态持续维护在 [TASKS.md](/home/liguoma/code-repos/digidocs-mgt/TASKS.md)。
