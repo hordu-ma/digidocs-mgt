@@ -18,11 +18,6 @@
 |------|------|
 | [adr/001-go-python-hybrid.md](adr/001-go-python-hybrid.md) | Go + Python 混合架构迁移方案与决策背景 |
 
-## 学习材料
-
-| 文件 | 说明 |
-|------|------|
-| [Harness Engineering 学习笔记.md](Harness%20Engineering%20学习笔记.md) | Harness 工程实践学习记录 |
 
 ## 约定
 
