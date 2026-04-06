@@ -71,6 +71,11 @@ Go 主业务迁移与协作环境固化阶段
   - 新增 `.github/INDEX.md` 作为 `.github/` 唯一入口
   - `AGENTS.md` 会话启动清单增加 `.github/INDEX.md` 读取步骤
   - `README.md`、`doctor.sh`、`check-doc-sync.sh`、`report.sh` 同步接入 GitHub 入口校验
+- 完成 p14s/Linux compose 首轮部署适配
+  - `backend-py-worker` 增加 `host.docker.internal:host-gateway`，统一容器访问宿主机 OpenClaw 路径
+  - 部署说明补充 `GET /v1/models` 前置检查，避免把 Gateway 存活误判为兼容 HTTP 已就绪
+- 修复 `backend-go` 容器内自动迁移缺口
+  - 运行镜像补充 `migrations/` 目录，避免长驻环境因镜像缺少 SQL 文件而无法自动补迁移
 - 完成代码审查与安全修复（一期）
   - JWT 改为真实 HMAC-SHA256 签名，淘汰伪造 base64 token
   - login 接入 bcrypt 密码校验与独立 AuthService
@@ -340,6 +345,7 @@ Go 主业务迁移与协作环境固化阶段
   - 验证：补充测试覆盖 skill 白名单、非法 skill 拒绝、跨 scope 越权拦截、输出归一化与审计字段落库
 - p14s 部署准备
   - 确认 OpenClaw Gateway 已启用 `GET /v1/models` 与 `POST /v1/chat/completions`
+  - 当前 p14s 已确认 `openclaw gateway`/Control UI 在 `127.0.0.1:18789` 正常，但尚未暴露兼容 `v1` HTTP 端点
   - 固化 p14s 上的 `.env`，确认 `OPENCLAW_BASE_URL` / `OPENCLAW_API_KEY` / `CALLBACK_BASE_URL`
   - 选择部署方式：`docker compose` 或 `systemd + 反向代理`
   - 配置 TLS / 反向代理 / 防火墙，仅暴露前端入口

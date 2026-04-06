@@ -91,7 +91,7 @@ def test_summarize_document_parses_json_code_block(monkeypatch) -> None:
 def test_generate_suggestion_raises_on_http_error(monkeypatch) -> None:
     client = OpenClawClient()
     error = urllib.error.HTTPError(
-        url="http://localhost:8001/v1/chat/completions",
+        url="http://localhost:18789/v1/chat/completions",
         code=401,
         msg="Unauthorized",
         hdrs=None,

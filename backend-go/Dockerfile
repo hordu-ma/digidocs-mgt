@@ -10,6 +10,7 @@ FROM debian:bookworm-slim
 WORKDIR /app
 
 COPY --from=build /out/digidocs-go-api /usr/local/bin/digidocs-go-api
+COPY --from=build /app/migrations ./migrations
 
 EXPOSE 8080
 
