@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 
 	"digidocs-mgt/backend-go/internal/domain/task"
 	"digidocs-mgt/backend-go/internal/queue"
@@ -41,13 +39,4 @@ func (s TaskService) Publish(
 	}
 
 	return message, nil
-}
-
-func newRequestID() string {
-	buf := make([]byte, 8)
-	if _, err := rand.Read(buf); err != nil {
-		return "request-id-unavailable"
-	}
-
-	return hex.EncodeToString(buf)
 }

@@ -173,3 +173,24 @@ type AuditEventFilter struct {
 	Page       int
 	PageSize   int
 }
+
+type AssistantSuggestionItem struct {
+	ID             string   `json:"id"`
+	RelatedType    string   `json:"related_type"`
+	RelatedID      string   `json:"related_id"`
+	SuggestionType string   `json:"suggestion_type"`
+	Status         string   `json:"status"`
+	Title          string   `json:"title,omitempty"`
+	Content        string   `json:"content"`
+	SourceScope    string   `json:"source_scope,omitempty"`
+	Confidence     *float64 `json:"confidence,omitempty"`
+	RequestID      string   `json:"request_id,omitempty"`
+	GeneratedAt    string   `json:"generated_at"`
+}
+
+type AssistantSuggestionFilter struct {
+	RelatedType    string
+	RelatedID      string
+	Status         string
+	SuggestionType string
+}

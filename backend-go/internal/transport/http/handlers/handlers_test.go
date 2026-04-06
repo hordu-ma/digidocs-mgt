@@ -21,9 +21,10 @@ func testServer(t *testing.T) (http.Handler, string) {
 	t.Helper()
 
 	cfg := config.Config{
-		APIV1Prefix: "/api/v1",
-		DataBackend: "memory",
-		JWTSecret:   "test-secret-key-for-handler-tests",
+		APIV1Prefix:         "/api/v1",
+		DataBackend:         "memory",
+		JWTSecret:           "test-secret-key-for-handler-tests",
+		WorkerCallbackToken: "worker-test-token",
 	}
 
 	container, err := bootstrap.BuildContainer(cfg)
@@ -50,6 +51,15 @@ func testServer(t *testing.T) (http.Handler, string) {
 func authedRequest(method, path string, body io.Reader, token string) *http.Request {
 	req := httptest.NewRequest(method, path, body)
 	req.Header.Set("Authorization", "Bearer "+token)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	return req
+}
+
+func workerRequest(method, path string, body io.Reader) *http.Request {
+	req := httptest.NewRequest(method, path, body)
+	req.Header.Set("Authorization", "Bearer worker-test-token")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -214,6 +224,101 @@ func TestDashboard_RiskDocuments(t *testing.T) {
 	handler.ServeHTTP(rec, authedRequest("GET", "/api/v1/dashboard/risk-documents", nil, token))
 	if rec.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+// --- Assistant ---
+
+func TestAssistant_DocumentSummarize_PersistsSuggestionAfterWorkerCallback(t *testing.T) {
+	handler, token := testServer(t)
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, authedRequest("POST", "/api/v1/assistant/documents/doc-1/summarize", jsonBody(map[string]string{
+		"version_id": "ver-1",
+	}), token))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("queue status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+
+	queueResult := parseResponse(t, rec)
+	queueData, _ := queueResult["data"].(map[string]any)
+	requestID, _ := queueData["request_id"].(string)
+	if requestID == "" {
+		t.Fatal("expected request_id in summarize response")
+	}
+
+	pollRec := httptest.NewRecorder()
+	handler.ServeHTTP(pollRec, workerRequest("GET", "/api/v1/internal/poll-tasks", nil))
+	if pollRec.Code != http.StatusOK {
+		t.Fatalf("poll status = %d, want 200; body = %s", pollRec.Code, pollRec.Body.String())
+	}
+
+	callbackRec := httptest.NewRecorder()
+	handler.ServeHTTP(callbackRec, workerRequest("POST", "/api/v1/internal/worker-results", jsonBody(map[string]any{
+		"request_id": requestID,
+		"status":     "completed",
+		"output": map[string]any{
+			"summary_text": "这是测试摘要",
+			"suggestions": []map[string]any{
+				{
+					"title":           "测试摘要",
+					"content":         "这是测试摘要",
+					"suggestion_type": "document_summary",
+				},
+			},
+		},
+	})))
+	if callbackRec.Code != http.StatusOK {
+		t.Fatalf("callback status = %d, want 200; body = %s", callbackRec.Code, callbackRec.Body.String())
+	}
+
+	listRec := httptest.NewRecorder()
+	handler.ServeHTTP(listRec, authedRequest("GET", "/api/v1/assistant/suggestions?related_type=document&related_id=doc-1", nil, token))
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("list status = %d, want 200; body = %s", listRec.Code, listRec.Body.String())
+	}
+
+	listResult := parseResponse(t, listRec)
+	items, ok := listResult["data"].([]any)
+	if !ok || len(items) == 0 {
+		t.Fatalf("expected persisted suggestions, got %#v", listResult["data"])
+	}
+}
+
+func TestAssistant_ConfirmSuggestion(t *testing.T) {
+	handler, token := testServer(t)
+
+	queueRec := httptest.NewRecorder()
+	handler.ServeHTTP(queueRec, authedRequest("POST", "/api/v1/assistant/documents/doc-1/summarize", jsonBody(map[string]string{}), token))
+	queueResult := parseResponse(t, queueRec)
+	queueData, _ := queueResult["data"].(map[string]any)
+	requestID, _ := queueData["request_id"].(string)
+
+	callbackRec := httptest.NewRecorder()
+	handler.ServeHTTP(callbackRec, workerRequest("POST", "/api/v1/internal/worker-results", jsonBody(map[string]any{
+		"request_id": requestID,
+		"status":     "completed",
+		"output": map[string]any{
+			"summary_text": "这是测试摘要",
+		},
+	})))
+
+	listRec := httptest.NewRecorder()
+	handler.ServeHTTP(listRec, authedRequest("GET", "/api/v1/assistant/suggestions?related_type=document&related_id=doc-1", nil, token))
+	listResult := parseResponse(t, listRec)
+	items, _ := listResult["data"].([]any)
+	first, _ := items[0].(map[string]any)
+	suggestionID, _ := first["id"].(string)
+	if suggestionID == "" {
+		t.Fatal("expected suggestion id")
+	}
+
+	confirmRec := httptest.NewRecorder()
+	handler.ServeHTTP(confirmRec, authedRequest("POST", "/api/v1/assistant/suggestions/"+suggestionID+"/confirm", jsonBody(map[string]string{
+		"note": "采纳",
+	}), token))
+	if confirmRec.Code != http.StatusOK {
+		t.Fatalf("confirm status = %d, want 200; body = %s", confirmRec.Code, confirmRec.Body.String())
 	}
 }
 

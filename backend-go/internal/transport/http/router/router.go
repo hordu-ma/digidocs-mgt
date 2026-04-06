@@ -14,12 +14,12 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 
 	systemHandler := handlers.NewSystemHandler(cfg)
 	authHandler := handlers.NewAuthHandler(container.AuthService, container.TokenService)
-	assistantHandler := handlers.NewAssistantHandler(container.TaskService)
+	assistantHandler := handlers.NewAssistantHandler(container.AssistantService)
 	auditEventHandler := handlers.NewAuditEventHandler(container.AuditQueryService)
 	flowHandler := handlers.NewFlowHandler(container.FlowService)
 	handoverHandler := handlers.NewHandoverHandler(container.HandoverService)
 	dashboardHandler := handlers.NewDashboardHandler(container.DashboardQueryService)
-	internalWorkerHandler := handlers.NewInternalWorkerHandler(cfg, container.QueueConsumer)
+	internalWorkerHandler := handlers.NewInternalWorkerHandler(cfg, container.QueueConsumer, container.AssistantService)
 	teamSpaceHandler := handlers.NewTeamSpaceHandler(container.QueryService)
 	projectHandler := handlers.NewProjectHandler(container.QueryService)
 	documentHandler := handlers.NewDocumentHandler(container.DocumentService)
@@ -89,4 +89,3 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 		middleware.AccessLog,
 	)
 }
-

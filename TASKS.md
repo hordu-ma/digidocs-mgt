@@ -149,6 +149,12 @@ Go 主业务迁移与协作环境固化阶段
   - 前端统一按后端真实错误结构读取 `message`
   - 修复文档详情页 `transfer` 动作缺少 `to_user_id` 的前后端断裂
   - 统一 `/assistant/ask` 为异步排队语义，并兼容 `scope.project_id/document_id` 输入
+- 完成 P1 AI 持久化闭环首轮修复
+  - 新增 `AssistantService`，统一 AI 任务入队、建议查询和 Worker 回调结果处理
+  - `assistant_requests` 在任务创建时真实落库，`worker-results` 回调后更新状态与完成时间
+  - `assistant_suggestions` 支持真实查询、确认、忽略
+  - memory / postgres 双实现同步补齐
+  - 新增 handler 级集成测试，覆盖摘要任务回写后建议可查、建议确认动作
 - 清理冗余 `SKILLS/` 目录
   - 旧 FastAPI 技能文档已过时、前端和集成层约束已被 `ops/codex/skills/` 覆盖
   - 移除 `AGENTS.md`、`README.md` 中的 `SKILLS/` 引用

@@ -37,11 +37,14 @@ class WorkerDispatcher:
 
     def handle_task(self, task: WorkerTask) -> TaskResult:
         if task.task_type == "assistant.ask":
+            scope = task.payload.get("scope", {})
+            if not isinstance(scope, dict):
+                scope = {}
             answer = self.openclaw_client.ask(
                 question=str(task.payload.get("question", "")),
                 scope={
-                    "project_id": task.payload.get("project_id"),
-                    "document_id": task.payload.get("document_id"),
+                    "project_id": scope.get("project_id", task.payload.get("project_id")),
+                    "document_id": scope.get("document_id", task.payload.get("document_id")),
                 },
             )
             return TaskResult(
@@ -53,6 +56,33 @@ class WorkerDispatcher:
         if task.task_type in {
             "document.summarize",
             "handover.summarize",
+        }:
+            summary_text = (
+                "文档摘要任务已完成，当前为占位结果，待真实 OpenClaw 摘要接入。"
+                if task.task_type == "document.summarize"
+                else "交接摘要任务已完成，当前为占位结果，待真实 OpenClaw 摘要接入。"
+            )
+            return TaskResult(
+                request_id=task.request_id,
+                status="completed",
+                output={
+                    "task_type": task.task_type,
+                    "summary_text": summary_text,
+                    "suggestions": [
+                        {
+                            "title": "AI 摘要",
+                            "content": summary_text,
+                            "suggestion_type": (
+                                "document_summary"
+                                if task.task_type == "document.summarize"
+                                else "handover_summary"
+                            ),
+                        }
+                    ],
+                },
+            )
+
+        if task.task_type in {
             "document.extract_text",
             "assistant.generate_suggestion",
         }:
@@ -61,7 +91,13 @@ class WorkerDispatcher:
                 status="completed",
                 output={
                     "task_type": task.task_type,
-                    "queued": True,
+                    "suggestions": [
+                        {
+                            "title": "AI 建议",
+                            "content": "建议任务已完成，当前为占位结果，待真实 OpenClaw 建议接入。",
+                            "suggestion_type": "structure_recommendation",
+                        }
+                    ],
                     "payload": task.payload,
                 },
             )

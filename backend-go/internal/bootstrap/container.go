@@ -22,13 +22,13 @@ type Container struct {
 	DB                    *sql.DB
 	QueueConsumer         queue.Consumer
 	QueryService          service.QueryService
+	AssistantService      service.AssistantService
 	DocumentService       service.DocumentService
 	AuditQueryService     service.AuditQueryService
 	DashboardQueryService service.DashboardQueryService
 	VersionService        service.VersionService
 	FlowService           service.FlowService
 	HandoverService       service.HandoverService
-	TaskService           service.TaskService
 	AuthService           service.AuthService
 	TokenService          service.TokenService
 	AuditService          service.AuditService
@@ -67,13 +67,13 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				pgrepo.NewTeamSpaceRepository(postgresDB),
 				pgrepo.NewProjectRepository(postgresDB),
 			),
+			AssistantService:      service.NewAssistantService(publisher, pgrepo.NewAssistantRepository(postgresDB)),
 			DocumentService:       service.NewDocumentService(docRepo, docRepo, storageProvider, versionWorkflow),
 			AuditQueryService:     service.NewAuditQueryService(pgrepo.NewAuditRepository(postgresDB)),
 			DashboardQueryService: service.NewDashboardQueryService(pgrepo.NewDashboardRepository(postgresDB)),
 			VersionService:        service.NewVersionService(storageProvider, versionWorkflow, versionRepo),
 			FlowService:           service.NewFlowService(pgrepo.NewFlowRepository(postgresDB), actionRepo),
 			HandoverService:       service.NewHandoverService(pgrepo.NewHandoverRepository(postgresDB), actionRepo),
-			TaskService:           service.NewTaskService(publisher),
 			AuthService:           authService,
 			TokenService:          tokenService,
 			AuditService:          auditService,
@@ -88,13 +88,13 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				memory.NewTeamSpaceRepository(),
 				memory.NewProjectRepository(),
 			),
+			AssistantService:      service.NewAssistantService(publisher, memory.NewAssistantRepository()),
 			DocumentService:       service.NewDocumentService(docRepo, docRepo, storageProvider, memory.NewVersionWorkflow()),
 			AuditQueryService:     service.NewAuditQueryService(memory.NewAuditRepository()),
 			DashboardQueryService: service.NewDashboardQueryService(memory.NewDashboardRepository()),
 			VersionService:        service.NewVersionService(storageProvider, memory.NewVersionWorkflow(), memory.NewVersionRepository()),
 			FlowService:           service.NewFlowService(memory.NewFlowRepository(), actionRepo),
 			HandoverService:       service.NewHandoverService(memory.NewHandoverRepository(), actionRepo),
-			TaskService:           service.NewTaskService(publisher),
 			AuthService:           authService,
 			TokenService:          tokenService,
 			AuditService:          auditService,

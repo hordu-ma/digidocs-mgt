@@ -847,10 +847,10 @@
 
 `GET /api/v1/assistant/suggestions`
 
-当前实现说明（待后续补齐持久化与筛选逻辑）：
+当前实现说明：
 
-- 当前返回空数组占位
-- 查询参数契约已预留，但尚未完成真实过滤与结果回读
+- 已支持从 `assistant_suggestions` 读取结果
+- 当前主要由 Worker 回调后的摘要/建议结果生成记录
 
 查询参数：
 
@@ -859,14 +859,30 @@
 - `status`
 - `suggestion_type`
 
+响应体：
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "related_type": "document",
+      "related_id": "uuid",
+      "suggestion_type": "document_summary",
+      "status": "pending",
+      "title": "文档摘要",
+      "content": "本次摘要结果……",
+      "source_scope": "{\"project_id\":\"uuid\"}",
+      "request_id": "uuid",
+      "generated_at": "2026-04-03T16:05:00Z"
+    }
+  ]
+}
+```
+
 ### 9.5 确认建议
 
 `POST /api/v1/assistant/suggestions/{suggestion_id}/confirm`
-
-当前实现说明（待后续补齐正式落库）：
-
-- 当前返回确认动作回执
-- 尚未真正修改 `assistant_suggestions` 状态
 
 请求体：
 
@@ -876,20 +892,41 @@
 }
 ```
 
+响应体：
+
+```json
+{
+  "data": {
+    "id": "uuid",
+    "status": "confirmed",
+    "confirmed_by": "uuid",
+    "note": "采纳该建议"
+  }
+}
+```
+
 ### 9.6 忽略建议
 
 `POST /api/v1/assistant/suggestions/{suggestion_id}/dismiss`
-
-当前实现说明（待后续补齐正式落库）：
-
-- 当前返回忽略动作回执
-- 尚未真正修改 `assistant_suggestions` 状态
 
 请求体：
 
 ```json
 {
   "reason": "当前无需处理"
+}
+```
+
+响应体：
+
+```json
+{
+  "data": {
+    "id": "uuid",
+    "status": "dismissed",
+    "dismissed_by": "uuid",
+    "reason": "当前无需处理"
+  }
 }
 ```
 

@@ -2,22 +2,29 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
 	"digidocs-mgt/backend-go/internal/config"
 	"digidocs-mgt/backend-go/internal/domain/task"
 	"digidocs-mgt/backend-go/internal/queue"
+	"digidocs-mgt/backend-go/internal/service"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
 )
 
 type InternalWorkerHandler struct {
-	cfg      config.Config
-	consumer queue.Consumer
+	cfg       config.Config
+	consumer  queue.Consumer
+	assistant service.AssistantService
 }
 
-func NewInternalWorkerHandler(cfg config.Config, consumer queue.Consumer) InternalWorkerHandler {
-	return InternalWorkerHandler{cfg: cfg, consumer: consumer}
+func NewInternalWorkerHandler(
+	cfg config.Config,
+	consumer queue.Consumer,
+	assistant service.AssistantService,
+) InternalWorkerHandler {
+	return InternalWorkerHandler{cfg: cfg, consumer: consumer, assistant: assistant}
 }
 
 func (h InternalWorkerHandler) ReceiveResult(w http.ResponseWriter, r *http.Request) {
@@ -29,6 +36,15 @@ func (h InternalWorkerHandler) ReceiveResult(w http.ResponseWriter, r *http.Requ
 	var result task.Result
 	if err := json.NewDecoder(r.Body).Decode(&result); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid request body")
+		return
+	}
+
+	if err := h.assistant.ReceiveResult(r.Context(), result); err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.WriteError(w, http.StatusNotFound, "not_found", "assistant request not found")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to persist worker result")
 		return
 	}
 

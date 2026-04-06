@@ -2,20 +2,23 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
+	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/domain/task"
 	"digidocs-mgt/backend-go/internal/service"
+	"digidocs-mgt/backend-go/internal/transport/http/middleware"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
 )
 
 type AssistantHandler struct {
-	taskService service.TaskService
+	service service.AssistantService
 }
 
-func NewAssistantHandler(taskService service.TaskService) AssistantHandler {
-	return AssistantHandler{taskService: taskService}
+func NewAssistantHandler(service service.AssistantService) AssistantHandler {
+	return AssistantHandler{service: service}
 }
 
 func (h AssistantHandler) Ask(w http.ResponseWriter, r *http.Request) {
@@ -37,12 +40,13 @@ func (h AssistantHandler) Ask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	message, err := h.taskService.Publish(
+	message, err := h.service.QueueTask(
 		r.Context(),
 		task.TaskTypeAssistantAsk,
 		"",
 		"",
 		payload,
+		middleware.UserIDFromContext(r.Context()),
 	)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to queue assistant ask")
@@ -69,12 +73,13 @@ func (h AssistantHandler) SummarizeDocument(w http.ResponseWriter, r *http.Reque
 	}
 
 	documentID := r.PathValue("documentID")
-	message, err := h.taskService.Publish(
+	message, err := h.service.QueueTask(
 		r.Context(),
 		task.TaskTypeDocumentSummarize,
 		"document",
 		documentID,
 		payload,
+		middleware.UserIDFromContext(r.Context()),
 	)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to queue document summary")
@@ -91,12 +96,13 @@ func (h AssistantHandler) SummarizeDocument(w http.ResponseWriter, r *http.Reque
 
 func (h AssistantHandler) SummarizeHandover(w http.ResponseWriter, r *http.Request) {
 	handoverID := r.PathValue("handoverID")
-	message, err := h.taskService.Publish(
+	message, err := h.service.QueueTask(
 		r.Context(),
 		task.TaskTypeHandoverSummarize,
 		"handover",
 		handoverID,
 		nil,
+		middleware.UserIDFromContext(r.Context()),
 	)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to queue handover summary")
@@ -111,8 +117,17 @@ func (h AssistantHandler) SummarizeHandover(w http.ResponseWriter, r *http.Reque
 }
 
 func (h AssistantHandler) ListSuggestions(w http.ResponseWriter, r *http.Request) {
-	_ = r
-	response.WriteData(w, http.StatusOK, []map[string]any{})
+	items, err := h.service.ListSuggestions(r.Context(), query.AssistantSuggestionFilter{
+		RelatedType:    r.URL.Query().Get("related_type"),
+		RelatedID:      r.URL.Query().Get("related_id"),
+		Status:         r.URL.Query().Get("status"),
+		SuggestionType: r.URL.Query().Get("suggestion_type"),
+	})
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list suggestions")
+		return
+	}
+	response.WriteData(w, http.StatusOK, items)
 }
 
 func (h AssistantHandler) ConfirmSuggestion(w http.ResponseWriter, r *http.Request) {
@@ -121,11 +136,21 @@ func (h AssistantHandler) ConfirmSuggestion(w http.ResponseWriter, r *http.Reque
 		_ = json.NewDecoder(r.Body).Decode(&payload)
 	}
 
-	response.WriteData(w, http.StatusOK, map[string]any{
-		"id":      r.PathValue("suggestionID"),
-		"action":  "confirm",
-		"payload": payload,
-	})
+	data, err := h.service.ConfirmSuggestion(
+		r.Context(),
+		r.PathValue("suggestionID"),
+		middleware.UserIDFromContext(r.Context()),
+		stringValue(payload["note"]),
+	)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.WriteError(w, http.StatusNotFound, "not_found", "suggestion not found")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to confirm suggestion")
+		return
+	}
+	response.WriteData(w, http.StatusOK, data)
 }
 
 func (h AssistantHandler) DismissSuggestion(w http.ResponseWriter, r *http.Request) {
@@ -134,9 +159,19 @@ func (h AssistantHandler) DismissSuggestion(w http.ResponseWriter, r *http.Reque
 		_ = json.NewDecoder(r.Body).Decode(&payload)
 	}
 
-	response.WriteData(w, http.StatusOK, map[string]any{
-		"id":      r.PathValue("suggestionID"),
-		"action":  "dismiss",
-		"payload": payload,
-	})
+	data, err := h.service.DismissSuggestion(
+		r.Context(),
+		r.PathValue("suggestionID"),
+		middleware.UserIDFromContext(r.Context()),
+		stringValue(payload["reason"]),
+	)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.WriteError(w, http.StatusNotFound, "not_found", "suggestion not found")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to dismiss suggestion")
+		return
+	}
+	response.WriteData(w, http.StatusOK, data)
 }

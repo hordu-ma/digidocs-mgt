@@ -6,6 +6,7 @@ import (
 	"digidocs-mgt/backend-go/internal/domain/auth"
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
+	"digidocs-mgt/backend-go/internal/domain/task"
 )
 
 type TeamSpaceReader interface {
@@ -71,4 +72,12 @@ type DocumentWriter interface {
 
 type UserAuthReader interface {
 	FindUserByUsername(ctx context.Context, username string) (*auth.UserRecord, error)
+}
+
+type AssistantRepository interface {
+	CreateAssistantRequest(ctx context.Context, message task.Message, actorID string) error
+	CompleteAssistantRequest(ctx context.Context, result task.Result) error
+	ListSuggestions(ctx context.Context, filter query.AssistantSuggestionFilter) ([]query.AssistantSuggestionItem, error)
+	ConfirmSuggestion(ctx context.Context, suggestionID string, actorID string, note string) (map[string]any, error)
+	DismissSuggestion(ctx context.Context, suggestionID string, actorID string, reason string) (map[string]any, error)
 }
