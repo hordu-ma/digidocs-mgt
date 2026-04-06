@@ -23,6 +23,10 @@ func (m *mockStorageProvider) PutObject(_ context.Context, _ storage.PutObjectIn
 	return m.result, m.err
 }
 
+func (m *mockStorageProvider) GetObject(_ context.Context, _ string) (*storage.GetObjectOutput, error) {
+	return nil, errors.New("not implemented in mock")
+}
+
 type mockVersionWorkflow struct {
 	result map[string]any
 	err    error

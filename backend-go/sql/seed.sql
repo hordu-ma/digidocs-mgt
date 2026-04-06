@@ -1,5 +1,5 @@
 -- DigiDocs Mgt 开发环境种子数据
--- 执行前提：已通过 Alembic 初始化 schema（20260403_0001_initial_schema）
+-- 执行前提：已通过 Go 端自动迁移初始化 schema（001_initial_schema.sql）
 -- 用法：psql -h localhost -p 15432 -U postgres -d digidocs_mgt -f backend-go/sql/seed.sql
 
 BEGIN;

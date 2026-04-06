@@ -2,6 +2,9 @@ package bootstrap
 
 import (
 	"database/sql"
+	"log"
+	"path/filepath"
+	"runtime"
 
 	"digidocs-mgt/backend-go/internal/config"
 	"digidocs-mgt/backend-go/internal/db"
@@ -41,6 +44,14 @@ func BuildContainer(cfg config.Config) (Container, error) {
 		if err != nil {
 			return Container{}, err
 		}
+
+		migrationsDir := findMigrationsDir()
+		if migrationsDir != "" {
+			if err := db.RunMigrations(postgresDB, migrationsDir); err != nil {
+				log.Printf("[bootstrap] migration warning: %v", err)
+			}
+		}
+
 		actionRepo := pgrepo.NewActionRepository(postgresDB)
 		authService := service.NewAuthService(pgrepo.NewUserAuthRepository(postgresDB), tokenService)
 		versionRepo := pgrepo.NewVersionRepository(postgresDB)
@@ -87,4 +98,25 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			AuditService:          auditService,
 		}, nil
 	}
+}
+
+// findMigrationsDir locates the migrations/ directory relative to the project root.
+func findMigrationsDir() string {
+	// Try relative to working directory first.
+	candidates := []string{"migrations", "backend-go/migrations"}
+
+	// Also try relative to this source file (for tests).
+	_, thisFile, _, ok := runtime.Caller(0)
+	if ok {
+		candidates = append(candidates, filepath.Join(filepath.Dir(thisFile), "..", "..", "migrations"))
+	}
+
+	for _, dir := range candidates {
+		if info, err := filepath.Glob(filepath.Join(dir, "*.sql")); err == nil && len(info) > 0 {
+			abs, _ := filepath.Abs(dir)
+			return abs
+		}
+	}
+
+	return ""
 }

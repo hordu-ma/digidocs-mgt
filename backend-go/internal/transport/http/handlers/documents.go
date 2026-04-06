@@ -9,6 +9,7 @@ import (
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/service"
+	"digidocs-mgt/backend-go/internal/shared"
 	"digidocs-mgt/backend-go/internal/transport/http/middleware"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
 )
@@ -22,7 +23,7 @@ func NewDocumentHandler(svc service.DocumentService) DocumentHandler {
 }
 
 func (h DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
+	if err := r.ParseMultipartForm(shared.MaxUploadSize); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid multipart form")
 		return
 	}
@@ -33,6 +34,11 @@ func (h DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+
+	if !shared.ValidateFileName(header.Filename) {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "file type not allowed")
+		return
+	}
 
 	actorID := middleware.UserIDFromContext(r.Context())
 	ownerID := r.FormValue("current_owner_id")

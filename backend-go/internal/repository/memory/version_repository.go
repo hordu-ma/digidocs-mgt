@@ -32,6 +32,9 @@ func (r VersionRepository) GetVersion(ctx context.Context, versionID string) (*q
 
 	return &query.VersionDetail{
 		ID:               versionID,
+		FileName:         "sample.docx",
+		StorageProvider:  "memory",
+		StorageObjectKey: "documents/sample/" + versionID,
 		PreviewType:      "pdf",
 		WatermarkEnabled: true,
 	}, nil

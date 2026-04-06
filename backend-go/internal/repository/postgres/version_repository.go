@@ -68,7 +68,11 @@ func (r VersionRepository) GetVersion(ctx context.Context, versionID string) (*q
 			document_id::text,
 			version_no,
 			COALESCE(commit_message, ''),
-			file_name
+			file_name,
+			file_size,
+			storage_provider,
+			storage_object_key,
+			COALESCE(mime_type, '')
 		FROM document_versions
 		WHERE id::text = $1
 		`,
@@ -79,6 +83,10 @@ func (r VersionRepository) GetVersion(ctx context.Context, versionID string) (*q
 		&item.VersionNo,
 		&item.CommitMessage,
 		&item.FileName,
+		&item.FileSize,
+		&item.StorageProvider,
+		&item.StorageObjectKey,
+		&item.MimeType,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, service.ErrNotFound

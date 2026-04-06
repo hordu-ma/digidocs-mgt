@@ -78,3 +78,18 @@ func (s VersionService) List(ctx context.Context, documentID string) ([]query.Ve
 func (s VersionService) Get(ctx context.Context, versionID string) (*query.VersionDetail, error) {
 	return s.reader.GetVersion(ctx, versionID)
 }
+
+// GetFile returns the file content for a version from storage.
+func (s VersionService) GetFile(ctx context.Context, versionID string) (*query.VersionDetail, *storage.GetObjectOutput, error) {
+	ver, err := s.reader.GetVersion(ctx, versionID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	obj, err := s.storage.GetObject(ctx, ver.StorageObjectKey)
+	if err != nil {
+		return ver, nil, fmt.Errorf("storage get failed: %w", err)
+	}
+
+	return ver, obj, nil
+}

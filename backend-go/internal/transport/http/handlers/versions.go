@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"digidocs-mgt/backend-go/internal/service"
+	"digidocs-mgt/backend-go/internal/shared"
 	"digidocs-mgt/backend-go/internal/transport/http/middleware"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
 )
@@ -18,7 +19,7 @@ func NewVersionHandler(svc service.VersionService) VersionHandler {
 }
 
 func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
+	if err := r.ParseMultipartForm(shared.MaxUploadSize); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid multipart form")
 		return
 	}
@@ -29,6 +30,11 @@ func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+
+	if !shared.ValidateFileName(header.Filename) {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "file type not allowed")
+		return
+	}
 
 	data, err := h.service.UploadAndCreateVersion(
 		r.Context(),

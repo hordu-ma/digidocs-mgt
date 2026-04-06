@@ -194,6 +194,24 @@ Go 主业务迁移与协作环境固化阶段
   - `callback_client.py` 补充类型注解（类属性、返回值）
   - 新增 `pyrightconfig.json` 配置基础类型检查模式
   - `.vscode/settings.json` 增加 `python.analysis.extraPaths` 解决隐式相对导入
+- 完成 Go 端数据库自动迁移
+  - 创建 `backend-go/migrations/001_initial_schema.sql`（12 张表 + 枚举 + 索引，含 assistant_suggestions / assistant_requests）
+  - 实现 `db.RunMigrations()` 自动迁移引擎（基于 schema_migrations 表幂等执行）
+  - Go 服务启动时自动运行 pending migrations（postgres 模式下）
+  - seed.sql 注释更新（移除 Alembic 依赖说明）
+- 完成版本文件下载与预览接口
+  - storage.Provider 接口新增 `GetObject()` 方法
+  - memory Provider 改为真正存储数据（sync.RWMutex + map）
+  - VersionService 新增 `GetFile()` 方法（查版本 → 取文件）
+  - `Download` handler 返回 `Content-Disposition: attachment` + 文件流
+  - `Preview` handler 返回 `Content-Disposition: inline` + 文件流
+  - VersionDetail 结构补充 `file_size`、`storage_provider`、`storage_object_key`、`mime_type` 字段
+  - postgres GetVersion 查询补充对应字段
+  - MIME 类型推断（pdf/docx/xlsx/pptx/png/jpg 等）
+- 完成安全加固（一期）
+  - 生产环境（APP_ENV=production）启动时校验 JWT_SECRET / WORKER_CALLBACK_TOKEN 不得使用默认值
+  - 文件上传白名单校验（pdf/docx/xlsx/pptx/doc/xls/ppt/txt/md/csv/png/jpg/jpeg）
+  - 统一上传大小常量 `shared.MaxUploadSize`
 
 ## 进行中
 

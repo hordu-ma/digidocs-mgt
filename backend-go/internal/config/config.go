@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"log"
+	"os"
+)
 
 type Config struct {
 	AppName             string
@@ -14,7 +17,7 @@ type Config struct {
 }
 
 func Load() Config {
-	return Config{
+	cfg := Config{
 		AppName:             getEnv("APP_NAME", "DigiDocs Mgt Go API"),
 		HTTPAddr:            getEnv("HTTP_ADDR", ":8080"),
 		AppEnv:              getEnv("APP_ENV", "development"),
@@ -24,6 +27,17 @@ func Load() Config {
 		WorkerCallbackToken: getEnv("WORKER_CALLBACK_TOKEN", "replace-me"),
 		JWTSecret:           getEnv("JWT_SECRET", "dev-secret"),
 	}
+
+	if cfg.AppEnv == "production" {
+		if cfg.JWTSecret == "dev-secret" {
+			log.Fatal("FATAL: JWT_SECRET must be set to a secure value in production")
+		}
+		if cfg.WorkerCallbackToken == "replace-me" {
+			log.Fatal("FATAL: WORKER_CALLBACK_TOKEN must be set to a secure value in production")
+		}
+	}
+
+	return cfg
 }
 
 func getEnv(key string, fallback string) string {

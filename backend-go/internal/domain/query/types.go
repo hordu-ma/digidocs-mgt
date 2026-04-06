@@ -40,6 +40,10 @@ type VersionDetail struct {
 	VersionNo        int    `json:"version_no,omitempty"`
 	CommitMessage    string `json:"commit_message,omitempty"`
 	FileName         string `json:"file_name,omitempty"`
+	FileSize         int64  `json:"file_size,omitempty"`
+	StorageProvider  string `json:"storage_provider,omitempty"`
+	StorageObjectKey string `json:"storage_object_key,omitempty"`
+	MimeType         string `json:"mime_type,omitempty"`
 	Download         string `json:"download,omitempty"`
 	PreviewType      string `json:"preview_type,omitempty"`
 	PreviewURL       string `json:"preview_url,omitempty"`
