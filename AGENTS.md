@@ -27,8 +27,6 @@
 
 ## 3. 目录职责
 
-- `backend/`
-  - 旧 FastAPI 后端（已冻结，主业务已迁移至 `backend-go/`）
 - `frontend/`
   - Vue 3 前端实现
 - `ops/codex/skills/`

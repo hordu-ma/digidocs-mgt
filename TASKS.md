@@ -186,6 +186,14 @@ Go 主业务迁移与协作环境固化阶段
   - 覆盖 18 个测试用例：文档 CRUD、Dashboard、交接、审计、认证、鉴权拦截
 - 完成 smoke test 细化
   - `smoke-local.sh` 新增业务端点验证：登录获取 token → documents / dashboard / handovers / audit-events
+- 清理旧 `backend/` 目录
+  - 旧 FastAPI 后端已完全被 `backend-go/` + `backend-py-worker/` 替代
+  - `git rm -r backend/` 删除全部文件
+  - 更新 `AGENTS.md`、`README.md` 移除 `backend/` 引用
+- 修复 `backend-py-worker/` Pylance 类型检查问题
+  - `callback_client.py` 补充类型注解（类属性、返回值）
+  - 新增 `pyrightconfig.json` 配置基础类型检查模式
+  - `.vscode/settings.json` 增加 `python.analysis.extraPaths` 解决隐式相对导入
 
 ## 进行中
 

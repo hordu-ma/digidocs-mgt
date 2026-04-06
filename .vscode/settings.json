@@ -1,0 +1,12 @@
+{
+    "python.analysis.extraPaths": [
+        "backend-py-worker"
+    ],
+    "python.analysis.typeCheckingMode": "basic",
+    "chat.tools.terminal.autoApprove": {
+        "/^cd /home/liguoma/code-repos/digidocs-mgt/backend-py-worker && python -m pytest -q 2>&1 \\| tail -20$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

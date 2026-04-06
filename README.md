@@ -31,7 +31,6 @@
 │   ├── adr/
 │   │   └── 001-go-python-hybrid.md
 │   └── Harness Engineering 学习笔记.md
-├── backend/
 ├── backend-go/
 ├── backend-py-worker/
 ├── docker-compose.yml
@@ -177,9 +176,8 @@ make verify
 
 ```bash
 git pull
-cp .env.example backend/.env
-cd backend
-uv sync
+cd backend-go
+# configure .env as needed
 cd ../frontend
 npm install
 cd ..
