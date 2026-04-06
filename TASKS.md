@@ -175,6 +175,12 @@ Go 主业务迁移与协作环境固化阶段
   - 新增 Worker 专用版本文件下载接口，供正文抽取使用
   - Python Worker 已支持 `txt` / `md` / `csv` / `json` / `docx` 的最小正文抽取
   - `document.summarize` 在缺少已抽取文本时会尝试内联抽取，再提交给 OpenClaw
+- 完成仓库内部署资产首轮收口
+  - 新增前端生产镜像与 nginx 反向代理配置
+  - `docker-compose.yml` 增加 `frontend` 服务，并统一接入环境变量模板
+  - 新增根目录 `.env.production.example`
+  - 新增 `docs/部署准备与运行说明.md`
+  - `README.md` 增加部署配置模板与部署说明入口
 - 清理冗余 `SKILLS/` 目录
   - 旧 FastAPI 技能文档已过时、前端和集成层约束已被 `ops/codex/skills/` 覆盖
   - 移除 `AGENTS.md`、`README.md` 中的 `SKILLS/` 引用
@@ -293,6 +299,18 @@ Go 主业务迁移与协作环境固化阶段
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
 - 增加 `pdf` / 图片 OCR / 扫描件的正文抽取链路
 - 增加 Assistant 问答历史列表与筛选
+- p14s 部署准备
+  - 确认 OpenClaw Gateway 已启用 `GET /v1/models` 与 `POST /v1/chat/completions`
+  - 固化 p14s 上的 `.env`，确认 `OPENCLAW_BASE_URL` / `OPENCLAW_API_KEY` / `CALLBACK_BASE_URL`
+  - 选择部署方式：`docker compose` 或 `systemd + 反向代理`
+  - 配置 TLS / 反向代理 / 防火墙，仅暴露前端入口
+  - 进行一次真实端到端烟测
+- 群晖 DS925+ 部署准备
+  - 创建 `DigiDocs` 共享目录与最小权限服务账号
+  - 验证 DSM / File Station API 连通性与证书策略
+  - 确认 PostgreSQL 运行位置、备份频率、恢复方式
+  - 确认 p14s 与群晖之间网络可达与地址固定策略
+  - 进行一次真实上传 / 下载 / 创建目录 / 共享链接烟测
 - ~~增加群晖 NAS 适配器~~ ✅ 已完成
 - ~~增加基础测试~~ ✅ 已完成
 - ~~增加更细粒度的 smoke test 和分层验证矩阵~~ ✅ 已完成（smoke-local.sh 已覆盖业务端点）

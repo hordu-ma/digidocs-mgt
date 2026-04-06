@@ -47,6 +47,7 @@
 - [数据库设计](docs/数据库设计.md)
 - [API 设计](docs/API设计.md)
 - [异步任务消息契约](docs/异步任务消息契约.md)
+- [部署准备与运行说明](docs/部署准备与运行说明.md)
 - [ADR-001 Go-Python 混合迁移方案](docs/adr/001-go-python-hybrid.md)
 
 ## 技术栈
@@ -145,8 +146,14 @@ docker compose up -d postgres
 启动容器内联调路径：
 
 ```bash
-docker compose --profile app up -d backend-go backend-py-worker
+docker compose --profile app up -d backend-go backend-py-worker frontend
 ```
+
+部署前配置模板：
+
+- 本地开发模板：[.env.example](/Users/liguo/code-repos/digidocs-mgt/.env.example)
+- 生产部署模板：[.env.production.example](/Users/liguo/code-repos/digidocs-mgt/.env.production.example)
+- 部署说明：[部署准备与运行说明](/Users/liguo/code-repos/digidocs-mgt/docs/部署准备与运行说明.md)
 
 ### Codex 协作环境
 
