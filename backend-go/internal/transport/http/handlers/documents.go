@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -105,6 +106,85 @@ func (h DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.WriteData(w, http.StatusOK, item)
+}
+
+func (h DocumentHandler) Update(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		FolderID    string `json:"folder_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+
+	actorID := middleware.UserIDFromContext(r.Context())
+	data, err := h.service.UpdateDocument(r.Context(), command.DocumentUpdateInput{
+		DocumentID:  r.PathValue("documentID"),
+		Title:       body.Title,
+		Description: body.Description,
+		FolderID:    body.FolderID,
+		ActorID:     actorID,
+	})
+	if err != nil {
+		if errors.Is(err, service.ErrValidation) {
+			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrNotFound) {
+			response.WriteError(w, http.StatusNotFound, "not_found", "document not found")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update document")
+		return
+	}
+
+	response.WriteData(w, http.StatusOK, data)
+}
+
+func (h DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+
+	actorID := middleware.UserIDFromContext(r.Context())
+	documentID := r.PathValue("documentID")
+	err := h.service.DeleteDocument(r.Context(), command.DocumentDeleteInput{
+		DocumentID: documentID,
+		Reason:     body.Reason,
+		ActorID:    actorID,
+	})
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.WriteError(w, http.StatusNotFound, "not_found", "document not found")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to delete document")
+		return
+	}
+
+	response.WriteData(w, http.StatusOK, map[string]any{"id": documentID, "is_deleted": true})
+}
+
+func (h DocumentHandler) Restore(w http.ResponseWriter, r *http.Request) {
+	actorID := middleware.UserIDFromContext(r.Context())
+	documentID := r.PathValue("documentID")
+	err := h.service.RestoreDocument(r.Context(), documentID, actorID)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.WriteError(w, http.StatusNotFound, "not_found", "document not found")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to restore document")
+		return
+	}
+
+	response.WriteData(w, http.StatusOK, map[string]any{"id": documentID, "is_deleted": false})
 }
 
 func parseIntOrDefault(raw string, fallback int) int {

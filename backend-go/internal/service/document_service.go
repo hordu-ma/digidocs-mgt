@@ -40,6 +40,30 @@ func (s DocumentService) GetDocument(ctx context.Context, documentID string) (*q
 	return s.reader.GetDocument(ctx, documentID)
 }
 
+func (s DocumentService) UpdateDocument(ctx context.Context, input command.DocumentUpdateInput) (map[string]any, error) {
+	if input.DocumentID == "" {
+		return nil, fmt.Errorf("%w: document_id is required", ErrValidation)
+	}
+	if input.Title == "" && input.Description == "" && input.FolderID == "" {
+		return nil, fmt.Errorf("%w: at least one field (title, description, folder_id) must be provided", ErrValidation)
+	}
+	return s.writer.UpdateDocument(ctx, input)
+}
+
+func (s DocumentService) DeleteDocument(ctx context.Context, input command.DocumentDeleteInput) error {
+	if input.DocumentID == "" {
+		return fmt.Errorf("%w: document_id is required", ErrValidation)
+	}
+	return s.writer.DeleteDocument(ctx, input)
+}
+
+func (s DocumentService) RestoreDocument(ctx context.Context, documentID string, actorID string) error {
+	if documentID == "" {
+		return fmt.Errorf("%w: document_id is required", ErrValidation)
+	}
+	return s.writer.RestoreDocument(ctx, documentID, actorID)
+}
+
 func (s DocumentService) CreateWithFirstVersion(
 	ctx context.Context,
 	input command.DocumentCreateInput,

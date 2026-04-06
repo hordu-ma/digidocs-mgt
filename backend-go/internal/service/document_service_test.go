@@ -37,6 +37,18 @@ func (m *mockDocumentWriter) CreateDocument(_ context.Context, _ command.Documen
 	return m.result, m.err
 }
 
+func (m *mockDocumentWriter) UpdateDocument(_ context.Context, _ command.DocumentUpdateInput) (map[string]any, error) {
+	return m.result, m.err
+}
+
+func (m *mockDocumentWriter) DeleteDocument(_ context.Context, _ command.DocumentDeleteInput) error {
+	return m.err
+}
+
+func (m *mockDocumentWriter) RestoreDocument(_ context.Context, _ string, _ string) error {
+	return m.err
+}
+
 type mockDocStorage struct {
 	result storage.PutObjectResult
 	err    error
@@ -161,5 +173,94 @@ func TestDocumentService_CreateWithFirstVersion_VersionError(t *testing.T) {
 	_, err := svc.CreateWithFirstVersion(context.Background(), validCreateInput(), "test.pdf", 1024, "", strings.NewReader(""))
 	if err == nil || !strings.Contains(err.Error(), "first version creation failed") {
 		t.Errorf("err = %v, want first version creation failed", err)
+	}
+}
+
+// --- UpdateDocument tests ---
+
+func TestDocumentService_UpdateDocument_OK(t *testing.T) {
+	svc := NewDocumentService(
+		&mockDocumentReader{},
+		&mockDocumentWriter{result: map[string]any{"id": "doc-1", "title": "New Title"}},
+		&mockDocStorage{},
+		&mockDocVersionWorkflow{},
+	)
+	data, err := svc.UpdateDocument(context.Background(), command.DocumentUpdateInput{
+		DocumentID: "doc-1", Title: "New Title", ActorID: "u-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if data["title"] != "New Title" {
+		t.Errorf("title = %v, want New Title", data["title"])
+	}
+}
+
+func TestDocumentService_UpdateDocument_MissingDocumentID(t *testing.T) {
+	svc := NewDocumentService(&mockDocumentReader{}, &mockDocumentWriter{}, &mockDocStorage{}, &mockDocVersionWorkflow{})
+	_, err := svc.UpdateDocument(context.Background(), command.DocumentUpdateInput{})
+	if !errors.Is(err, ErrValidation) {
+		t.Errorf("err = %v, want ErrValidation", err)
+	}
+}
+
+func TestDocumentService_UpdateDocument_NoFieldsProvided(t *testing.T) {
+	svc := NewDocumentService(&mockDocumentReader{}, &mockDocumentWriter{}, &mockDocStorage{}, &mockDocVersionWorkflow{})
+	_, err := svc.UpdateDocument(context.Background(), command.DocumentUpdateInput{DocumentID: "doc-1"})
+	if !errors.Is(err, ErrValidation) {
+		t.Errorf("err = %v, want ErrValidation", err)
+	}
+}
+
+func TestDocumentService_UpdateDocument_WriterError(t *testing.T) {
+	svc := NewDocumentService(
+		&mockDocumentReader{},
+		&mockDocumentWriter{err: errors.New("db error")},
+		&mockDocStorage{},
+		&mockDocVersionWorkflow{},
+	)
+	_, err := svc.UpdateDocument(context.Background(), command.DocumentUpdateInput{
+		DocumentID: "doc-1", Title: "T", ActorID: "u-1",
+	})
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+}
+
+// --- DeleteDocument tests ---
+
+func TestDocumentService_DeleteDocument_OK(t *testing.T) {
+	svc := NewDocumentService(&mockDocumentReader{}, &mockDocumentWriter{}, &mockDocStorage{}, &mockDocVersionWorkflow{})
+	err := svc.DeleteDocument(context.Background(), command.DocumentDeleteInput{
+		DocumentID: "doc-1", Reason: "test", ActorID: "u-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDocumentService_DeleteDocument_MissingDocumentID(t *testing.T) {
+	svc := NewDocumentService(&mockDocumentReader{}, &mockDocumentWriter{}, &mockDocStorage{}, &mockDocVersionWorkflow{})
+	err := svc.DeleteDocument(context.Background(), command.DocumentDeleteInput{})
+	if !errors.Is(err, ErrValidation) {
+		t.Errorf("err = %v, want ErrValidation", err)
+	}
+}
+
+// --- RestoreDocument tests ---
+
+func TestDocumentService_RestoreDocument_OK(t *testing.T) {
+	svc := NewDocumentService(&mockDocumentReader{}, &mockDocumentWriter{}, &mockDocStorage{}, &mockDocVersionWorkflow{})
+	err := svc.RestoreDocument(context.Background(), "doc-1", "u-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDocumentService_RestoreDocument_MissingDocumentID(t *testing.T) {
+	svc := NewDocumentService(&mockDocumentReader{}, &mockDocumentWriter{}, &mockDocStorage{}, &mockDocVersionWorkflow{})
+	err := svc.RestoreDocument(context.Background(), "", "u-1")
+	if !errors.Is(err, ErrValidation) {
+		t.Errorf("err = %v, want ErrValidation", err)
 	}
 }

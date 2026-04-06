@@ -64,6 +64,9 @@ type DocumentReader interface {
 
 type DocumentWriter interface {
 	CreateDocument(ctx context.Context, input command.DocumentCreateInput) (map[string]any, error)
+	UpdateDocument(ctx context.Context, input command.DocumentUpdateInput) (map[string]any, error)
+	DeleteDocument(ctx context.Context, input command.DocumentDeleteInput) error
+	RestoreDocument(ctx context.Context, documentID string, actorID string) error
 }
 
 type UserAuthReader interface {

@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
-import { computed, onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
+import type { UploadRawFile } from "element-plus";
+import { computed, onMounted, reactive, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
 
 const route = useRoute();
+const router = useRouter();
 const documentID = route.params.id as string;
 
 const doc = ref<any>(null);
@@ -80,6 +82,98 @@ async function applyFlowAction(endpoint: string, label: string) {
   }
 }
 
+// --- Edit document info ---
+const showEditDialog = ref(false);
+const editLoading = ref(false);
+const editForm = reactive({ title: "", description: "", folder_id: "" });
+
+function openEdit() {
+  editForm.title = doc.value?.title ?? "";
+  editForm.description = doc.value?.description ?? "";
+  editForm.folder_id = "";
+  showEditDialog.value = true;
+}
+
+async function submitEdit() {
+  editLoading.value = true;
+  try {
+    await api.patch(`/documents/${documentID}`, editForm);
+    ElMessage.success("文档信息已更新");
+    showEditDialog.value = false;
+    await loadData();
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "更新失败");
+  } finally {
+    editLoading.value = false;
+  }
+}
+
+// --- Delete / Restore ---
+async function deleteDocument() {
+  actionLoading.value = true;
+  try {
+    await api.post(`/documents/${documentID}/delete`, { reason: "" });
+    ElMessage.success("文档已删除");
+    router.push("/documents");
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "删除失败");
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+async function restoreDocument() {
+  actionLoading.value = true;
+  try {
+    await api.post(`/documents/${documentID}/restore`);
+    ElMessage.success("文档已恢复");
+    await loadData();
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "恢复失败");
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+// --- Upload new version ---
+const showUploadDialog = ref(false);
+const uploadLoading = ref(false);
+const uploadMessage = ref("");
+const uploadFile = ref<UploadRawFile | null>(null);
+
+function openUpload() {
+  uploadMessage.value = "";
+  uploadFile.value = null;
+  showUploadDialog.value = true;
+}
+
+function handleUploadFileChange(file: { raw: UploadRawFile }) {
+  uploadFile.value = file.raw;
+}
+
+async function submitUpload() {
+  if (!uploadFile.value) {
+    ElMessage.warning("请选择文件");
+    return;
+  }
+  uploadLoading.value = true;
+  try {
+    const fd = new FormData();
+    fd.append("commit_message", uploadMessage.value);
+    fd.append("file", uploadFile.value);
+    await api.post(`/documents/${documentID}/versions`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    ElMessage.success("新版本上传成功");
+    showUploadDialog.value = false;
+    await loadData();
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "上传失败");
+  } finally {
+    uploadLoading.value = false;
+  }
+}
+
 onMounted(loadData);
 </script>
 
@@ -110,6 +204,24 @@ onMounted(loadData);
             :loading="actionLoading"
             @click="applyFlowAction(act.endpoint, act.label)"
             >{{ act.label }}</ElButton
+          >
+          <ElButton @click="openEdit">编辑信息</ElButton>
+          <ElButton @click="openUpload">上传新版本</ElButton>
+          <ElButton
+            type="danger"
+            :loading="actionLoading"
+            @click="deleteDocument"
+            >删除</ElButton
+          >
+        </div>
+        <div v-else class="action-bar">
+          <ElButton @click="openEdit">编辑信息</ElButton>
+          <ElButton @click="openUpload">上传新版本</ElButton>
+          <ElButton
+            type="danger"
+            :loading="actionLoading"
+            @click="deleteDocument"
+            >删除</ElButton
           >
         </div>
       </ElCard>
@@ -147,6 +259,52 @@ onMounted(loadData);
         </ElTable>
       </ElCard>
     </div>
+
+    <ElDialog v-model="showEditDialog" title="编辑文档信息" width="480px">
+      <ElForm label-position="top">
+        <ElFormItem label="标题">
+          <ElInput v-model="editForm.title" />
+        </ElFormItem>
+        <ElFormItem label="描述">
+          <ElInput v-model="editForm.description" type="textarea" :rows="3" />
+        </ElFormItem>
+        <ElFormItem label="目录 ID">
+          <ElInput
+            v-model="editForm.folder_id"
+            placeholder="移动到新目录（可选）"
+          />
+        </ElFormItem>
+      </ElForm>
+      <template #footer>
+        <ElButton @click="showEditDialog = false">取消</ElButton>
+        <ElButton type="primary" :loading="editLoading" @click="submitEdit"
+          >保存</ElButton
+        >
+      </template>
+    </ElDialog>
+
+    <ElDialog v-model="showUploadDialog" title="上传新版本" width="480px">
+      <ElForm label-position="top">
+        <ElFormItem label="提交说明">
+          <ElInput v-model="uploadMessage" placeholder="版本提交说明" />
+        </ElFormItem>
+        <ElFormItem label="文件">
+          <ElUpload
+            :auto-upload="false"
+            :limit="1"
+            :on-change="handleUploadFileChange"
+          >
+            <ElButton>选择文件</ElButton>
+          </ElUpload>
+        </ElFormItem>
+      </ElForm>
+      <template #footer>
+        <ElButton @click="showUploadDialog = false">取消</ElButton>
+        <ElButton type="primary" :loading="uploadLoading" @click="submitUpload"
+          >上传</ElButton
+        >
+      </template>
+    </ElDialog>
   </AppLayout>
 </template>
 

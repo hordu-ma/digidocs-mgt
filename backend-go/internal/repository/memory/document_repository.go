@@ -72,3 +72,27 @@ func (r DocumentRepository) CreateDocument(_ context.Context, input command.Docu
 		"current_status": "draft",
 	}, nil
 }
+
+func (r DocumentRepository) UpdateDocument(_ context.Context, input command.DocumentUpdateInput) (map[string]any, error) {
+	title := input.Title
+	if title == "" {
+		title = "课题申报书"
+	}
+	return map[string]any{
+		"id":               input.DocumentID,
+		"title":            title,
+		"description":      input.Description,
+		"current_status":   "draft",
+		"current_owner":    map[string]string{"id": "00000000-0000-0000-0000-000000000001", "display_name": "系统管理员"},
+		"current_version_id": nil,
+		"is_archived":      false,
+	}, nil
+}
+
+func (r DocumentRepository) DeleteDocument(_ context.Context, _ command.DocumentDeleteInput) error {
+	return nil
+}
+
+func (r DocumentRepository) RestoreDocument(_ context.Context, _ string, _ string) error {
+	return nil
+}

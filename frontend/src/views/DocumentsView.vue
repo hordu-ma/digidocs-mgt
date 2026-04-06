@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { ElMessage } from "element-plus";
+import type { UploadRawFile } from "element-plus";
+import { onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
@@ -47,6 +49,72 @@ function goDetail(row: any) {
   router.push(`/documents/${row.id}`);
 }
 
+// --- Create document dialog ---
+const showCreateDialog = ref(false);
+const createLoading = ref(false);
+const createForm = reactive({
+  team_space_id: "",
+  project_id: "",
+  folder_id: "",
+  title: "",
+  description: "",
+  commit_message: "",
+});
+const createFile = ref<UploadRawFile | null>(null);
+
+function openCreate() {
+  Object.assign(createForm, {
+    team_space_id: "",
+    project_id: "",
+    folder_id: "",
+    title: "",
+    description: "",
+    commit_message: "",
+  });
+  createFile.value = null;
+  showCreateDialog.value = true;
+}
+
+function handleFileChange(file: { raw: UploadRawFile }) {
+  createFile.value = file.raw;
+}
+
+async function submitCreate() {
+  if (
+    !createForm.title ||
+    !createForm.team_space_id ||
+    !createForm.project_id
+  ) {
+    ElMessage.warning("请填写标题、团队空间 ID 和课题 ID");
+    return;
+  }
+  if (!createFile.value) {
+    ElMessage.warning("请选择文件");
+    return;
+  }
+  createLoading.value = true;
+  try {
+    const fd = new FormData();
+    fd.append("team_space_id", createForm.team_space_id);
+    fd.append("project_id", createForm.project_id);
+    fd.append("folder_id", createForm.folder_id);
+    fd.append("title", createForm.title);
+    fd.append("description", createForm.description);
+    fd.append("commit_message", createForm.commit_message);
+    fd.append("file", createFile.value);
+    await api.post("/documents", fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    ElMessage.success("文档创建成功");
+    showCreateDialog.value = false;
+    await fetchDocuments();
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "创建失败");
+  } finally {
+    createLoading.value = false;
+  }
+}
+
 onMounted(fetchDocuments);
 </script>
 
@@ -58,7 +126,7 @@ onMounted(fetchDocuments);
           <h1>文档管理</h1>
           <p>按团队空间、课题和目录组织文档，并管理责任人和版本。</p>
         </div>
-        <ElButton type="primary">新建文档</ElButton>
+        <ElButton type="primary" @click="openCreate">新建文档</ElButton>
       </div>
       <ElCard class="page-card">
         <div class="toolbar">
@@ -99,6 +167,60 @@ onMounted(fetchDocuments);
           @current-change="handlePageChange"
         />
       </ElCard>
+
+      <ElDialog v-model="showCreateDialog" title="新建文档" width="520px">
+        <ElForm label-position="top">
+          <ElFormItem label="标题" required>
+            <ElInput v-model="createForm.title" placeholder="文档标题" />
+          </ElFormItem>
+          <ElFormItem label="团队空间 ID" required>
+            <ElInput
+              v-model="createForm.team_space_id"
+              placeholder="团队空间 UUID"
+            />
+          </ElFormItem>
+          <ElFormItem label="课题 ID" required>
+            <ElInput v-model="createForm.project_id" placeholder="课题 UUID" />
+          </ElFormItem>
+          <ElFormItem label="目录 ID">
+            <ElInput
+              v-model="createForm.folder_id"
+              placeholder="目录 UUID（可选）"
+            />
+          </ElFormItem>
+          <ElFormItem label="描述">
+            <ElInput
+              v-model="createForm.description"
+              type="textarea"
+              :rows="2"
+            />
+          </ElFormItem>
+          <ElFormItem label="提交说明">
+            <ElInput
+              v-model="createForm.commit_message"
+              placeholder="首版本提交说明"
+            />
+          </ElFormItem>
+          <ElFormItem label="文件" required>
+            <ElUpload
+              :auto-upload="false"
+              :limit="1"
+              :on-change="handleFileChange"
+            >
+              <ElButton>选择文件</ElButton>
+            </ElUpload>
+          </ElFormItem>
+        </ElForm>
+        <template #footer>
+          <ElButton @click="showCreateDialog = false">取消</ElButton>
+          <ElButton
+            type="primary"
+            :loading="createLoading"
+            @click="submitCreate"
+            >创建</ElButton
+          >
+        </template>
+      </ElDialog>
     </div>
   </AppLayout>
 </template>

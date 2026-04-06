@@ -237,3 +237,84 @@ func (r DocumentRepository) CreateDocument(ctx context.Context, input command.Do
 		"current_status": "draft",
 	}, nil
 }
+
+func (r DocumentRepository) UpdateDocument(ctx context.Context, input command.DocumentUpdateInput) (map[string]any, error) {
+	var title, description, status string
+	var owner query.UserSummary
+	var currentVersionID *string
+	var isArchived bool
+
+	err := r.db.QueryRowContext(
+		ctx,
+		`
+		UPDATE documents
+		SET title       = COALESCE(NULLIF($2, ''), title),
+		    description = CASE WHEN $3 = '' THEN description ELSE $3 END,
+		    folder_id   = COALESCE(NULLIF($4, '')::uuid, folder_id),
+		    updated_at  = NOW()
+		WHERE id::text = $1 AND is_deleted = false
+		RETURNING
+			id::text,
+			title,
+			COALESCE(description, ''),
+			current_status::text,
+			current_owner_id::text,
+			(SELECT display_name FROM users WHERE id = documents.current_owner_id),
+			current_version_id::text,
+			is_archived
+		`,
+		input.DocumentID,
+		input.Title,
+		input.Description,
+		input.FolderID,
+	).Scan(&input.DocumentID, &title, &description, &status, &owner.ID, &owner.DisplayName, &currentVersionID, &isArchived)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, service.ErrNotFound
+		}
+		return nil, err
+	}
+
+	result := map[string]any{
+		"id":               input.DocumentID,
+		"title":            title,
+		"description":      description,
+		"current_status":   status,
+		"current_owner":    map[string]string{"id": owner.ID, "display_name": owner.DisplayName},
+		"current_version_id": currentVersionID,
+		"is_archived":      isArchived,
+	}
+	return result, nil
+}
+
+func (r DocumentRepository) DeleteDocument(ctx context.Context, input command.DocumentDeleteInput) error {
+	res, err := r.db.ExecContext(
+		ctx,
+		`UPDATE documents SET is_deleted = true, updated_at = NOW() WHERE id::text = $1 AND is_deleted = false`,
+		input.DocumentID,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return service.ErrNotFound
+	}
+	return nil
+}
+
+func (r DocumentRepository) RestoreDocument(ctx context.Context, documentID string, actorID string) error {
+	res, err := r.db.ExecContext(
+		ctx,
+		`UPDATE documents SET is_deleted = false, updated_at = NOW() WHERE id::text = $1 AND is_deleted = true`,
+		documentID,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return service.ErrNotFound
+	}
+	return nil
+}

@@ -10,6 +10,20 @@ type DocumentCreateInput struct {
 	ActorID        string
 }
 
+type DocumentUpdateInput struct {
+	DocumentID  string
+	Title       string
+	Description string
+	FolderID    string
+	ActorID     string
+}
+
+type DocumentDeleteInput struct {
+	DocumentID string
+	Reason     string
+	ActorID    string
+}
+
 type FlowActionInput struct {
 	DocumentID string
 	Action     string

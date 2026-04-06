@@ -170,6 +170,22 @@ Go 主业务迁移与协作环境固化阶段
   - 新增 `DocumentService`，整合文档创建 + 文件上传 + 首版本创建
   - 新增 8 个单元测试（必填字段、Writer 错误、存储错误、版本错误）
   - handler 处理 multipart 表单上传，router 注册 POST 路由
+- 补齐文档 CRUD 剩余接口
+  - 新增 `PATCH /documents/{id}`（更新标题/描述/目录）
+  - 新增 `POST /documents/{id}/delete`（逻辑删除）
+  - 新增 `POST /documents/{id}/restore`（恢复已删除文档）
+  - 新增 `DocumentUpdateInput`、`DocumentDeleteInput` 命令类型
+  - `DocumentWriter` 接口新增 `UpdateDocument` / `DeleteDocument` / `RestoreDocument`
+  - postgres / memory 双实现
+  - `DocumentService` 新增 3 方法 + 7 个单元测试
+- 完成前端视图功能补全
+  - `DocumentsView`：新建文档 Dialog（multipart 上传），接入 `POST /documents`
+  - `DocumentDetailView`：编辑信息 Dialog（PATCH）、删除/恢复按钮、上传新版本 Dialog
+- 完成 Handler 层集成测试
+  - 新增 `handlers_test.go`，基于 memory 仓储的端到端 HTTP 测试
+  - 覆盖 18 个测试用例：文档 CRUD、Dashboard、交接、审计、认证、鉴权拦截
+- 完成 smoke test 细化
+  - `smoke-local.sh` 新增业务端点验证：登录获取 token → documents / dashboard / handovers / audit-events
 
 ## 进行中
 
@@ -197,8 +213,8 @@ Go 主业务迁移与协作环境固化阶段
 - 增加 OpenClaw 客户端真实调用
 - 增加群晖 NAS 适配器
 - ~~增加基础测试~~ ✅ 已完成
-- 增加更细粒度的 smoke test 和分层验证矩阵
-- 将 smoke 验证进一步细化到关键业务闭环接口
+- ~~增加更细粒度的 smoke test 和分层验证矩阵~~ ✅ 已完成（smoke-local.sh 已覆盖业务端点）
+- ~~将 smoke 验证进一步细化到关键业务闭环接口~~ ✅ 已完成
 - ~~前端 Element Plus 改为按需引入~~ ✅ 已完成（JS bundle 从 1,041 KB 降至 470 KB）
 
 ## 更新规则
