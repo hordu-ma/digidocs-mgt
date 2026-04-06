@@ -67,6 +67,10 @@ Go 主业务迁移与协作环境固化阶段
   - 已启用 `.githooks`
   - 已跑通 `make status`
   - 已执行 `make smoke`，当前以非严格模式跳过宿主机 `18081/healthz`
+- 完成 GitHub 协作资产入口补齐
+  - 新增 `.github/INDEX.md` 作为 `.github/` 唯一入口
+  - `AGENTS.md` 会话启动清单增加 `.github/INDEX.md` 读取步骤
+  - `README.md`、`doctor.sh`、`check-doc-sync.sh`、`report.sh` 同步接入 GitHub 入口校验
 - 完成代码审查与安全修复（一期）
   - JWT 改为真实 HMAC-SHA256 签名，淘汰伪造 base64 token
   - login 接入 bcrypt 密码校验与独立 AuthService

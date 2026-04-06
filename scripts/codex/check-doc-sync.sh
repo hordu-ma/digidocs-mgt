@@ -66,7 +66,17 @@ fi
 echo '== codex assets mentioned =='
 require_pattern README.md 'ops/codex/skills/' 'README mentions project skills path' || status=1
 require_pattern README.md './scripts/codex/doctor.sh' 'README mentions doctor entry' || status=1
+require_pattern README.md '.github/INDEX.md' 'README mentions .github index entry' || status=1
 require_pattern AGENTS.md 'ops/codex/skills/' 'AGENTS mentions project skills path' || status=1
 require_pattern AGENTS.md 'TASKS.md.*README.md' 'AGENTS mentions task/readme sync' || status=1
+require_pattern AGENTS.md '.github/INDEX.md' 'AGENTS mentions .github index entry' || status=1
+
+echo '== github entry =='
+if [[ -f .github/INDEX.md ]]; then
+  printf '[OK] %s\n' '.github/INDEX.md exists'
+else
+  printf '[MISS] %s\n' '.github/INDEX.md exists'
+  status=1
+fi
 
 exit "$status"

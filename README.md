@@ -49,6 +49,7 @@
 - [异步任务消息契约](docs/异步任务消息契约.md)
 - [部署准备与运行说明](docs/部署准备与运行说明.md)
 - [ADR-001 Go-Python 混合迁移方案](docs/adr/001-go-python-hybrid.md)
+- [.github 协作资产索引](.github/INDEX.md)
 
 ## 技术栈
 
@@ -85,6 +86,7 @@
 - 项目级 Codex 可执行 skills 统一维护在 `ops/codex/skills/`。
 - 新机器或新会话接力开发时，优先运行 `./scripts/codex/doctor.sh` 做环境体检。
 - 若需让 Codex 在运行时发现项目技能，执行 `./scripts/codex/install-project-skills.sh`。
+- GitHub 协作资产默认从 `.github/INDEX.md` 进入，不直接扫描整个 `.github/`。
 
 ## 近期开发顺序
 
@@ -179,6 +181,7 @@ make verify
 - `scripts/codex/smoke-local.sh`：本地容器联调烟测骨架
 - `Makefile`：统一 `make doctor`、`make verify`、`make check-doc-sync`
 - `.githooks/`：本地提交前和推送前门禁
+- `.github/INDEX.md`：GitHub 协作资产入口
 - `.github/workflows/verify.yml`：远端 GitHub Actions 验证门禁
 - `docs/Harness Engineering 学习笔记.md`：本项目的 Harness Engineering 学习文档
 
@@ -234,5 +237,6 @@ docker compose up -d postgres
 - 已完成 P0 文档/契约收口首轮修复（验证命令、README/AGENTS 迁移描述、前后端错误读取、转交流程、AI 问答契约）
 - 已完成 P1 AI 持久化闭环首轮修复（`assistant_requests` 落库、Worker 回调幂等更新、`assistant_suggestions` 查询/确认/忽略真实接线）
 - 已完成 P2 持久化任务消费与 AI 结果展示首轮修复（PostgreSQL 任务轮询、摘要结果回写、文档详情页 AI 建议展示）
+- 已补 `.github/INDEX.md` 与 GitHub 协作资产入口校验
 
 详细任务状态持续维护在 [TASKS.md](/home/liguoma/code-repos/digidocs-mgt/TASKS.md)。

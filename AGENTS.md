@@ -19,9 +19,10 @@
 1. `docs/项目定义与技术架构.md`
 2. `docs/数据库设计.md`
 3. `docs/API设计.md`
-4. `README.md`
-5. `TASKS.md`
-6. `ops/codex/skills/` 下的项目级可执行技能
+4. `.github/INDEX.md`
+5. `README.md`
+6. `TASKS.md`
+7. `ops/codex/skills/` 下的项目级可执行技能
 
 如果实现与这些文档冲突，先更新文档再改代码，禁止静默偏离设计。
 
@@ -68,10 +69,11 @@
 每次进入本仓库开始开发前，代理或开发者应先完成以下动作：
 
 1. 读取 `docs/项目定义与技术架构.md`、`docs/数据库设计.md`、`docs/API设计.md`
-2. 读取 `README.md` 和 `TASKS.md`，确认当前阶段与进行中事项
-3. 判断本次任务是否需要启用 `ops/codex/skills/` 下的专项 skill
-4. 明确本次会影响的目录、契约和验证命令
-5. 如发现 `README.md` 与 `TASKS.md` 阶段不一致，先修正文档再进入实现
+2. 读取 `.github/INDEX.md`，仅按索引按需进入 `.github/` 资产
+3. 读取 `README.md` 和 `TASKS.md`，确认当前阶段与进行中事项
+4. 判断本次任务是否需要启用 `ops/codex/skills/` 下的专项 skill
+5. 明确本次会影响的目录、契约和验证命令
+6. 如发现 `README.md` 与 `TASKS.md` 阶段不一致，先修正文档再进入实现
 
 ## 5.2 项目技能使用约定
 
