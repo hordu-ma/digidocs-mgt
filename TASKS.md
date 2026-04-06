@@ -159,6 +159,17 @@ Go 主业务迁移与协作环境固化阶段
   - 新增 `HandoverService`，整合交接查询 + 创建/更新/动作执行，增加输入校验
   - 交接 handler 从双服务简化为单服务调用
   - 新增 14 个单元测试（Create/UpdateItems/ApplyAction/Get 各路径校验）
+- 清理旧服务层残留代码
+  - 删除 8 个已被新服务层取代的旧文件（action_service / upload_service / version_command / version_workflow / flow_query / handover_query / version_query）
+- 完成审计事件过滤条件补齐
+  - `AuditEventFilter` 新增 `UserID`、`DateFrom`、`DateTo` 字段
+  - postgres 查询添加用户与日期范围过滤
+  - handler 从 query params 解析新字段
+- 完成创建文档接口（POST /documents）
+  - 新增 `DocumentCreateInput` 与 `DocumentWriter` 接口
+  - 新增 `DocumentService`，整合文档创建 + 文件上传 + 首版本创建
+  - 新增 8 个单元测试（必填字段、Writer 错误、存储错误、版本错误）
+  - handler 处理 multipart 表单上传，router 注册 POST 路由
 
 ## 进行中
 
@@ -180,7 +191,7 @@ Go 主业务迁移与协作环境固化阶段
 - ~~增加毕业交接服务层~~ ✅ 已完成
 - ~~将 JWT 用户 ID 透传至所有审计事件写入~~ ✅ 已完成
 - ~~Python CallbackClient / OpenClawClient 实现真实 HTTP 调用~~ ✅ CallbackClient 已完成，OpenClawClient 待对接真实服务
-- 增加更完整的审计事件过滤条件与统计聚合
+- ~~增加更完整的审计事件过滤条件与统计聚合~~ ✅ 已完成（过滤条件已补齐，统计聚合待后续细化）
 - ~~增加 dashboard 聚合相关基础测试~~ ✅ 已完成
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
 - 增加 OpenClaw 客户端真实调用

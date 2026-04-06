@@ -5,17 +5,66 @@ import (
 	"net/http"
 	"strconv"
 
+	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/service"
+	"digidocs-mgt/backend-go/internal/transport/http/middleware"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
 )
 
 type DocumentHandler struct {
-	queryService service.QueryService
+	service service.DocumentService
 }
 
-func NewDocumentHandler(queryService service.QueryService) DocumentHandler {
-	return DocumentHandler{queryService: queryService}
+func NewDocumentHandler(svc service.DocumentService) DocumentHandler {
+	return DocumentHandler{service: svc}
+}
+
+func (h DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid multipart form")
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "bad_request", "file is required")
+		return
+	}
+	defer file.Close()
+
+	actorID := middleware.UserIDFromContext(r.Context())
+	ownerID := r.FormValue("current_owner_id")
+	if ownerID == "" {
+		ownerID = actorID
+	}
+
+	data, err := h.service.CreateWithFirstVersion(
+		r.Context(),
+		command.DocumentCreateInput{
+			TeamSpaceID:    r.FormValue("team_space_id"),
+			ProjectID:      r.FormValue("project_id"),
+			FolderID:       r.FormValue("folder_id"),
+			Title:          r.FormValue("title"),
+			Description:    r.FormValue("description"),
+			CurrentOwnerID: ownerID,
+			ActorID:        actorID,
+		},
+		header.Filename,
+		header.Size,
+		r.FormValue("commit_message"),
+		file,
+	)
+	if err != nil {
+		if errors.Is(err, service.ErrValidation) {
+			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create document")
+		return
+	}
+
+	response.WriteData(w, http.StatusCreated, data)
 }
 
 func (h DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +80,7 @@ func (h DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 		PageSize:        parseIntOrDefault(r.URL.Query().Get("page_size"), 20),
 	}
 
-	items, total, err := h.queryService.ListDocuments(r.Context(), filter)
+	items, total, err := h.service.ListDocuments(r.Context(), filter)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list documents")
 		return
@@ -45,7 +94,7 @@ func (h DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
-	item, err := h.queryService.GetDocument(r.Context(), r.PathValue("documentID"))
+	item, err := h.service.GetDocument(r.Context(), r.PathValue("documentID"))
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			response.WriteError(w, http.StatusNotFound, "not_found", "document not found")

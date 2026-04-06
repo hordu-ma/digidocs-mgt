@@ -62,6 +62,10 @@ type DocumentReader interface {
 	GetDocument(ctx context.Context, documentID string) (*query.DocumentDetail, error)
 }
 
+type DocumentWriter interface {
+	CreateDocument(ctx context.Context, input command.DocumentCreateInput) (map[string]any, error)
+}
+
 type UserAuthReader interface {
 	FindUserByUsername(ctx context.Context, username string) (*auth.UserRecord, error)
 }

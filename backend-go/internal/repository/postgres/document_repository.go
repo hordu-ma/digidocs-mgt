@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
+	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/service"
 )
@@ -175,4 +177,63 @@ func (r DocumentRepository) GetDocument(ctx context.Context, documentID string) 
 
 	item.CurrentOwner = &owner
 	return &item, nil
+}
+
+func (r DocumentRepository) CreateDocument(ctx context.Context, input command.DocumentCreateInput) (map[string]any, error) {
+	id := newID()
+	now := time.Now().UTC()
+
+	_, err := r.db.ExecContext(
+		ctx,
+		`
+		INSERT INTO documents (
+			id,
+			team_space_id,
+			project_id,
+			folder_id,
+			title,
+			description,
+			current_owner_id,
+			current_status,
+			is_archived,
+			is_deleted,
+			created_by,
+			created_at,
+			updated_at
+		)
+		VALUES (
+			$1::uuid,
+			$2::uuid,
+			$3::uuid,
+			NULLIF($4, '')::uuid,
+			$5,
+			NULLIF($6, ''),
+			$7::uuid,
+			'draft'::document_status,
+			false,
+			false,
+			$8::uuid,
+			$9,
+			$9
+		)
+		`,
+		id,
+		input.TeamSpaceID,
+		input.ProjectID,
+		input.FolderID,
+		input.Title,
+		input.Description,
+		input.CurrentOwnerID,
+		actorOrSystem(input.ActorID),
+		now,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"id":             id,
+		"title":          input.Title,
+		"current_status": "draft",
+	}, nil
 }

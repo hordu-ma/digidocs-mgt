@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 
+	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 )
 
@@ -61,5 +62,13 @@ func (r DocumentRepository) GetDocument(ctx context.Context, documentID string) 
 			DisplayName: "系统管理员",
 		},
 		IsArchived: false,
+	}, nil
+}
+
+func (r DocumentRepository) CreateDocument(_ context.Context, input command.DocumentCreateInput) (map[string]any, error) {
+	return map[string]any{
+		"id":             "00000000-0000-0000-0000-000000000200",
+		"title":          input.Title,
+		"current_status": "draft",
 	}, nil
 }

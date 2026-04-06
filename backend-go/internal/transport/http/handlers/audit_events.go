@@ -23,7 +23,10 @@ func (h AuditEventHandler) List(w http.ResponseWriter, r *http.Request) {
 	items, total, err := h.queryService.List(r.Context(), query.AuditEventFilter{
 		ProjectID:  r.URL.Query().Get("project_id"),
 		DocumentID: r.URL.Query().Get("document_id"),
+		UserID:     r.URL.Query().Get("user_id"),
 		ActionType: r.URL.Query().Get("action_type"),
+		DateFrom:   r.URL.Query().Get("date_from"),
+		DateTo:     r.URL.Query().Get("date_to"),
 		Page:       page,
 		PageSize:   pageSize,
 	})

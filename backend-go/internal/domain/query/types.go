@@ -159,7 +159,10 @@ type PaginationMeta struct {
 type AuditEventFilter struct {
 	ProjectID  string
 	DocumentID string
+	UserID     string
 	ActionType string
+	DateFrom   string
+	DateTo     string
 	Page       int
 	PageSize   int
 }

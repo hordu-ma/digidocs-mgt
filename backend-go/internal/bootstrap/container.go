@@ -17,6 +17,7 @@ type Container struct {
 	DB                    *sql.DB
 	QueueConsumer         queue.Consumer
 	QueryService          service.QueryService
+	DocumentService       service.DocumentService
 	AuditQueryService     service.AuditQueryService
 	DashboardQueryService service.DashboardQueryService
 	VersionService        service.VersionService
@@ -43,6 +44,8 @@ func BuildContainer(cfg config.Config) (Container, error) {
 		actionRepo := pgrepo.NewActionRepository(postgresDB)
 		authService := service.NewAuthService(pgrepo.NewUserAuthRepository(postgresDB), tokenService)
 		versionRepo := pgrepo.NewVersionRepository(postgresDB)
+		docRepo := pgrepo.NewDocumentRepository(postgresDB)
+		versionWorkflow := pgrepo.NewVersionWorkflow(postgresDB)
 
 		return Container{
 			DB:            postgresDB,
@@ -50,11 +53,11 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			QueryService: service.NewQueryService(
 				pgrepo.NewTeamSpaceRepository(postgresDB),
 				pgrepo.NewProjectRepository(postgresDB),
-				pgrepo.NewDocumentRepository(postgresDB),
 			),
+			DocumentService:       service.NewDocumentService(docRepo, docRepo, storageProvider, versionWorkflow),
 			AuditQueryService:     service.NewAuditQueryService(pgrepo.NewAuditRepository(postgresDB)),
 			DashboardQueryService: service.NewDashboardQueryService(pgrepo.NewDashboardRepository(postgresDB)),
-			VersionService:        service.NewVersionService(storageProvider, pgrepo.NewVersionWorkflow(postgresDB), versionRepo),
+			VersionService:        service.NewVersionService(storageProvider, versionWorkflow, versionRepo),
 			FlowService:           service.NewFlowService(pgrepo.NewFlowRepository(postgresDB), actionRepo),
 			HandoverService:       service.NewHandoverService(pgrepo.NewHandoverRepository(postgresDB), actionRepo),
 			TaskService:           service.NewTaskService(publisher),
@@ -65,13 +68,14 @@ func BuildContainer(cfg config.Config) (Container, error) {
 	default:
 		actionRepo := memory.NewActionRepository()
 		authService := service.NewAuthService(memory.NewUserAuthRepository(), tokenService)
+		docRepo := memory.NewDocumentRepository()
 		return Container{
 			QueueConsumer: publisher,
 			QueryService: service.NewQueryService(
 				memory.NewTeamSpaceRepository(),
 				memory.NewProjectRepository(),
-				memory.NewDocumentRepository(),
 			),
+			DocumentService:       service.NewDocumentService(docRepo, docRepo, storageProvider, memory.NewVersionWorkflow()),
 			AuditQueryService:     service.NewAuditQueryService(memory.NewAuditRepository()),
 			DashboardQueryService: service.NewDashboardQueryService(memory.NewDashboardRepository()),
 			VersionService:        service.NewVersionService(storageProvider, memory.NewVersionWorkflow(), memory.NewVersionRepository()),

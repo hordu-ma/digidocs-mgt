@@ -1,5 +1,15 @@
 package command
 
+type DocumentCreateInput struct {
+	TeamSpaceID    string
+	ProjectID      string
+	FolderID       string
+	Title          string
+	Description    string
+	CurrentOwnerID string
+	ActorID        string
+}
+
 type FlowActionInput struct {
 	DocumentID string
 	Action     string

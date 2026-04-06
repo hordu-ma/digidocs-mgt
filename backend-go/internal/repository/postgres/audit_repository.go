@@ -30,10 +30,16 @@ func (r AuditRepository) ListAuditEvents(
 		WHERE ($1 = '' OR d.project_id::text = $1)
 		  AND ($2 = '' OR ae.document_id::text = $2)
 		  AND ($3 = '' OR ae.action_type::text = $3)
+		  AND ($4 = '' OR ae.user_id::text = $4)
+		  AND ($5 = '' OR ae.created_at >= $5::timestamptz)
+		  AND ($6 = '' OR ae.created_at < $6::timestamptz + interval '1 day')
 		`,
 		filter.ProjectID,
 		filter.DocumentID,
 		filter.ActionType,
+		filter.UserID,
+		filter.DateFrom,
+		filter.DateTo,
 	).Scan(&total); err != nil {
 		return nil, 0, err
 	}
@@ -53,12 +59,18 @@ func (r AuditRepository) ListAuditEvents(
 		WHERE ($1 = '' OR d.project_id::text = $1)
 		  AND ($2 = '' OR ae.document_id::text = $2)
 		  AND ($3 = '' OR ae.action_type::text = $3)
+		  AND ($4 = '' OR ae.user_id::text = $4)
+		  AND ($5 = '' OR ae.created_at >= $5::timestamptz)
+		  AND ($6 = '' OR ae.created_at < $6::timestamptz + interval '1 day')
 		ORDER BY ae.created_at DESC
-		OFFSET $4 LIMIT $5
+		OFFSET $7 LIMIT $8
 		`,
 		filter.ProjectID,
 		filter.DocumentID,
 		filter.ActionType,
+		filter.UserID,
+		filter.DateFrom,
+		filter.DateTo,
 		offset,
 		filter.PageSize,
 	)

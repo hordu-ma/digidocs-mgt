@@ -22,7 +22,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	internalWorkerHandler := handlers.NewInternalWorkerHandler(cfg, container.QueueConsumer)
 	teamSpaceHandler := handlers.NewTeamSpaceHandler(container.QueryService)
 	projectHandler := handlers.NewProjectHandler(container.QueryService)
-	documentHandler := handlers.NewDocumentHandler(container.QueryService)
+	documentHandler := handlers.NewDocumentHandler(container.DocumentService)
 	versionHandler := handlers.NewVersionHandler(container.VersionService)
 
 	authMw := middleware.Auth(container.TokenService)
@@ -52,6 +52,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.Handle("GET "+cfg.APIV1Prefix+"/team-spaces", protect(teamSpaceHandler.List))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/projects", protect(projectHandler.List))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/projects/{projectID}/folders/tree", protect(projectHandler.FolderTree))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/documents", protect(documentHandler.Create))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/documents", protect(documentHandler.List))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/documents/{documentID}", protect(documentHandler.Get))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/documents/{documentID}/versions", protect(versionHandler.Upload))
