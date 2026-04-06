@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 
 	"digidocs-mgt/backend-go/internal/config"
 	"digidocs-mgt/backend-go/internal/domain/task"
@@ -28,7 +27,7 @@ func NewInternalWorkerHandler(
 }
 
 func (h InternalWorkerHandler) ReceiveResult(w http.ResponseWriter, r *http.Request) {
-	if !h.authorized(r) {
+	if !workerAuthorized(r, h.cfg) {
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid worker callback token")
 		return
 	}
@@ -57,7 +56,7 @@ func (h InternalWorkerHandler) ReceiveResult(w http.ResponseWriter, r *http.Requ
 
 // PollTasks returns up to 10 pending task messages from the queue.
 func (h InternalWorkerHandler) PollTasks(w http.ResponseWriter, r *http.Request) {
-	if !h.authorized(r) {
+	if !workerAuthorized(r, h.cfg) {
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid worker callback token")
 		return
 	}
@@ -68,14 +67,4 @@ func (h InternalWorkerHandler) PollTasks(w http.ResponseWriter, r *http.Request)
 	}
 
 	response.WriteData(w, http.StatusOK, messages)
-}
-
-func (h InternalWorkerHandler) authorized(r *http.Request) bool {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		return false
-	}
-
-	token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer"))
-	return token == h.cfg.WorkerCallbackToken
 }

@@ -20,6 +20,14 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	handoverHandler := handlers.NewHandoverHandler(container.HandoverService)
 	dashboardHandler := handlers.NewDashboardHandler(container.DashboardQueryService)
 	internalWorkerHandler := handlers.NewInternalWorkerHandler(cfg, container.QueueConsumer, container.AssistantService)
+	internalAssistantContextHandler := handlers.NewInternalAssistantContextHandler(
+		cfg,
+		container.DocumentService,
+		container.VersionService,
+		container.FlowService,
+		container.HandoverService,
+		container.DashboardQueryService,
+	)
 	teamSpaceHandler := handlers.NewTeamSpaceHandler(container.QueryService)
 	projectHandler := handlers.NewProjectHandler(container.QueryService)
 	documentHandler := handlers.NewDocumentHandler(container.DocumentService)
@@ -37,6 +45,9 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	// Worker callback uses its own shared-secret token, not user JWT.
 	mux.HandleFunc("POST "+cfg.APIV1Prefix+"/internal/worker-results", internalWorkerHandler.ReceiveResult)
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/poll-tasks", internalWorkerHandler.PollTasks)
+	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/assistant-context/projects/{projectID}", internalAssistantContextHandler.GetProjectContext)
+	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/assistant-context/documents/{documentID}", internalAssistantContextHandler.GetDocumentContext)
+	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/assistant-context/handovers/{handoverID}", internalAssistantContextHandler.GetHandoverContext)
 
 	// --- Protected routes (JWT required) ---
 	mux.Handle("GET "+cfg.APIV1Prefix+"/auth/me", protect(authHandler.Me))

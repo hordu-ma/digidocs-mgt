@@ -218,6 +218,35 @@ func TestDashboard_RecentFlows(t *testing.T) {
 	}
 }
 
+func TestInternalAssistantContext_Document(t *testing.T) {
+	handler, _ := testServer(t)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, workerRequest("GET", "/api/v1/internal/assistant-context/documents/some-id", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	result := parseResponse(t, rec)
+	data, _ := result["data"].(map[string]any)
+	if data["document"] == nil {
+		t.Error("expected document context")
+	}
+	if data["versions"] == nil {
+		t.Error("expected version context")
+	}
+	if data["flows"] == nil {
+		t.Error("expected flow context")
+	}
+}
+
+func TestInternalAssistantContext_Project_Unauthorized(t *testing.T) {
+	handler, _ := testServer(t)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/internal/assistant-context/projects/p-1", nil))
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestDashboard_RiskDocuments(t *testing.T) {
 	handler, token := testServer(t)
 	rec := httptest.NewRecorder()

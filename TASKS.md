@@ -161,6 +161,13 @@ Go 主业务迁移与协作环境固化阶段
   - 交接摘要结果回写 `graduation_handovers.ai_summary`
   - `DocumentDetailView` 接入 AI 摘要生成、建议列表读取、确认/忽略动作
   - `docs/项目定义与技术架构.md` / `README.md` 更新异步任务实现描述
+- 完成 OpenClaw 真实网关对接首轮收口
+  - `backend-py-worker` 改为通过 OpenClaw Gateway 的 OpenAI 兼容接口 `POST /v1/chat/completions` 发起真实调用
+  - 新增 Worker 专用内部上下文接口：项目 / 文档 / 交接单
+  - Worker 先读取受控结构化上下文，再调用 OpenClaw，避免直连数据库
+  - `assistant.ask` / `document.summarize` / `handover.summarize` / `assistant.generate_suggestion` 接入真实 OpenClaw 客户端
+  - 为 OpenClaw 客户端与内部上下文接口补充测试
+  - 更新 `.env.example`、`README.md`、`docs/API设计.md`、`docs/异步任务消息契约.md`
 - 清理冗余 `SKILLS/` 目录
   - 旧 FastAPI 技能文档已过时、前端和集成层约束已被 `ops/codex/skills/` 覆盖
   - 移除 `AGENTS.md`、`README.md` 中的 `SKILLS/` 引用
@@ -259,9 +266,6 @@ Go 主业务迁移与协作环境固化阶段
 
 ## 进行中
 
-- `backend-py-worker/` 职责收口
-  - 明确 Worker 任务类型
-  - 从旧 Python Web API 中抽离 AI 能力边界
 - Codex 项目技能运行时接入
   - 待在本机执行 `./scripts/codex/install-project-skills.sh`
   - 待按实际使用反馈继续补 `backend-go` / `worker` / `verify` skill 内容
@@ -276,11 +280,12 @@ Go 主业务迁移与协作环境固化阶段
 - ~~增加流转状态机服务层~~ ✅ 已完成
 - ~~增加毕业交接服务层~~ ✅ 已完成
 - ~~将 JWT 用户 ID 透传至所有审计事件写入~~ ✅ 已完成
-- ~~Python CallbackClient / OpenClawClient 实现真实 HTTP 调用~~ ✅ CallbackClient 已完成，OpenClawClient 待对接真实服务
+- ~~Python CallbackClient / OpenClawClient 实现真实 HTTP 调用~~ ✅ 已完成
 - ~~增加更完整的审计事件过滤条件与统计聚合~~ ✅ 已完成（过滤条件已补齐，统计聚合待后续细化）
 - ~~增加 dashboard 聚合相关基础测试~~ ✅ 已完成
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
-- 增加 OpenClaw 客户端真实调用
+- 增加文档正文抽取与 AI 可授权内容引用链路
+- 增加 Assistant 问答结果查询接口与前端结果回显
 - ~~增加群晖 NAS 适配器~~ ✅ 已完成
 - ~~增加基础测试~~ ✅ 已完成
 - ~~增加更细粒度的 smoke test 和分层验证矩阵~~ ✅ 已完成（smoke-local.sh 已覆盖业务端点）

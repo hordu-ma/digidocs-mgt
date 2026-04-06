@@ -71,7 +71,7 @@
 ### 外部系统
 
 - Synology DS925+ DSM / File Station Web API（文件存储）
-- DGX Spark 上部署的 OpenClaw 服务（AI 能力层）
+- DGX Spark / p14s 上部署的 OpenClaw Gateway（AI 能力层，当前按 OpenAI 兼容 HTTP 接口接入）
 
 ## 协作规范
 
@@ -94,6 +94,14 @@
 5. 打通文档上传、版本、流转、交接、总览的最小闭环
 6. 接入 OpenClaw 摘要链路
 7. 接入群晖 NAS 存储适配器
+
+## OpenClaw 当前实现
+
+- Python Worker 当前通过 `POST /v1/chat/completions` 调用 OpenClaw Gateway。
+- Worker 先从 Go 主后端读取受控内部上下文，再把结构化上下文提交给 OpenClaw。
+- 当前已落地的内部上下文范围：项目总览、文档详情/版本/流转、交接单详情。
+- 假设/待确认：若 p14s 上 OpenClaw Gateway 未启用 OpenAI 兼容 HTTP 端点，需要先在网关配置中显式开启。
+- 当前限制：尚未接入真实文档正文抽取链路，因此摘要结果仍以结构化业务上下文为主，不等同于全文摘要。
 
 ## 开发命令约定
 
@@ -191,7 +199,7 @@ docker compose up -d postgres
 - 已完成 `flow / handover` 写链的首轮事务化与审计联动
 - 已完成 `dashboard` 三个聚合接口的 Go 真实查询接入
 - 已完成 `flow / handover` 非法状态跳转校验
-- 已通过 Docker 网络内 Alembic 路径完成 PostgreSQL 初始 schema 初始化
+- 已通过 Go 自动迁移完成 PostgreSQL 初始 schema 初始化
 - 已完成 `dashboard/overview` 与 `audit-events` 容器网络烟测
 - 已完成项目级 Codex skills、技能索引、安装脚本与 doctor 体检脚本初版
 - 已完成 `make verify` 与 `check-doc-sync.sh` 统一验证入口
@@ -210,6 +218,7 @@ docker compose up -d postgres
 - 已修复 `DocumentDetail` API 返回 `current_owner` 含 display_name（与 `DocumentListItem` 对齐）
 - 已清理 TASKS.md，将已完成的大量"进行中"子项归档至"已完成"
 - 已完成 Go 后端核心业务服务层单元测试（auth/action/dashboard，共 13 个用例）
+- 已完成 OpenClaw Gateway 真实 HTTP 对接与 Worker 内部上下文桥接
 - 已完成前端 Element Plus 按需引入（JS bundle 从 1,041 KB 降至 470 KB）
 - 已完成 Python Worker 真实队列消费链路（Go/HTTP 轮询 → 处理 → 回写）
 - 已完成前端写操作 UI（文档流转操作、AI 助手问答提交、交接单创建）

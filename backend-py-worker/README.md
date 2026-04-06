@@ -1,6 +1,6 @@
 # Backend Python Worker
 
-Python AI 与文档处理 Worker 骨架。
+Python AI 与文档处理 Worker。
 
 ## Scope
 
@@ -27,8 +27,16 @@ docker compose --profile app up -d backend-py-worker
 
 - 配置加载
 - 任务消息结构
-- OpenClaw / Callback 客户端骨架
-- Worker 调度器骨架
+- OpenClaw Gateway OpenAI 兼容客户端
+- Go 后端内部上下文读取客户端
+- Worker 调度器与真实 HTTP 轮询消费
 - 与 `异步任务消息契约.md` 对齐
 - 结果回写目标约定为 `/api/v1/internal/worker-results`
-- 已补基础调度器测试样例
+- OpenClaw 调用统一走 `POST /v1/chat/completions`
+- 已补调度器与 OpenClaw 客户端测试样例
+
+## Current Notes
+
+- 当前 OpenClaw 对接使用官方 Gateway 的 OpenAI 兼容 HTTP 接口。
+- 当前文档摘要和交接摘要优先消费“结构化业务上下文”；如果缺少正文内容，结果会明确标注为元数据级摘要。
+- `document.extract_text` 仍未接入实际正文抽取链路，当前会返回失败状态，避免误导为已具备全文摘要能力。

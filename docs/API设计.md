@@ -782,6 +782,12 @@
 
 ## 9. OpenClaw 接口
 
+当前实现说明：
+
+- Python Worker 通过 OpenClaw Gateway 的 OpenAI 兼容接口 `POST /v1/chat/completions` 调用 AI 能力。
+- Worker 只读取本系统暴露的受控内部上下文，不直接访问业务数据库。
+- 当前摘要能力优先基于结构化业务上下文；若尚未提供文档正文，则结果属于“元数据级摘要”。
+
 ### 9.1 发起问答
 
 `POST /api/v1/assistant/ask`
@@ -880,7 +886,81 @@
 }
 ```
 
-### 9.5 确认建议
+### 9.5 Worker 内部上下文接口
+
+这些接口仅供 `backend-py-worker` 使用，统一使用 `Authorization: Bearer <worker-callback-token>` 鉴权。
+
+#### 9.5.1 查询项目上下文
+
+`GET /api/v1/internal/assistant-context/projects/{project_id}`
+
+响应体：
+
+```json
+{
+  "data": {
+    "scope": {
+      "project_id": "uuid"
+    },
+    "overview": {
+      "document_total": 12,
+      "status_counts": {
+        "in_progress": 4
+      },
+      "handover_pending_count": 1,
+      "risk_document_count": 2
+    },
+    "recent_flows": [],
+    "risk_documents": []
+  }
+}
+```
+
+#### 9.5.2 查询文档上下文
+
+`GET /api/v1/internal/assistant-context/documents/{document_id}`
+
+响应体：
+
+```json
+{
+  "data": {
+    "scope": {
+      "document_id": "uuid"
+    },
+    "document": {
+      "id": "uuid",
+      "title": "课题记录",
+      "current_status": "in_progress"
+    },
+    "versions": [],
+    "flows": []
+  }
+}
+```
+
+#### 9.5.3 查询交接上下文
+
+`GET /api/v1/internal/assistant-context/handovers/{handover_id}`
+
+响应体：
+
+```json
+{
+  "data": {
+    "scope": {
+      "handover_id": "uuid",
+      "project_id": "uuid"
+    },
+    "handover": {
+      "id": "uuid",
+      "status": "pending"
+    }
+  }
+}
+```
+
+### 9.6 确认建议
 
 `POST /api/v1/assistant/suggestions/{suggestion_id}/confirm`
 
@@ -905,7 +985,7 @@
 }
 ```
 
-### 9.6 忽略建议
+### 9.7 忽略建议
 
 `POST /api/v1/assistant/suggestions/{suggestion_id}/dismiss`
 
