@@ -1,0 +1,80 @@
+package service
+
+import (
+	"context"
+	"fmt"
+	"io"
+
+	"digidocs-mgt/backend-go/internal/domain/command"
+	"digidocs-mgt/backend-go/internal/domain/query"
+	"digidocs-mgt/backend-go/internal/repository"
+	"digidocs-mgt/backend-go/internal/storage"
+)
+
+type VersionService struct {
+	storage  storage.Provider
+	workflow repository.VersionWorkflow
+	reader   repository.VersionReader
+}
+
+func NewVersionService(
+	storage storage.Provider,
+	workflow repository.VersionWorkflow,
+	reader repository.VersionReader,
+) VersionService {
+	return VersionService{storage: storage, workflow: workflow, reader: reader}
+}
+
+func (s VersionService) UploadAndCreateVersion(
+	ctx context.Context,
+	documentID string,
+	fileName string,
+	fileSize int64,
+	commitMessage string,
+	reader io.Reader,
+	actorID string,
+) (map[string]any, error) {
+	if documentID == "" {
+		return nil, fmt.Errorf("%w: document_id is required", ErrValidation)
+	}
+	if fileName == "" {
+		return nil, fmt.Errorf("%w: file_name is required", ErrValidation)
+	}
+	if actorID == "" {
+		return nil, fmt.Errorf("%w: actor_id is required", ErrValidation)
+	}
+
+	objectKey := fmt.Sprintf("documents/%s/%s", documentID, fileName)
+	result, err := s.storage.PutObject(ctx, storage.PutObjectInput{
+		ObjectKey: objectKey,
+		Reader:    reader,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("upload failed: %w", err)
+	}
+
+	versionData, err := s.workflow.CreateUploadedVersion(ctx, command.VersionCreateInput{
+		DocumentID:       documentID,
+		FileName:         fileName,
+		FileSize:         fileSize,
+		CommitMessage:    commitMessage,
+		StorageObjectKey: result.ObjectKey,
+		StorageProvider:  result.Provider,
+		ActorID:          actorID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("version creation failed: %w", err)
+	}
+
+	versionData["storage"] = result
+	versionData["status"] = "uploaded"
+	return versionData, nil
+}
+
+func (s VersionService) List(ctx context.Context, documentID string) ([]query.VersionItem, error) {
+	return s.reader.ListVersions(ctx, documentID)
+}
+
+func (s VersionService) Get(ctx context.Context, versionID string) (*query.VersionDetail, error) {
+	return s.reader.GetVersion(ctx, versionID)
+}

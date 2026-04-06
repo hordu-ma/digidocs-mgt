@@ -12,15 +12,11 @@ import (
 )
 
 type FlowHandler struct {
-	queryService  service.FlowQueryService
-	actionService service.ActionService
+	service service.FlowService
 }
 
-func NewFlowHandler(queryService service.FlowQueryService, actionService service.ActionService) FlowHandler {
-	return FlowHandler{
-		queryService:  queryService,
-		actionService: actionService,
-	}
+func NewFlowHandler(svc service.FlowService) FlowHandler {
+	return FlowHandler{service: svc}
 }
 
 func (h FlowHandler) MarkInProgress(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +44,7 @@ func (h FlowHandler) Unarchive(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h FlowHandler) List(w http.ResponseWriter, r *http.Request) {
-	items, err := h.queryService.List(r.Context(), r.PathValue("documentID"))
+	items, err := h.service.ListFlows(r.Context(), r.PathValue("documentID"))
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list flows")
 		return
@@ -65,7 +61,7 @@ func (h FlowHandler) writeAction(w http.ResponseWriter, r *http.Request, action 
 		_ = json.NewDecoder(r.Body).Decode(&payload)
 	}
 
-	data, err := h.actionService.ApplyFlow(r.Context(), command.FlowActionInput{
+	data, err := h.service.ApplyAction(r.Context(), command.FlowActionInput{
 		DocumentID: r.PathValue("documentID"),
 		Action:     action,
 		Note:       stringValue(payload["note"]),
@@ -73,6 +69,10 @@ func (h FlowHandler) writeAction(w http.ResponseWriter, r *http.Request, action 
 		ActorID:    middleware.UserIDFromContext(r.Context()),
 	})
 	if err != nil {
+		if errors.Is(err, service.ErrValidation) {
+			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
+		}
 		if errors.Is(err, service.ErrInvalidTransition) {
 			response.WriteError(w, http.StatusBadRequest, "invalid_transition", "invalid flow transition")
 			return

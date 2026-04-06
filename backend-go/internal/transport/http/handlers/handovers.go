@@ -12,18 +12,11 @@ import (
 )
 
 type HandoverHandler struct {
-	queryService  service.HandoverQueryService
-	actionService service.ActionService
+	service service.HandoverService
 }
 
-func NewHandoverHandler(
-	queryService service.HandoverQueryService,
-	actionService service.ActionService,
-) HandoverHandler {
-	return HandoverHandler{
-		queryService:  queryService,
-		actionService: actionService,
-	}
+func NewHandoverHandler(svc service.HandoverService) HandoverHandler {
+	return HandoverHandler{service: svc}
 }
 
 func (h HandoverHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +26,7 @@ func (h HandoverHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := h.actionService.CreateHandover(r.Context(), command.HandoverCreateInput{
+	data, err := h.service.Create(r.Context(), command.HandoverCreateInput{
 		TargetUserID:   stringValue(payload["target_user_id"]),
 		ReceiverUserID: stringValue(payload["receiver_user_id"]),
 		ProjectID:      stringValue(payload["project_id"]),
@@ -41,6 +34,10 @@ func (h HandoverHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ActorID:        middleware.UserIDFromContext(r.Context()),
 	})
 	if err != nil {
+		if errors.Is(err, service.ErrValidation) {
+			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
+		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create handover")
 		return
 	}
@@ -49,9 +46,7 @@ func (h HandoverHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h HandoverHandler) List(w http.ResponseWriter, r *http.Request) {
-	_ = r
-
-	items, err := h.queryService.List(r.Context())
+	items, err := h.service.List(r.Context())
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list handovers")
 		return
@@ -61,7 +56,7 @@ func (h HandoverHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h HandoverHandler) Get(w http.ResponseWriter, r *http.Request) {
-	item, err := h.queryService.Get(r.Context(), r.PathValue("handoverID"))
+	item, err := h.service.Get(r.Context(), r.PathValue("handoverID"))
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			response.WriteError(w, http.StatusNotFound, "not_found", "handover not found")
@@ -96,12 +91,16 @@ func (h HandoverHandler) UpdateItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	data, err := h.actionService.UpdateHandoverItems(r.Context(), command.HandoverItemUpdateInput{
+	data, err := h.service.UpdateItems(r.Context(), command.HandoverItemUpdateInput{
 		HandoverID: r.PathValue("handoverID"),
 		Items:      items,
 		ActorID:    middleware.UserIDFromContext(r.Context()),
 	})
 	if err != nil {
+		if errors.Is(err, service.ErrValidation) {
+			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
+		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update handover items")
 		return
 	}
@@ -127,7 +126,7 @@ func (h HandoverHandler) writeAction(w http.ResponseWriter, r *http.Request, act
 		_ = json.NewDecoder(r.Body).Decode(&payload)
 	}
 
-	data, err := h.actionService.ApplyHandover(r.Context(), command.HandoverActionInput{
+	data, err := h.service.ApplyAction(r.Context(), command.HandoverActionInput{
 		HandoverID: r.PathValue("handoverID"),
 		Action:     action,
 		Note:       stringValue(payload["note"]),
@@ -135,6 +134,10 @@ func (h HandoverHandler) writeAction(w http.ResponseWriter, r *http.Request, act
 		ActorID:    middleware.UserIDFromContext(r.Context()),
 	})
 	if err != nil {
+		if errors.Is(err, service.ErrValidation) {
+			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
+		}
 		if errors.Is(err, service.ErrInvalidTransition) {
 			response.WriteError(w, http.StatusBadRequest, "invalid_transition", "invalid handover transition")
 			return

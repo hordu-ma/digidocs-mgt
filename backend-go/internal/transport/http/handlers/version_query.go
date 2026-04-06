@@ -7,7 +7,7 @@ import (
 )
 
 func (h VersionHandler) List(w http.ResponseWriter, r *http.Request) {
-	items, err := h.queryService.List(r.Context(), r.PathValue("documentID"))
+	items, err := h.service.List(r.Context(), r.PathValue("documentID"))
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list versions")
 		return
@@ -19,7 +19,7 @@ func (h VersionHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h VersionHandler) Get(w http.ResponseWriter, r *http.Request) {
-	item, err := h.queryService.Get(r.Context(), r.PathValue("versionID"))
+	item, err := h.service.Get(r.Context(), r.PathValue("versionID"))
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to get version")
 		return
@@ -29,7 +29,7 @@ func (h VersionHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h VersionHandler) Download(w http.ResponseWriter, r *http.Request) {
-	item, err := h.queryService.Get(r.Context(), r.PathValue("versionID"))
+	item, err := h.service.Get(r.Context(), r.PathValue("versionID"))
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to get version download")
 		return
@@ -40,7 +40,7 @@ func (h VersionHandler) Download(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h VersionHandler) Preview(w http.ResponseWriter, r *http.Request) {
-	item, err := h.queryService.Get(r.Context(), r.PathValue("versionID"))
+	item, err := h.service.Get(r.Context(), r.PathValue("versionID"))
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to get version preview")
 		return

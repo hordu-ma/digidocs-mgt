@@ -16,18 +16,14 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	authHandler := handlers.NewAuthHandler(container.AuthService, container.TokenService)
 	assistantHandler := handlers.NewAssistantHandler(container.TaskService)
 	auditEventHandler := handlers.NewAuditEventHandler(container.AuditQueryService)
-	flowHandler := handlers.NewFlowHandler(container.FlowQueryService, container.ActionService)
-	handoverHandler := handlers.NewHandoverHandler(container.HandoverQueryService, container.ActionService)
+	flowHandler := handlers.NewFlowHandler(container.FlowService)
+	handoverHandler := handlers.NewHandoverHandler(container.HandoverService)
 	dashboardHandler := handlers.NewDashboardHandler(container.DashboardQueryService)
 	internalWorkerHandler := handlers.NewInternalWorkerHandler(cfg, container.QueueConsumer)
 	teamSpaceHandler := handlers.NewTeamSpaceHandler(container.QueryService)
 	projectHandler := handlers.NewProjectHandler(container.QueryService)
 	documentHandler := handlers.NewDocumentHandler(container.QueryService)
-	versionHandler := handlers.NewVersionHandler(
-		container.UploadService,
-		container.VersionQueryService,
-		container.VersionWorkflowService,
-	)
+	versionHandler := handlers.NewVersionHandler(container.VersionService)
 
 	authMw := middleware.Auth(container.TokenService)
 	protect := func(h http.HandlerFunc) http.Handler {

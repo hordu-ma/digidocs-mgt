@@ -14,22 +14,18 @@ import (
 )
 
 type Container struct {
-	DB                     *sql.DB
-	QueueConsumer          queue.Consumer
-	QueryService           service.QueryService
-	AuditQueryService      service.AuditQueryService
-	DashboardQueryService  service.DashboardQueryService
-	VersionQueryService    service.VersionQueryService
-	VersionCommandService  service.VersionCommandService
-	VersionWorkflowService service.VersionWorkflowService
-	FlowQueryService       service.FlowQueryService
-	HandoverQueryService   service.HandoverQueryService
-	TaskService            service.TaskService
-	ActionService          service.ActionService
-	AuthService            service.AuthService
-	TokenService           service.TokenService
-	AuditService           service.AuditService
-	UploadService          service.UploadService
+	DB                    *sql.DB
+	QueueConsumer         queue.Consumer
+	QueryService          service.QueryService
+	AuditQueryService     service.AuditQueryService
+	DashboardQueryService service.DashboardQueryService
+	VersionService        service.VersionService
+	FlowService           service.FlowService
+	HandoverService       service.HandoverService
+	TaskService           service.TaskService
+	AuthService           service.AuthService
+	TokenService          service.TokenService
+	AuditService          service.AuditService
 }
 
 func BuildContainer(cfg config.Config) (Container, error) {
@@ -37,7 +33,6 @@ func BuildContainer(cfg config.Config) (Container, error) {
 	storageProvider := memstorage.NewProvider()
 	tokenService := service.NewTokenService(cfg.JWTSecret)
 	auditService := service.NewAuditService()
-	uploadService := service.NewUploadService(storageProvider)
 
 	switch cfg.DataBackend {
 	case "postgres":
@@ -45,8 +40,9 @@ func BuildContainer(cfg config.Config) (Container, error) {
 		if err != nil {
 			return Container{}, err
 		}
-		actionService := service.NewActionService(pgrepo.NewActionRepository(postgresDB))
+		actionRepo := pgrepo.NewActionRepository(postgresDB)
 		authService := service.NewAuthService(pgrepo.NewUserAuthRepository(postgresDB), tokenService)
+		versionRepo := pgrepo.NewVersionRepository(postgresDB)
 
 		return Container{
 			DB:            postgresDB,
@@ -56,22 +52,18 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				pgrepo.NewProjectRepository(postgresDB),
 				pgrepo.NewDocumentRepository(postgresDB),
 			),
-			AuditQueryService:      service.NewAuditQueryService(pgrepo.NewAuditRepository(postgresDB)),
-			DashboardQueryService:  service.NewDashboardQueryService(pgrepo.NewDashboardRepository(postgresDB)),
-			VersionQueryService:    service.NewVersionQueryService(pgrepo.NewVersionRepository(postgresDB)),
-			VersionCommandService:  service.NewVersionCommandService(pgrepo.NewVersionRepository(postgresDB)),
-			VersionWorkflowService: service.NewVersionWorkflowService(pgrepo.NewVersionWorkflow(postgresDB)),
-			FlowQueryService:       service.NewFlowQueryService(pgrepo.NewFlowRepository(postgresDB)),
-			HandoverQueryService:   service.NewHandoverQueryService(pgrepo.NewHandoverRepository(postgresDB)),
-			TaskService:            service.NewTaskService(publisher),
-			ActionService:          actionService,
-			AuthService:            authService,
-			TokenService:           tokenService,
-			AuditService:           auditService,
-			UploadService:          uploadService,
+			AuditQueryService:     service.NewAuditQueryService(pgrepo.NewAuditRepository(postgresDB)),
+			DashboardQueryService: service.NewDashboardQueryService(pgrepo.NewDashboardRepository(postgresDB)),
+			VersionService:        service.NewVersionService(storageProvider, pgrepo.NewVersionWorkflow(postgresDB), versionRepo),
+			FlowService:           service.NewFlowService(pgrepo.NewFlowRepository(postgresDB), actionRepo),
+			HandoverService:       service.NewHandoverService(pgrepo.NewHandoverRepository(postgresDB), actionRepo),
+			TaskService:           service.NewTaskService(publisher),
+			AuthService:           authService,
+			TokenService:          tokenService,
+			AuditService:          auditService,
 		}, nil
 	default:
-		actionService := service.NewActionService(memory.NewActionRepository())
+		actionRepo := memory.NewActionRepository()
 		authService := service.NewAuthService(memory.NewUserAuthRepository(), tokenService)
 		return Container{
 			QueueConsumer: publisher,
@@ -80,19 +72,15 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				memory.NewProjectRepository(),
 				memory.NewDocumentRepository(),
 			),
-			AuditQueryService:      service.NewAuditQueryService(memory.NewAuditRepository()),
-			DashboardQueryService:  service.NewDashboardQueryService(memory.NewDashboardRepository()),
-			VersionQueryService:    service.NewVersionQueryService(memory.NewVersionRepository()),
-			VersionCommandService:  service.NewVersionCommandService(memory.NewVersionRepository()),
-			VersionWorkflowService: service.NewVersionWorkflowService(memory.NewVersionWorkflow()),
-			FlowQueryService:       service.NewFlowQueryService(memory.NewFlowRepository()),
-			HandoverQueryService:   service.NewHandoverQueryService(memory.NewHandoverRepository()),
-			TaskService:            service.NewTaskService(publisher),
-			ActionService:          actionService,
-			AuthService:            authService,
-			TokenService:           tokenService,
-			AuditService:           auditService,
-			UploadService:          uploadService,
+			AuditQueryService:     service.NewAuditQueryService(memory.NewAuditRepository()),
+			DashboardQueryService: service.NewDashboardQueryService(memory.NewDashboardRepository()),
+			VersionService:        service.NewVersionService(storageProvider, memory.NewVersionWorkflow(), memory.NewVersionRepository()),
+			FlowService:           service.NewFlowService(memory.NewFlowRepository(), actionRepo),
+			HandoverService:       service.NewHandoverService(memory.NewHandoverRepository(), actionRepo),
+			TaskService:           service.NewTaskService(publisher),
+			AuthService:           authService,
+			TokenService:          tokenService,
+			AuditService:          auditService,
 		}, nil
 	}
 }
