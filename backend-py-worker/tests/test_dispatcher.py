@@ -114,8 +114,6 @@ def test_handle_document_summarize_returns_completed(monkeypatch: MonkeyPatch) -
     assert result.output["task_type"] == "document.summarize"
     assert result.output["summary_text"] == "这是测试摘要"
 
-
-def test_handle_generate_suggestion_openclaw_error(monkeypatch) -> None:
 def test_handle_generate_suggestion_openclaw_error(monkeypatch: MonkeyPatch) -> None:
     dispatcher = WorkerDispatcher()
 
