@@ -252,5 +252,6 @@ docker compose up -d postgres
 - 已完成 Assistant 问答历史列表 / 筛选与 Markdown 结果展示首轮接线
 - 已完成 PDF 正文抽取与 AI 可观测性首轮补强（模型、上游响应 ID、耗时、Worker 日志）
 - 已将 `make smoke` 扩展到 `assistant.ask -> completed` 的 AI 闭环验证
+- 已修复文档详情页 AI 建议展示口径，重开页面后不再把已处理建议重复展示为待处理提示
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

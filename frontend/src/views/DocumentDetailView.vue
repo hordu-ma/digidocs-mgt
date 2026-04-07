@@ -68,6 +68,7 @@ async function loadData() {
       params: {
         related_type: "document",
         related_id: documentID,
+        status: "pending",
       },
     }),
   ]);

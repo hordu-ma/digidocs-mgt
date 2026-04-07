@@ -258,6 +258,8 @@ Go 主业务迁移与协作环境固化阶段
 - 完成版本文件下载与预览接口
   - storage.Provider 接口新增 `GetObject()` 方法
   - memory Provider 改为真正存储数据（sync.RWMutex + map）
+- 修复文档详情页 AI 建议重复展示问题
+  - 文档详情页重新打开后仅查询 `pending` 建议，已确认/已忽略项不再重复显示为待处理提示
   - VersionService 新增 `GetFile()` 方法（查版本 → 取文件）
   - `Download` handler 返回 `Content-Disposition: attachment` + 文件流
   - `Preview` handler 返回 `Content-Disposition: inline` + 文件流

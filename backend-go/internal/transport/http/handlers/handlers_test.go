@@ -431,6 +431,18 @@ func TestAssistant_ConfirmSuggestion(t *testing.T) {
 	if confirmRec.Code != http.StatusOK {
 		t.Fatalf("confirm status = %d, want 200; body = %s", confirmRec.Code, confirmRec.Body.String())
 	}
+
+	pendingRec := httptest.NewRecorder()
+	handler.ServeHTTP(pendingRec, authedRequest("GET", "/api/v1/assistant/suggestions?related_type=document&related_id=doc-1&status=pending", nil, token))
+	if pendingRec.Code != http.StatusOK {
+		t.Fatalf("pending list status = %d, want 200; body = %s", pendingRec.Code, pendingRec.Body.String())
+	}
+
+	pendingResult := parseResponse(t, pendingRec)
+	pendingItems, _ := pendingResult["data"].([]any)
+	if len(pendingItems) != 0 {
+		t.Fatalf("expected no pending suggestions after confirm, got %#v", pendingResult["data"])
+	}
 }
 
 func TestAssistant_GetRequest_ReturnsWorkerOutput(t *testing.T) {
