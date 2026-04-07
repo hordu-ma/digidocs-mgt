@@ -73,4 +73,20 @@ fi
 echo '== skill count =='
 find ops/codex/skills -mindepth 1 -maxdepth 1 -type d | sort
 
+echo '== installed project skills =='
+project_skill_count="$(find ops/codex/skills -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+installed_skill_count="$(
+  find "${HOME}/.codex/skills" -mindepth 1 -maxdepth 1 -type l \
+    -lname "${ROOT_DIR}/ops/codex/skills/*" 2>/dev/null | wc -l | tr -d ' '
+)"
+printf 'project skills: %s\n' "$project_skill_count"
+printf 'installed links: %s\n' "$installed_skill_count"
+if [[ "$project_skill_count" == "$installed_skill_count" ]]; then
+  echo '[OK] project skills installed into ~/.codex/skills'
+else
+  echo '[MISS] project skills not fully installed into ~/.codex/skills'
+  echo '       run: ./scripts/codex/install-project-skills.sh'
+  status=1
+fi
+
 exit "$status"
