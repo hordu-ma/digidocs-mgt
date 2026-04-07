@@ -81,7 +81,9 @@ installed_skill_count="$(
 )"
 printf 'project skills: %s\n' "$project_skill_count"
 printf 'installed links: %s\n' "$installed_skill_count"
-if [[ "$project_skill_count" == "$installed_skill_count" ]]; then
+if [[ "${CI:-}" == "true" || "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  echo '[OK] skip project skill installation check in CI'
+elif [[ "$project_skill_count" == "$installed_skill_count" ]]; then
   echo '[OK] project skills installed into ~/.codex/skills'
 else
   echo '[MISS] project skills not fully installed into ~/.codex/skills'
