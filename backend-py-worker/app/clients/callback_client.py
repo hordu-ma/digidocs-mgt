@@ -5,10 +5,13 @@ from __future__ import annotations
 import json
 import logging
 import urllib.request
-from typing import Any
+from http.client import HTTPResponse
+from typing import cast
 
-from app.core.config import settings
-from app.tasks.contracts import TaskResult
+from ..core.config import settings
+from ..tasks.contracts import TaskResult
+
+type ObjectDict = dict[str, object]
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +24,7 @@ class CallbackClient:
         self.base_url = settings.callback_base_url
         self.token = settings.callback_token
 
-    def submit_result(self, result: TaskResult) -> dict[str, Any]:
+    def submit_result(self, result: TaskResult) -> ObjectDict:
         url = f"{self.base_url}/api/v1/internal/worker-results"
         payload = json.dumps(
             {
@@ -37,13 +40,21 @@ class CallbackClient:
         req.add_header("Content-Type", "application/json")
 
         try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                body: str = resp.read().decode()
-                return json.loads(body)  # type: ignore[no-any-return]
+            with cast(HTTPResponse, urllib.request.urlopen(req, timeout=10)) as resp:
+                body = resp.read().decode()
+                parsed = cast(object, json.loads(body))
+                parsed_dict = _as_object_dict(parsed)
+                if parsed_dict is not None:
+                    return parsed_dict
         except Exception:
             logger.warning("callback failed for request_id=%s", result.request_id)
-            return {
-                "callback_base_url": self.base_url,
-                "request_id": result.request_id,
-                "status": "callback_failed",
-            }
+
+        return {
+            "callback_base_url": self.base_url,
+            "request_id": result.request_id,
+            "status": "callback_failed",
+        }
+
+
+def _as_object_dict(value: object) -> ObjectDict | None:
+    return cast(ObjectDict, value) if isinstance(value, dict) else None

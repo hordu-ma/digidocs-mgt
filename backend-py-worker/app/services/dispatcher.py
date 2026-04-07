@@ -1,32 +1,33 @@
 import logging
 import time
-from typing import Any
+from typing import cast
 
-from app.clients.backend_context_client import BackendContextClient
-from app.clients.callback_client import CallbackClient
-from app.clients.openclaw_client import OpenClawClient, OpenClawClientError
-from app.clients.task_poller import TaskPollerClient
-from app.core.config import settings
-from app.services.document_text_extractor import (
+from ..clients.backend_context_client import BackendContextClient
+from ..clients.callback_client import CallbackClient
+from ..clients.openclaw_client import OpenClawClient, OpenClawClientError
+from ..clients.task_poller import TaskPollerClient
+from ..core.config import settings
+from ..services.document_text_extractor import (
     DocumentTextExtractionError,
     extract_text,
 )
-from app.tasks.contracts import TaskResult, WorkerTask
+from ..tasks.contracts import TaskResult, WorkerTask
+
+type ObjectDict = dict[str, object]
 
 logger = logging.getLogger(__name__)
 
 
 class WorkerDispatcher:
     def __init__(self) -> None:
-        self.openclaw_client = OpenClawClient()
-        self.context_client = BackendContextClient()
-        self.callback_client = CallbackClient()
-        self.poller = TaskPollerClient()
+        self.openclaw_client: OpenClawClient = OpenClawClient()
+        self.context_client: BackendContextClient = BackendContextClient()
+        self.callback_client: CallbackClient = CallbackClient()
+        self.poller: TaskPollerClient = TaskPollerClient()
 
     def describe_startup(self) -> None:
         print(
-            f"worker={settings.worker_name} mode={settings.worker_mode} "
-            f"openclaw={settings.openclaw_base_url}"
+            f"worker={settings.worker_name} mode={settings.worker_mode} openclaw={settings.openclaw_base_url}"
         )
 
     def run_forever(self) -> None:
@@ -37,24 +38,22 @@ class WorkerDispatcher:
                 tasks = self.poller.poll()
                 for task in tasks:
                     logger.info("processing task=%s request_id=%s", task.task_type, task.request_id)
-                    self.handle_and_callback(task)
+                    _ = self.handle_and_callback(task)
             except Exception:
                 logger.exception("poll loop error")
             time.sleep(settings.poll_interval)
 
     def handle_task(self, task: WorkerTask) -> TaskResult:
         if task.task_type == "assistant.ask":
-            scope = task.payload.get("scope", {})
-            if not isinstance(scope, dict):
-                scope = {}
-            normalized_scope = {
-                "project_id": scope.get("project_id", task.payload.get("project_id")),
-                "document_id": scope.get("document_id", task.payload.get("document_id")),
+            scope = _as_object_dict(task.payload.get("scope")) or {}
+            normalized_scope: ObjectDict = {
+                "project_id": scope.get("project_id") or task.payload.get("project_id"),
+                "document_id": scope.get("document_id") or task.payload.get("document_id"),
             }
             context = self._build_context(task, normalized_scope)
             try:
                 answer = self.openclaw_client.ask(
-                    question=str(task.payload.get("question", "")),
+                    question=_string_value(task.payload.get("question")),
                     scope=normalized_scope,
                     context=context,
                 )
@@ -80,7 +79,9 @@ class WorkerDispatcher:
             if extracted_text:
                 context["document_text"] = extracted_text
             try:
-                output = self.openclaw_client.summarize_document(task.request_id, task.payload, context)
+                output = self.openclaw_client.summarize_document(
+                    task.request_id, task.payload, context
+                )
             except OpenClawClientError as exc:
                 return TaskResult(
                     request_id=task.request_id,
@@ -98,7 +99,9 @@ class WorkerDispatcher:
         if task.task_type == "handover.summarize":
             context = self._build_context(task)
             try:
-                output = self.openclaw_client.summarize_handover(task.request_id, task.payload, context)
+                output = self.openclaw_client.summarize_handover(
+                    task.request_id, task.payload, context
+                )
             except OpenClawClientError as exc:
                 return TaskResult(
                     request_id=task.request_id,
@@ -114,7 +117,9 @@ class WorkerDispatcher:
         if task.task_type == "assistant.generate_suggestion":
             context = self._build_context(task)
             try:
-                output = self.openclaw_client.generate_suggestion(task.request_id, task.payload, context)
+                output = self.openclaw_client.generate_suggestion(
+                    task.request_id, task.payload, context
+                )
             except OpenClawClientError as exc:
                 return TaskResult(
                     request_id=task.request_id,
@@ -151,21 +156,21 @@ class WorkerDispatcher:
             error_message=f"unsupported task type: {task.task_type}",
         )
 
-    def handle_and_callback(self, task: WorkerTask) -> dict:
+    def handle_and_callback(self, task: WorkerTask) -> ObjectDict:
         result = self.handle_task(task)
         return self.callback_client.submit_result(result)
 
     def _build_context(
         self,
         task: WorkerTask,
-        scope: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        context: dict[str, Any] = {
+        scope: ObjectDict | None = None,
+    ) -> ObjectDict:
+        context: ObjectDict = {
             "task_type": task.task_type,
             "request_id": task.request_id,
             "related_type": task.related_type,
             "related_id": task.related_id,
-            "payload": task.payload,
+            "payload": cast(object, task.payload),
         }
 
         if task.related_type == "document" and task.related_id:
@@ -191,10 +196,10 @@ class WorkerDispatcher:
     def _resolve_document_text(
         self,
         task: WorkerTask,
-        context: dict[str, Any],
+        context: ObjectDict,
     ) -> str:
-        document_context = context.get("document_context")
-        if isinstance(document_context, dict):
+        document_context = _as_object_dict(context.get("document_context"))
+        if document_context is not None:
             existing_text = _string_value(document_context.get("extracted_text"))
             if existing_text:
                 return existing_text
@@ -214,8 +219,12 @@ class WorkerDispatcher:
         return extracted_text
 
 
-def _string_value(value: Any) -> str:
+def _string_value(value: object) -> str:
     return value if isinstance(value, str) else ""
+
+
+def _as_object_dict(value: object) -> ObjectDict | None:
+    return cast(ObjectDict, value) if isinstance(value, dict) else None
 
 
 def _extract_filename(content_disposition: str, fallback: str) -> str:

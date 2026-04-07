@@ -1,9 +1,16 @@
+from typing import cast
+
+from _pytest.monkeypatch import MonkeyPatch
+
 from app.clients.openclaw_client import OpenClawClientError
 from app.services.dispatcher import WorkerDispatcher
-from app.tasks.contracts import WorkerTask
+from app.tasks.contracts import TaskType, WorkerTask
 
 
-def test_handle_assistant_ask_task(monkeypatch) -> None:
+type ObjectDict = dict[str, object]
+
+
+def test_handle_assistant_ask_task(monkeypatch: MonkeyPatch) -> None:
     dispatcher = WorkerDispatcher()
     captured: dict[str, object] = {}
 
@@ -13,7 +20,7 @@ def test_handle_assistant_ask_task(monkeypatch) -> None:
         lambda project_id: {"available": True, "scope": {"project_id": project_id}},
     )
 
-    def fake_ask(*, question: str, scope: dict, context: dict) -> dict:
+    def fake_ask(*, question: str, scope: ObjectDict, context: ObjectDict) -> ObjectDict:
         captured["question"] = question
         captured["scope"] = scope
         captured["context"] = context
@@ -40,7 +47,7 @@ def test_handle_assistant_ask_task(monkeypatch) -> None:
         "project_id": "00000000-0000-0000-0000-000000000020",
         "document_id": None,
     }
-    assert "project_context" in captured["context"]
+    assert "project_context" in cast(ObjectDict, captured["context"])
 
 
 def test_handle_unsupported_task_type() -> None:
@@ -49,7 +56,7 @@ def test_handle_unsupported_task_type() -> None:
     result = dispatcher.handle_task(
         WorkerTask(
             request_id="req-2",
-            task_type="unknown.type",  # type: ignore[arg-type]
+            task_type=cast(TaskType, "unknown.type"),
             payload={},
         )
     )
@@ -58,7 +65,7 @@ def test_handle_unsupported_task_type() -> None:
     assert "unsupported" in (result.error_message or "")
 
 
-def test_handle_document_summarize_returns_completed(monkeypatch) -> None:
+def test_handle_document_summarize_returns_completed(monkeypatch: MonkeyPatch) -> None:
     dispatcher = WorkerDispatcher()
 
     monkeypatch.setattr(
@@ -109,6 +116,7 @@ def test_handle_document_summarize_returns_completed(monkeypatch) -> None:
 
 
 def test_handle_generate_suggestion_openclaw_error(monkeypatch) -> None:
+def test_handle_generate_suggestion_openclaw_error(monkeypatch: MonkeyPatch) -> None:
     dispatcher = WorkerDispatcher()
 
     monkeypatch.setattr(
@@ -131,7 +139,7 @@ def test_handle_generate_suggestion_openclaw_error(monkeypatch) -> None:
     assert result.error_message == "boom"
 
 
-def test_handle_document_extract_text_task(monkeypatch) -> None:
+def test_handle_document_extract_text_task(monkeypatch: MonkeyPatch) -> None:
     dispatcher = WorkerDispatcher()
 
     monkeypatch.setattr(

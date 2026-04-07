@@ -1,5 +1,5 @@
-from app.core.config import settings
-from app.services.dispatcher import WorkerDispatcher
+from .core.config import settings
+from .services.dispatcher import WorkerDispatcher
 
 
 def main() -> None:

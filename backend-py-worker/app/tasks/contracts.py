@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Literal
+
+type ObjectDict = dict[str, object]
 
 
 TaskType = Literal[
@@ -17,12 +19,12 @@ class WorkerTask:
     task_type: TaskType
     related_type: str | None = None
     related_id: str | None = None
-    payload: dict[str, Any] = field(default_factory=dict)
+    payload: ObjectDict = field(default_factory=dict)
 
 
 @dataclass(slots=True)
 class TaskResult:
     request_id: str
     status: Literal["completed", "failed"]
-    output: dict[str, Any] = field(default_factory=dict)
+    output: ObjectDict = field(default_factory=dict)
     error_message: str | None = None

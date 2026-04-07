@@ -6,9 +6,12 @@ import json
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Any
+from http.client import HTTPResponse
+from typing import cast
 
-from app.core.config import settings
+from ..core.config import settings
+
+type ObjectDict = dict[str, object]
 
 
 class OpenClawClientError(RuntimeError):
@@ -20,18 +23,18 @@ class ChatCompletionResult:
     response_id: str
     model: str
     content: str
-    usage: dict[str, Any]
+    usage: ObjectDict
 
 
 class OpenClawClient:
     def __init__(self) -> None:
-        self.base_url = settings.openclaw_base_url.rstrip("/")
-        self.api_key = settings.openclaw_api_key
-        self.model = settings.openclaw_model
-        self.backend_model = settings.openclaw_backend_model
-        self.timeout_seconds = settings.openclaw_timeout_seconds
+        self.base_url: str = settings.openclaw_base_url.rstrip("/")
+        self.api_key: str = settings.openclaw_api_key
+        self.model: str = settings.openclaw_model
+        self.backend_model: str = settings.openclaw_backend_model
+        self.timeout_seconds: int = settings.openclaw_timeout_seconds
 
-    def ask(self, question: str, scope: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    def ask(self, question: str, scope: ObjectDict, context: ObjectDict) -> ObjectDict:
         prompt = [
             "请基于给定业务上下文回答问题。",
             "如果上下文不足，必须明确指出缺少哪些信息，不要编造未提供的事实。",
@@ -59,9 +62,9 @@ class OpenClawClient:
     def summarize_document(
         self,
         request_id: str,
-        payload: dict[str, Any],
-        context: dict[str, Any],
-    ) -> dict[str, Any]:
+        payload: ObjectDict,
+        context: ObjectDict,
+    ) -> ObjectDict:
         raw = self._structured_chat(
             system_prompt=(
                 "你是 DigiDocs 文档助手。"
@@ -80,7 +83,9 @@ class OpenClawClient:
                 f"{json.dumps(context, ensure_ascii=False, indent=2)}"
             ),
         )
-        suggestions = _normalize_suggestions(raw.get("suggestions"), default_type="document_summary")
+        suggestions = _normalize_suggestions(
+            raw.get("suggestions"), default_type="document_summary"
+        )
         return {
             "task_type": "document.summarize",
             "summary_text": _string_value(raw.get("summary_text")),
@@ -90,9 +95,9 @@ class OpenClawClient:
     def summarize_handover(
         self,
         request_id: str,
-        payload: dict[str, Any],
-        context: dict[str, Any],
-    ) -> dict[str, Any]:
+        payload: ObjectDict,
+        context: ObjectDict,
+    ) -> ObjectDict:
         raw = self._structured_chat(
             system_prompt=(
                 "你是 DigiDocs 交接助手。"
@@ -110,7 +115,9 @@ class OpenClawClient:
                 f"{json.dumps(context, ensure_ascii=False, indent=2)}"
             ),
         )
-        suggestions = _normalize_suggestions(raw.get("suggestions"), default_type="handover_summary")
+        suggestions = _normalize_suggestions(
+            raw.get("suggestions"), default_type="handover_summary"
+        )
         return {
             "task_type": "handover.summarize",
             "summary_text": _string_value(raw.get("summary_text")),
@@ -120,9 +127,9 @@ class OpenClawClient:
     def generate_suggestion(
         self,
         request_id: str,
-        payload: dict[str, Any],
-        context: dict[str, Any],
-    ) -> dict[str, Any]:
+        payload: ObjectDict,
+        context: ObjectDict,
+    ) -> ObjectDict:
         raw = self._structured_chat(
             system_prompt=(
                 "你是 DigiDocs 结构化建议助手。"
@@ -147,7 +154,7 @@ class OpenClawClient:
             ),
         }
 
-    def _structured_chat(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+    def _structured_chat(self, system_prompt: str, user_prompt: str) -> ObjectDict:
         result = self._chat(system_prompt=system_prompt, user_prompt=user_prompt)
         content = result.content.strip()
         try:
@@ -156,7 +163,7 @@ class OpenClawClient:
             raise OpenClawClientError(f"OpenClaw 返回了非 JSON 结构化结果: {exc}") from exc
 
     def _chat(self, system_prompt: str, user_prompt: str) -> ChatCompletionResult:
-        payload = {
+        payload: ObjectDict = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system_prompt},
@@ -171,10 +178,10 @@ class OpenClawClient:
             response_id=_string_value(raw.get("id")) or "openclaw-response",
             model=_string_value(raw.get("model")) or self.model,
             content=content,
-            usage=raw.get("usage", {}) if isinstance(raw.get("usage"), dict) else {},
+            usage=_as_object_dict(raw.get("usage")) or {},
         )
 
-    def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def _post(self, path: str, payload: ObjectDict) -> ObjectDict:
         url = f"{self.base_url}{path}"
         request = urllib.request.Request(
             url,
@@ -189,7 +196,9 @@ class OpenClawClient:
             request.add_header("x-openclaw-model", self.backend_model)
 
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
+            with cast(
+                HTTPResponse, urllib.request.urlopen(request, timeout=self.timeout_seconds)
+            ) as response:
                 body = response.read().decode()
         except urllib.error.HTTPError as exc:
             error_body = exc.read().decode(errors="ignore")
@@ -200,63 +209,71 @@ class OpenClawClient:
             raise OpenClawClientError(f"OpenClaw 请求失败: {exc}") from exc
 
         try:
-            parsed = json.loads(body)
+            parsed = cast(object, json.loads(body))
         except json.JSONDecodeError as exc:
             raise OpenClawClientError("OpenClaw 返回了非 JSON 响应") from exc
-        if not isinstance(parsed, dict):
+        parsed_dict = _as_object_dict(parsed)
+        if parsed_dict is None:
             raise OpenClawClientError("OpenClaw 返回结构不是对象")
-        return parsed
+        return parsed_dict
 
 
-def _extract_message_content(payload: dict[str, Any]) -> str:
+def _extract_message_content(payload: ObjectDict) -> str:
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices:
         return ""
-    message = choices[0].get("message")
-    if not isinstance(message, dict):
+    choice_items = cast(list[object], choices)
+    first_choice = _as_object_dict(choice_items[0])
+    if first_choice is None:
+        return ""
+    message = _as_object_dict(first_choice.get("message"))
+    if message is None:
         return ""
     content = message.get("content")
     if isinstance(content, str):
         return content.strip()
     if isinstance(content, list):
         parts: list[str] = []
-        for item in content:
-            if isinstance(item, dict) and item.get("type") == "text":
-                text = item.get("text")
+        for item in cast(list[object], content):
+            item_dict = _as_object_dict(item)
+            if item_dict is not None and item_dict.get("type") == "text":
+                text = item_dict.get("text")
                 if isinstance(text, str) and text.strip():
                     parts.append(text.strip())
         return "\n".join(parts).strip()
     return ""
 
 
-def _parse_json_content(content: str) -> dict[str, Any]:
+def _parse_json_content(content: str) -> ObjectDict:
     cleaned = content.strip()
     if cleaned.startswith("```"):
         cleaned = cleaned.strip("`")
         cleaned = cleaned.removeprefix("json").strip()
-    parsed = json.loads(cleaned)
-    if not isinstance(parsed, dict):
+    parsed = cast(object, json.loads(cleaned))
+    parsed_dict = _as_object_dict(parsed)
+    if parsed_dict is None:
         raise json.JSONDecodeError("top-level JSON must be object", cleaned, 0)
-    return parsed
+    return parsed_dict
 
 
-def _normalize_suggestions(raw: Any, default_type: str) -> list[dict[str, Any]]:
+def _normalize_suggestions(raw: object, default_type: str) -> list[ObjectDict]:
     if not isinstance(raw, list):
         return []
 
-    normalized: list[dict[str, Any]] = []
-    for item in raw:
-        if not isinstance(item, dict):
+    normalized: list[ObjectDict] = []
+    for item in cast(list[object], raw):
+        item_dict = _as_object_dict(item)
+        if item_dict is None:
             continue
-        content = _string_value(item.get("content"))
+        content = _string_value(item_dict.get("content"))
         if not content:
             continue
-        suggestion: dict[str, Any] = {
-            "title": _string_value(item.get("title")) or "AI 建议",
+        suggestion: ObjectDict = {
+            "title": _string_value(item_dict.get("title")) or "AI 建议",
             "content": content,
-            "suggestion_type": _string_value(item.get("suggestion_type")) or default_type,
+            "suggestion_type": _string_value(item_dict.get("suggestion_type")) or default_type,
         }
-        confidence = item.get("confidence")
+        confidence = item_dict.get("confidence")
         if isinstance(confidence, (int, float)):
             suggestion["confidence"] = float(confidence)
         normalized.append(suggestion)
@@ -264,5 +281,9 @@ def _normalize_suggestions(raw: Any, default_type: str) -> list[dict[str, Any]]:
     return normalized
 
 
-def _string_value(value: Any) -> str:
+def _string_value(value: object) -> str:
     return value if isinstance(value, str) else ""
+
+
+def _as_object_dict(value: object) -> ObjectDict | None:
+    return cast(ObjectDict, value) if isinstance(value, dict) else None
