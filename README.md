@@ -150,6 +150,11 @@ docker compose up -d postgres
 docker compose --profile app up -d backend-go backend-py-worker frontend
 ```
 
+说明：
+
+- 上述 `docker compose` 主要用于本地单机联调；
+- 当前目标部署分层为：`DGX Spark / P14s` 承载应用层与 OpenClaw，`群晖 DS925+` 承载数据库层（`Container Manager` 中的 PostgreSQL 容器）和文件层（DSM / File Station 原生服务）。
+
 部署前配置模板：
 
 - 本地开发模板：[.env.example](.env.example)
