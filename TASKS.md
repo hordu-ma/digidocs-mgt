@@ -303,6 +303,41 @@ Go 主业务迁移与协作环境固化阶段
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
 - 增加 `pdf` / 图片 OCR / 扫描件的正文抽取链路
 - 增加 Assistant 问答历史列表与筛选
+- 增加业务侧 AI 记忆架构（一期）
+  - 目标：让 OpenClaw 保持无隐式环境记忆，仅消费本系统按 `scope` 装配的显式记忆，避免 p14s 个人环境 `soul.md` 等全局上下文污染业务结果
+  - 记忆分层：
+    - 短期记忆：当前会话最近若干轮问答与回答
+    - 中期记忆：当前 `project/document/handover` 范围内的历史请求、已生成建议、已确认建议
+    - 长期记忆：仅允许人工确认后的建议、摘要结论或后续沉淀的项目知识进入长期记忆，不直接继承 OpenClaw 宿主环境记忆
+  - 数据模型：新增 `assistant_conversations`、`assistant_conversation_messages` 两张表；为会话记录 `scope_type`、`scope_id`、`created_by`、`last_message_at`、`archived_at`
+  - 结果复用：基于现有 `assistant_requests`、`assistant_suggestions`、文档版本/流转/交接数据构建记忆装配器，不新增独立“黑盒记忆库”
+  - 上下文装配：在 `backend-go` 新增 `assistant_guard` / `assistant_memory_assembler` 等价模块，按请求范围拼装“结构化上下文 + 最近会话 + 已确认结论 + 相关业务摘要”后再交给 Worker
+  - 范围隔离：
+    - 会话必须绑定单一 `scope`，禁止跨项目自动串话
+    - `project` 级问答默认不带入无关 `document` 私有会话
+    - `document` 级问答只允许复用当前文档及所属项目的授权记忆
+  - 写入策略：
+    - 普通问答默认只写入会话消息，不自动升级为长期记忆
+    - 仅“用户确认”的建议或显式标记的结论可沉淀为可复用记忆
+    - AI 输出继续保持附属结果，不直接写主业务状态
+  - API：新增会话创建、历史列表、消息列表、继续追问接口；现有 `POST /assistant/ask` 兼容 `conversation_id`
+  - 前端：`AssistantView` 改为“会话 + 追问”模式，支持按项目/文档查看历史会话与记忆来源提示
+  - 可观测性：AI 响应保留 `source_scope`、`conversation_id`、命中的记忆摘要来源，便于审计与排查污染
+  - 验证：补充 handler/service/repository 测试，覆盖 scope 隔离、历史装配、确认后复用、跨 scope 禁止串话等关键路径
+- 增加 OpenClaw skill 复用策略（一期）
+  - 目标：复用 OpenClaw 已有的无状态能力型 skills，避免在业务侧重复建设，同时禁止宿主环境型 skills 直接污染业务结果
+  - 复用边界：
+    - 允许复用：摘要模板、结构化抽取、标签建议、风险提示等仅依赖显式输入上下文的 skills
+    - 禁止直连：依赖 `soul.md`、本地知识文件、默认 persona、长期对话历史、宿主文件系统或外部工具副作用的 skills
+  - 适配层：在 `backend-py-worker` 增加 `skill_registry` / `skill_adapter` 等价模块，对业务允许调用的 skill 做白名单注册、版本固定和输入输出归一化
+  - 输入约束：所有 skill 调用统一只接收业务侧装配的 `scope`、`context`、`memory`，不得在 skill 内自行扩展访问范围
+  - 输出约束：所有 skill 输出统一映射到 `assistant_requests`、`assistant_suggestions`、会话消息或后续记忆沉淀流程，不允许绕过业务层直接写主业务状态
+  - 可审计性：记录 `skill_name`、`skill_version`、`source_scope`、`conversation_id`、命中记忆来源和调用时间，便于排查结果漂移
+  - 运行隔离：
+    - 业务系统优先使用独立 OpenClaw service identity / API key
+    - 假设/待确认：若 p14s 上现有 OpenClaw Gateway 会默认注入全局 persona 或本地技能目录，需要为业务流量单独隔离配置或实例
+  - API/配置：新增可用 skill 列表配置与服务端开关；不同业务动作显式绑定允许调用的 skill 集合
+  - 验证：补充测试覆盖 skill 白名单、非法 skill 拒绝、跨 scope 越权拦截、输出归一化与审计字段落库
 - p14s 部署准备
   - 确认 OpenClaw Gateway 已启用 `GET /v1/models` 与 `POST /v1/chat/completions`
   - 固化 p14s 上的 `.env`，确认 `OPENCLAW_BASE_URL` / `OPENCLAW_API_KEY` / `CALLBACK_BASE_URL`
