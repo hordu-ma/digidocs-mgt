@@ -1,3 +1,8 @@
+---
+name: digidocs-backend-go
+description: 约束 backend-go/ 中主业务后端的实现方式，确保 Go 迁移继续遵循契约优先与分层设计。
+---
+
 # Skill: digidocs-backend-go
 
 ## 目的

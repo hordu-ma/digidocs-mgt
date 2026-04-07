@@ -1,3 +1,8 @@
+---
+name: digidocs-frontend-vue
+description: 约束 frontend/ 中的 Vue 页面实现，确保界面围绕固定角色、固定业务对象和明确 API 契约展开。
+---
+
 # Skill: digidocs-frontend-vue
 
 ## 目的

@@ -1,3 +1,8 @@
+---
+name: digidocs-verify
+description: 为仓库提供统一的环境诊断与基础验证入口，避免每次依赖人工回忆命令。
+---
+
 # Skill: digidocs-verify
 
 ## 目的

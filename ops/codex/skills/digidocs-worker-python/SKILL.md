@@ -1,3 +1,8 @@
+---
+name: digidocs-worker-python
+description: 约束 backend-py-worker/ 与 Python 辅助能力层的职责边界，确保 AI 与文档处理能力不侵入主业务账本。
+---
+
 # Skill: digidocs-worker-python
 
 ## 目的

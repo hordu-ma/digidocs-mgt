@@ -1,3 +1,8 @@
+---
+name: digidocs-doc-sync
+description: 确保项目的双账本与协作文档持续同步，避免实现前进、文档停留在旧阶段。
+---
+
 # Skill: digidocs-doc-sync
 
 ## 目的

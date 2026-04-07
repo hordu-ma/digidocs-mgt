@@ -1,3 +1,8 @@
+---
+name: digidocs-architecture-guard
+description: 在 DigiDocs Mgt 中执行文档优先、契约优先、边界优先的架构守卫，避免实现静默偏离设计。
+---
+
 # Skill: digidocs-architecture-guard
 
 ## 目的
