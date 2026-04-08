@@ -16,3 +16,4 @@ components.d.ts
 # Local env
 .env
 .DS_Store
+.vscode
