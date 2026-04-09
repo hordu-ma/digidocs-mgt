@@ -1,0 +1,4 @@
+curl -X POST "https://100.123.200.83:5001/api/SynologyDrive/default/v2/login" \
+ -H "accept: application/json" \
+ -H "content-type: application/json" \
+ -d '{"format":"sid","account":"qiao","passwd":"MA-keit13"}'
