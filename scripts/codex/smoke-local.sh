@@ -284,14 +284,13 @@ if [[ "${RUN_SYNOLOGY_PREFLIGHT:-0}" == "1" || "${STORAGE_BACKEND:-}" == "synolo
       synology_tmp=$(mktemp)
       tmp_files+=("$synology_tmp")
       printf 'digidocs synology smoke\n' >"$synology_tmp"
-      upload_resp=$(curl "${synology_curl_opts[@]}" -X POST "$synology_base_url/webapi/entry.cgi" \
+      upload_resp=$(curl "${synology_curl_opts[@]}" -X POST "$synology_base_url/webapi/entry.cgi?_sid=$synology_sid" \
         -F 'api=SYNO.FileStation.Upload' \
         -F 'version=2' \
         -F 'method=upload' \
         -F "path=$smoke_folder" \
         -F 'create_parents=true' \
         -F 'overwrite=true' \
-        -F "_sid=$synology_sid" \
         -F "file=@$synology_tmp;filename=smoke.txt;type=text/plain" 2>/dev/null || true)
       if [[ "$upload_resp" == *'"success":true'* ]]; then
         echo '[OK] synology upload succeeded'
