@@ -98,7 +98,25 @@
 
 ## 3. 组织结构接口
 
-### 3.1 团队空间列表
+### 3.1 用户列表
+
+`GET /api/v1/users`
+
+响应体：
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "display_name": "张三",
+      "role": "member"
+    }
+  ]
+}
+```
+
+### 3.2 团队空间列表
 
 `GET /api/v1/team-spaces`
 
@@ -116,7 +134,7 @@
 }
 ```
 
-### 3.2 项目列表
+### 3.3 项目列表
 
 `GET /api/v1/projects?team_space_id={id}`
 
@@ -139,7 +157,7 @@
 }
 ```
 
-### 3.3 目录树
+### 3.4 目录树
 
 `GET /api/v1/projects/{project_id}/folders/tree`
 

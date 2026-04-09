@@ -30,6 +30,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 		container.DashboardQueryService,
 	)
 	teamSpaceHandler := handlers.NewTeamSpaceHandler(container.QueryService)
+	userHandler := handlers.NewUserHandler(container.QueryService)
 	projectHandler := handlers.NewProjectHandler(container.QueryService)
 	documentHandler := handlers.NewDocumentHandler(container.DocumentService)
 	versionHandler := handlers.NewVersionHandler(container.VersionService)
@@ -54,6 +55,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	// --- Protected routes (JWT required) ---
 	mux.Handle("GET "+cfg.APIV1Prefix+"/auth/me", protect(authHandler.Me))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/logout", protect(authHandler.Logout))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/users", protect(userHandler.List))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/assistant/ask", protect(assistantHandler.Ask))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/assistant/requests", protect(assistantHandler.ListRequests))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/assistant/requests/{requestID}", protect(assistantHandler.GetRequest))

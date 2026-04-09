@@ -67,6 +67,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			QueueConsumer: pgqueue.NewConsumer(postgresDB),
 			QueryService: service.NewQueryService(
 				pgrepo.NewTeamSpaceRepository(postgresDB),
+				pgrepo.NewUserQueryRepository(postgresDB),
 				pgrepo.NewProjectRepository(postgresDB),
 			),
 			AssistantService:      service.NewAssistantService(noopqueue.NewPublisher(), pgrepo.NewAssistantRepository(postgresDB)),
@@ -90,6 +91,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			QueueConsumer: publisher,
 			QueryService: service.NewQueryService(
 				memory.NewTeamSpaceRepository(),
+				memory.NewUserQueryRepository(),
 				memory.NewProjectRepository(),
 			),
 			AssistantService:      service.NewAssistantService(publisher, memory.NewAssistantRepository()),

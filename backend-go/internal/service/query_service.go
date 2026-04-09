@@ -9,21 +9,28 @@ import (
 
 type QueryService struct {
 	teamSpaces repository.TeamSpaceReader
+	users      repository.UserReader
 	projects   repository.ProjectReader
 }
 
 func NewQueryService(
 	teamSpaces repository.TeamSpaceReader,
+	users repository.UserReader,
 	projects repository.ProjectReader,
 ) QueryService {
 	return QueryService{
 		teamSpaces: teamSpaces,
+		users:      users,
 		projects:   projects,
 	}
 }
 
 func (s QueryService) ListTeamSpaces(ctx context.Context) ([]query.TeamSpaceSummary, error) {
 	return s.teamSpaces.ListTeamSpaces(ctx)
+}
+
+func (s QueryService) ListUsers(ctx context.Context) ([]query.UserOption, error) {
+	return s.users.ListUsers(ctx)
 }
 
 func (s QueryService) ListProjects(ctx context.Context, teamSpaceID string) ([]query.ProjectSummary, error) {

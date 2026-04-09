@@ -106,6 +106,24 @@ func TestDocuments_List(t *testing.T) {
 	}
 }
 
+func TestUsers_List(t *testing.T) {
+	handler, token := testServer(t)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, authedRequest("GET", "/api/v1/users", nil, token))
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	result := parseResponse(t, rec)
+	items, ok := result["data"].([]any)
+	if !ok || len(items) == 0 {
+		t.Fatalf("expected non-empty user list, got %#v", result["data"])
+	}
+	first, _ := items[0].(map[string]any)
+	if first["display_name"] == "" {
+		t.Fatalf("expected display_name in first user item, got %#v", first)
+	}
+}
+
 func TestDocuments_GetByID(t *testing.T) {
 	handler, token := testServer(t)
 	rec := httptest.NewRecorder()

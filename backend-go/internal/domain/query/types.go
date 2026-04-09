@@ -5,6 +5,12 @@ type UserSummary struct {
 	DisplayName string `json:"display_name"`
 }
 
+type UserOption struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	Role        string `json:"role"`
+}
+
 type TeamSpaceSummary struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`

@@ -6,13 +6,48 @@ import { useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+import { useAuthStore } from "@/stores/auth";
+
+type TeamSpaceOption = {
+  id: string;
+  name: string;
+  code: string;
+};
+
+type UserOption = {
+  id: string;
+  display_name: string;
+  role: string;
+};
+
+type ProjectOption = {
+  id: string;
+  name: string;
+};
+
+type FolderNode = {
+  id: string;
+  path: string;
+  children?: FolderNode[];
+};
+
+type FolderOption = {
+  id: string;
+  path: string;
+};
 
 const router = useRouter();
+const auth = useAuthStore();
 const rows = ref<any[]>([]);
 const total = ref(0);
 const page = ref(1);
 const pageSize = ref(20);
 const keyword = ref("");
+const teamSpaces = ref<TeamSpaceOption[]>([]);
+const users = ref<UserOption[]>([]);
+const projects = ref<ProjectOption[]>([]);
+const folderOptions = ref<FolderOption[]>([]);
+const referenceLoading = ref(false);
 
 const statusLabel: Record<string, string> = {
   draft: "草稿",
@@ -56,21 +91,78 @@ const createForm = reactive({
   team_space_id: "",
   project_id: "",
   folder_id: "",
+  current_owner_id: "",
   title: "",
   description: "",
   commit_message: "",
 });
 const createFile = ref<UploadRawFile | null>(null);
 
+function flattenFolders(nodes: FolderNode[]): FolderOption[] {
+  const items: FolderOption[] = [];
+  for (const node of nodes) {
+    items.push({
+      id: node.id,
+      path: node.path,
+    });
+    if (Array.isArray(node.children) && node.children.length > 0) {
+      items.push(...flattenFolders(node.children));
+    }
+  }
+  return items;
+}
+
+async function fetchReferenceData() {
+  referenceLoading.value = true;
+  try {
+    const [teamRes, userRes] = await Promise.all([
+      api.get("/team-spaces"),
+      api.get("/users"),
+    ]);
+    teamSpaces.value = teamRes.data?.data ?? [];
+    users.value = userRes.data?.data ?? [];
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "加载基础选项失败");
+  } finally {
+    referenceLoading.value = false;
+  }
+}
+
+async function loadProjects(teamSpaceID: string) {
+  projects.value = [];
+  folderOptions.value = [];
+  createForm.project_id = "";
+  createForm.folder_id = "";
+  if (!teamSpaceID) {
+    return;
+  }
+  const res = await api.get("/projects", {
+    params: { team_space_id: teamSpaceID },
+  });
+  projects.value = res.data?.data ?? [];
+}
+
+async function loadFolders(projectID: string) {
+  folderOptions.value = [];
+  createForm.folder_id = "";
+  if (!projectID) {
+    return;
+  }
+  const res = await api.get(`/projects/${projectID}/folders/tree`);
+  folderOptions.value = flattenFolders(res.data?.data ?? []);
+}
+
 function openCreate() {
   Object.assign(createForm, {
-    team_space_id: "",
+    team_space_id: teamSpaces.value[0]?.id ?? "",
     project_id: "",
     folder_id: "",
+    current_owner_id: auth.userId || users.value[0]?.id || "",
     title: "",
     description: "",
     commit_message: "",
   });
+  void loadProjects(createForm.team_space_id);
   createFile.value = null;
   showCreateDialog.value = true;
 }
@@ -83,9 +175,10 @@ async function submitCreate() {
   if (
     !createForm.title ||
     !createForm.team_space_id ||
-    !createForm.project_id
+    !createForm.project_id ||
+    !createForm.current_owner_id
   ) {
-    ElMessage.warning("请填写标题、团队空间 ID 和课题 ID");
+    ElMessage.warning("请填写标题、团队空间、课题和当前责任人");
     return;
   }
   if (!createFile.value) {
@@ -98,6 +191,7 @@ async function submitCreate() {
     fd.append("team_space_id", createForm.team_space_id);
     fd.append("project_id", createForm.project_id);
     fd.append("folder_id", createForm.folder_id);
+    fd.append("current_owner_id", createForm.current_owner_id);
     fd.append("title", createForm.title);
     fd.append("description", createForm.description);
     fd.append("commit_message", createForm.commit_message);
@@ -115,7 +209,25 @@ async function submitCreate() {
   }
 }
 
-onMounted(fetchDocuments);
+async function handleTeamSpaceChange(teamSpaceID: string) {
+  try {
+    await loadProjects(teamSpaceID);
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "加载课题列表失败");
+  }
+}
+
+async function handleProjectChange(projectID: string) {
+  try {
+    await loadFolders(projectID);
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "加载目录树失败");
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([fetchDocuments(), fetchReferenceData()]);
+});
 </script>
 
 <template>
@@ -169,24 +281,70 @@ onMounted(fetchDocuments);
       </ElCard>
 
       <ElDialog v-model="showCreateDialog" title="新建文档" width="520px">
-        <ElForm label-position="top">
+        <ElForm label-position="top" v-loading="referenceLoading">
           <ElFormItem label="标题" required>
             <ElInput v-model="createForm.title" placeholder="文档标题" />
           </ElFormItem>
-          <ElFormItem label="团队空间 ID" required>
-            <ElInput
+          <ElFormItem label="团队空间" required>
+            <ElSelect
               v-model="createForm.team_space_id"
-              placeholder="团队空间 UUID"
-            />
+              filterable
+              placeholder="选择团队空间"
+              @change="handleTeamSpaceChange"
+            >
+              <ElOption
+                v-for="item in teamSpaces"
+                :key="item.id"
+                :label="`${item.name} (${item.code})`"
+                :value="item.id"
+              />
+            </ElSelect>
           </ElFormItem>
-          <ElFormItem label="课题 ID" required>
-            <ElInput v-model="createForm.project_id" placeholder="课题 UUID" />
+          <ElFormItem label="课题" required>
+            <ElSelect
+              v-model="createForm.project_id"
+              filterable
+              placeholder="选择课题"
+              :disabled="projects.length === 0"
+              @change="handleProjectChange"
+            >
+              <ElOption
+                v-for="item in projects"
+                :key="item.id"
+                :label="item.name"
+                :value="item.id"
+              />
+            </ElSelect>
           </ElFormItem>
-          <ElFormItem label="目录 ID">
-            <ElInput
+          <ElFormItem label="目录">
+            <ElSelect
               v-model="createForm.folder_id"
-              placeholder="目录 UUID（可选）"
-            />
+              clearable
+              filterable
+              placeholder="选择目录（可选）"
+              :disabled="folderOptions.length === 0"
+            >
+              <ElOption
+                v-for="item in folderOptions"
+                :key="item.id"
+                :label="item.path"
+                :value="item.id"
+              />
+            </ElSelect>
+          </ElFormItem>
+          <ElFormItem label="当前责任人" required>
+            <ElSelect
+              v-model="createForm.current_owner_id"
+              filterable
+              placeholder="选择责任人"
+            >
+              <ElOption
+                v-for="item in users"
+                :key="item.id"
+                :label="`${item.display_name} (${item.role})`"
+                :value="item.id"
+              />
+            </ElSelect>
           </ElFormItem>
           <ElFormItem label="描述">
             <ElInput

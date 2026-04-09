@@ -209,7 +209,7 @@ docker compose up -d postgres
 
 ## 开发进度
 
-当前阶段已进入 Go 主业务迁移与协作环境固化阶段：
+当前阶段已进入 交付闭环收口与部署验收准备阶段：
 
 - 已完成 `versions` 事务上传工作流
 - 已完成 `audit-events` Go 查询接口与 summary 聚合骨架
@@ -254,5 +254,7 @@ docker compose up -d postgres
 - 已完成 PDF 正文抽取与 AI 可观测性首轮补强（模型、上游响应 ID、耗时、Worker 日志）
 - 已将 `make smoke` 扩展到 `assistant.ask -> completed` 的 AI 闭环验证
 - 已修复文档详情页 AI 建议展示口径，重开页面后不再把已处理建议重复展示为待处理提示
+- 已完成文档与任务账本首轮纠偏，统一 OCR / Assistant 历史筛选的完成状态，并新增 `/api/v1/users` 只读查询契约
+- 已完成前端 P1 交付收口：文档创建改为团队空间/课题/目录/责任人选择器，文档转交改为成员选择，交接页补齐创建后管理、清单编辑、确认、完成、取消闭环
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

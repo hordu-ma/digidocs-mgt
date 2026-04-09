@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessage } from "element-plus";
 import type { UploadRawFile } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+
+type UserOption = {
+  id: string;
+  display_name: string;
+  role: string;
+};
 
 const route = useRoute();
 const router = useRouter();
@@ -17,6 +23,7 @@ const flows = ref<any[]>([]);
 const suggestions = ref<any[]>([]);
 const actionLoading = ref(false);
 const summaryLoading = ref(false);
+const users = ref<UserOption[]>([]);
 
 const statusLabel: Record<string, string> = {
   draft: "草稿",
@@ -59,6 +66,10 @@ const availableActions = computed(() => {
   return status ? (flowActions[status] ?? []) : [];
 });
 
+const selectableUsers = computed(() =>
+  users.value.filter((item) => item.id !== doc.value?.current_owner?.id),
+);
+
 async function loadData() {
   const [docRes, versionsRes, flowsRes, suggestionsRes] = await Promise.all([
     api.get(`/documents/${documentID}`),
@@ -78,36 +89,55 @@ async function loadData() {
   suggestions.value = suggestionsRes.data?.data ?? [];
 }
 
+async function loadUsers() {
+  const res = await api.get("/users");
+  users.value = res.data?.data ?? [];
+}
+
+const showTransferDialog = ref(false);
+const transferLoading = ref(false);
+const transferForm = reactive({
+  to_user_id: "",
+});
+
+function openTransferDialog() {
+  transferForm.to_user_id = "";
+  showTransferDialog.value = true;
+}
+
+async function submitTransfer() {
+  if (!transferForm.to_user_id) {
+    ElMessage.warning("请选择接收人");
+    return;
+  }
+
+  transferLoading.value = true;
+  try {
+    await api.post(`/documents/${documentID}/flow/transfer`, {
+      to_user_id: transferForm.to_user_id,
+    });
+    ElMessage.success("转交成功");
+    showTransferDialog.value = false;
+    await loadData();
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "转交失败");
+  } finally {
+    transferLoading.value = false;
+  }
+}
+
 async function applyFlowAction(endpoint: string, label: string) {
+  if (endpoint === "transfer") {
+    openTransferDialog();
+    return;
+  }
+
   actionLoading.value = true;
   try {
-    const payload: Record<string, string> = {};
-    if (endpoint === "transfer") {
-      const { value } = await ElMessageBox.prompt(
-        "请输入接收人的用户 ID",
-        "转交文档",
-        {
-          confirmButtonText: "确认转交",
-          cancelButtonText: "取消",
-          inputPlaceholder: "目标用户 UUID",
-          inputValidator: (input) => {
-            if (!input?.trim()) {
-              return "接收人用户 ID 不能为空";
-            }
-            return true;
-          },
-        },
-      );
-      payload.to_user_id = value.trim();
-    }
-
-    await api.post(`/documents/${documentID}/flow/${endpoint}`, payload);
+    await api.post(`/documents/${documentID}/flow/${endpoint}`, {});
     ElMessage.success(`${label}成功`);
     await loadData();
   } catch (err: any) {
-    if (err === "cancel") {
-      return;
-    }
     const msg = err.response?.data?.message ?? `${label}失败`;
     ElMessage.error(msg);
   } finally {
@@ -243,7 +273,13 @@ async function updateSuggestionStatus(id: string, action: "confirm" | "dismiss")
   }
 }
 
-onMounted(loadData);
+onMounted(async () => {
+  try {
+    await Promise.all([loadData(), loadUsers()]);
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "加载文档详情失败");
+  }
+});
 </script>
 
 <template>
@@ -400,6 +436,35 @@ onMounted(loadData);
         <ElButton type="primary" :loading="uploadLoading" @click="submitUpload"
           >上传</ElButton
         >
+      </template>
+    </ElDialog>
+
+    <ElDialog v-model="showTransferDialog" title="转交文档" width="420px">
+      <ElForm label-position="top">
+        <ElFormItem label="接收人" required>
+          <ElSelect
+            v-model="transferForm.to_user_id"
+            filterable
+            placeholder="选择接收人"
+          >
+            <ElOption
+              v-for="item in selectableUsers"
+              :key="item.id"
+              :label="`${item.display_name} (${item.role})`"
+              :value="item.id"
+            />
+          </ElSelect>
+        </ElFormItem>
+      </ElForm>
+      <template #footer>
+        <ElButton @click="showTransferDialog = false">取消</ElButton>
+        <ElButton
+          type="primary"
+          :loading="transferLoading"
+          @click="submitTransfer"
+        >
+          确认转交
+        </ElButton>
       </template>
     </ElDialog>
   </AppLayout>

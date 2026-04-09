@@ -13,6 +13,10 @@ type TeamSpaceReader interface {
 	ListTeamSpaces(ctx context.Context) ([]query.TeamSpaceSummary, error)
 }
 
+type UserReader interface {
+	ListUsers(ctx context.Context) ([]query.UserOption, error)
+}
+
 type ProjectReader interface {
 	ListProjects(ctx context.Context, teamSpaceID string) ([]query.ProjectSummary, error)
 	GetFolderTree(ctx context.Context, projectID string) ([]query.FolderTreeNode, error)
