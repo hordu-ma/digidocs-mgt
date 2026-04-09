@@ -22,6 +22,7 @@ type Config struct {
 	SynologyHost      string
 	SynologyPort      int
 	SynologyHTTPS     bool
+	SynologyInsecureSkipVerify bool
 	SynologyAccount   string
 	SynologyPassword  string
 	SynologySharePath string // shared folder path, e.g. "/DigiDocs"
@@ -45,6 +46,7 @@ func Load() Config {
 		SynologyHost:      getEnv("SYNOLOGY_HOST", ""),
 		SynologyPort:      synoPort,
 		SynologyHTTPS:     getEnv("SYNOLOGY_HTTPS", "false") == "true",
+		SynologyInsecureSkipVerify: getEnv("SYNOLOGY_INSECURE_SKIP_VERIFY", "false") == "true",
 		SynologyAccount:   getEnv("SYNOLOGY_ACCOUNT", ""),
 		SynologyPassword:  getEnv("SYNOLOGY_PASSWORD", ""),
 		SynologySharePath: getEnv("SYNOLOGY_SHARE_PATH", "/DigiDocs"),

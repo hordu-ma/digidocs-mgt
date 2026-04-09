@@ -285,6 +285,7 @@ Go 主业务迁移与协作环境固化阶段
     - 共享链接：SYNO.FileStation.Sharing.create（支持设置过期天数）
   - 更新 `storage/memory/provider.go`：实现所有新接口方法（含目录跟踪、子树删除、ListDir）
   - 更新 `config.go`：新增 `StorageBackend`、`SynologyHost/Port/HTTPS/Account/Password/SharePath` 配置项
+  - 新增 `SYNOLOGY_INSECURE_SKIP_VERIFY` 受控开关，用于自签名证书环境的临时联调接入
   - 更新 `bootstrap/container.go`：根据 `STORAGE_BACKEND` 自动选择 memory 或 synology 存储后端
   - 更新 `.env.example`：新增群晖相关环境变量
   - 更新 `docs/项目定义与技术架构.md`：将对象存储从 MinIO 改为群晖 File Station API

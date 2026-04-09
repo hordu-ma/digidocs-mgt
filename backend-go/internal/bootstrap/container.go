@@ -137,12 +137,13 @@ func buildStorageProvider(cfg config.Config) storage.Provider {
 		log.Printf("[bootstrap] using Synology storage: %s:%d share=%s",
 			cfg.SynologyHost, cfg.SynologyPort, cfg.SynologySharePath)
 		return synostorage.NewProvider(synostorage.Config{
-			Host:      cfg.SynologyHost,
-			Port:      cfg.SynologyPort,
-			HTTPS:     cfg.SynologyHTTPS,
-			Account:   cfg.SynologyAccount,
-			Password:  cfg.SynologyPassword,
-			SharePath: cfg.SynologySharePath,
+			Host:               cfg.SynologyHost,
+			Port:               cfg.SynologyPort,
+			HTTPS:              cfg.SynologyHTTPS,
+			InsecureSkipVerify: cfg.SynologyInsecureSkipVerify,
+			Account:            cfg.SynologyAccount,
+			Password:           cfg.SynologyPassword,
+			SharePath:          cfg.SynologySharePath,
 		})
 	default:
 		log.Println("[bootstrap] using memory storage")

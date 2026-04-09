@@ -242,6 +242,7 @@ docker compose up -d postgres
 - 已完成前端写操作 UI（文档流转操作、AI 助手问答提交、交接单创建）
 - 已完成 P0 文档/契约收口首轮修复（验证命令、README/AGENTS 迁移描述、前后端错误读取、转交流程、AI 问答契约）
 - 已完成群晖前置验收 smoke 收口：`make smoke` 现可选直连 DSM / File Station API 做登录、上传、下载、共享链接与清理
+- 已补群晖 HTTPS 受控兼容开关：自签名证书环境可通过 `SYNOLOGY_INSECURE_SKIP_VERIFY=true` 临时接入 Go 服务
 - 已完成版本文件链路强化验证：`make smoke` 已覆盖现有文档的版本上传、下载与预览闭环
 - 已补 Synology provider 分层契约测试与 memory 存储版本仓储联动，上传后再查询/下载/预览不再依赖静态占位返回
 - 已完成 P1 AI 持久化闭环首轮修复（`assistant_requests` 落库、Worker 回调幂等更新、`assistant_suggestions` 查询/确认/忽略真实接线）

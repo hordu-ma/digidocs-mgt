@@ -3,6 +3,7 @@ package synology
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,12 +33,13 @@ type Provider struct {
 
 // Config holds Synology connection parameters.
 type Config struct {
-	Host      string // IP or hostname
-	Port      int    // DSM port (5000 HTTP / 5001 HTTPS)
-	HTTPS     bool
-	Account   string
-	Password  string
-	SharePath string // top-level shared folder path, e.g. "/DigiDocs"
+	Host               string // IP or hostname
+	Port               int    // DSM port (5000 HTTP / 5001 HTTPS)
+	HTTPS              bool
+	InsecureSkipVerify bool
+	Account            string
+	Password           string
+	SharePath          string // top-level shared folder path, e.g. "/DigiDocs"
 }
 
 func NewProvider(cfg Config) *Provider {
@@ -45,12 +47,20 @@ func NewProvider(cfg Config) *Provider {
 	if cfg.HTTPS {
 		scheme = "https"
 	}
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if cfg.HTTPS {
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: cfg.InsecureSkipVerify,
+		}
+	}
+
 	return &Provider{
 		baseURL:   fmt.Sprintf("%s://%s:%d", scheme, cfg.Host, cfg.Port),
 		account:   cfg.Account,
 		password:  cfg.Password,
 		sharePath: strings.TrimRight(cfg.SharePath, "/"),
-		client:    &http.Client{Timeout: 120 * time.Second},
+		client:    &http.Client{Timeout: 120 * time.Second, Transport: transport},
 	}
 }
 
@@ -218,7 +228,6 @@ func (p *Provider) PutObject(ctx context.Context, input storage.PutObjectInput) 
 	_ = writer.WriteField("path", destFolder)
 	_ = writer.WriteField("create_parents", "true")
 	_ = writer.WriteField("overwrite", overwrite)
-	_ = writer.WriteField("_sid", p.getSID())
 
 	part, err := writer.CreateFormFile("file", fileName)
 	if err != nil {
@@ -232,7 +241,7 @@ func (p *Provider) PutObject(ctx context.Context, input storage.PutObjectInput) 
 	writer.Close()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		p.baseURL+"/webapi/entry.cgi", &body)
+		p.baseURL+"/webapi/entry.cgi?_sid="+url.QueryEscape(p.getSID()), &body)
 	if err != nil {
 		return storage.PutObjectResult{}, err
 	}

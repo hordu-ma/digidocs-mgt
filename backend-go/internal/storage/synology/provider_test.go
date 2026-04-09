@@ -49,6 +49,9 @@ func TestProviderPutObjectUploadsMultipartFile(t *testing.T) {
 			if err := r.ParseMultipartForm(1 << 20); err != nil {
 				t.Fatalf("parse multipart form: %v", err)
 			}
+			if got := r.URL.Query().Get("_sid"); got != "sid-1" {
+				t.Fatalf("query _sid = %s, want sid-1", got)
+			}
 			if got := r.FormValue("api"); got != "SYNO.FileStation.Upload" {
 				t.Fatalf("api = %s, want SYNO.FileStation.Upload", got)
 			}
@@ -58,8 +61,8 @@ func TestProviderPutObjectUploadsMultipartFile(t *testing.T) {
 			if got := r.FormValue("overwrite"); got != "true" {
 				t.Fatalf("overwrite = %s, want true", got)
 			}
-			if got := r.FormValue("_sid"); got != "sid-1" {
-				t.Fatalf("_sid = %s, want sid-1", got)
+			if got := strings.Join(r.MultipartForm.Value["_sid"], ","); got != "" {
+				t.Fatalf("multipart _sid = %s, want empty", got)
 			}
 			file, _, err := r.FormFile("file")
 			if err != nil {
@@ -206,5 +209,51 @@ func TestProviderCreateShareLinkParsesExpireDate(t *testing.T) {
 	}
 	if result.ExpiresAt.Before(time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)) {
 		t.Fatal("expires_at parsing failed")
+	}
+}
+
+func TestProviderLoginSupportsInsecureSkipVerify(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/webapi/auth.cgi":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"sid":"sid-1"}}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("parse server url: %v", err)
+	}
+	port, err := strconv.Atoi(parsed.Port())
+	if err != nil {
+		t.Fatalf("parse server port: %v", err)
+	}
+
+	provider := NewProvider(Config{
+		Host:      parsed.Hostname(),
+		Port:      port,
+		HTTPS:     true,
+		Account:   "worker",
+		Password:  "secret",
+		SharePath: "/DigiDocs",
+	})
+	if err := provider.login(context.Background()); err == nil {
+		t.Fatal("expected TLS verification error")
+	}
+
+	provider = NewProvider(Config{
+		Host:               parsed.Hostname(),
+		Port:               port,
+		HTTPS:              true,
+		InsecureSkipVerify: true,
+		Account:            "worker",
+		Password:           "secret",
+		SharePath:          "/DigiDocs",
+	})
+	if err := provider.login(context.Background()); err != nil {
+		t.Fatalf("expected login success with insecure skip verify: %v", err)
 	}
 }
