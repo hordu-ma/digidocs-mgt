@@ -558,6 +558,139 @@ func TestAssistant_ListRequests_WithFilters(t *testing.T) {
 	}
 }
 
+func TestAssistant_AskConversationFlow_PersistsMessages(t *testing.T) {
+	handler, token := testServer(t)
+
+	queueRec := httptest.NewRecorder()
+	handler.ServeHTTP(queueRec, authedRequest("POST", "/api/v1/assistant/ask", jsonBody(map[string]any{
+		"question": "请总结课题状态",
+		"scope": map[string]any{
+			"project_id": "project-1",
+		},
+	}), token))
+	if queueRec.Code != http.StatusOK {
+		t.Fatalf("queue status = %d, want 200; body = %s", queueRec.Code, queueRec.Body.String())
+	}
+
+	queueResult := parseResponse(t, queueRec)
+	queueData, _ := queueResult["data"].(map[string]any)
+	requestID, _ := queueData["request_id"].(string)
+	conversationID, _ := queueData["conversation_id"].(string)
+	if requestID == "" || conversationID == "" {
+		t.Fatalf("expected request_id and conversation_id, got %#v", queueData)
+	}
+
+	callbackRec := httptest.NewRecorder()
+	handler.ServeHTTP(callbackRec, workerRequest("POST", "/api/v1/internal/worker-results", jsonBody(map[string]any{
+		"request_id": requestID,
+		"status":     "completed",
+		"output": map[string]any{
+			"answer":     "这是第一轮回答",
+			"model":      "openclaw/default",
+			"request_id": "chatcmpl_conv_1",
+		},
+	})))
+	if callbackRec.Code != http.StatusOK {
+		t.Fatalf("callback status = %d, want 200; body = %s", callbackRec.Code, callbackRec.Body.String())
+	}
+
+	convRec := httptest.NewRecorder()
+	handler.ServeHTTP(convRec, authedRequest("GET", "/api/v1/assistant/conversations?project_id=project-1", nil, token))
+	if convRec.Code != http.StatusOK {
+		t.Fatalf("conversation list status = %d, want 200; body = %s", convRec.Code, convRec.Body.String())
+	}
+	convResult := parseResponse(t, convRec)
+	conversations, _ := convResult["data"].([]any)
+	if len(conversations) != 1 {
+		t.Fatalf("expected 1 conversation, got %#v", convResult["data"])
+	}
+
+	msgRec := httptest.NewRecorder()
+	handler.ServeHTTP(msgRec, authedRequest("GET", "/api/v1/assistant/conversations/"+conversationID+"/messages", nil, token))
+	if msgRec.Code != http.StatusOK {
+		t.Fatalf("message list status = %d, want 200; body = %s", msgRec.Code, msgRec.Body.String())
+	}
+	msgResult := parseResponse(t, msgRec)
+	items, _ := msgResult["data"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("expected 2 messages, got %#v", msgResult["data"])
+	}
+	first, _ := items[0].(map[string]any)
+	second, _ := items[1].(map[string]any)
+	if first["role"] != "user" || second["role"] != "assistant" {
+		t.Fatalf("unexpected roles: %#v", msgResult["data"])
+	}
+}
+
+func TestAssistant_AskConversationFollowup_EmbedsMemory(t *testing.T) {
+	handler, token := testServer(t)
+
+	firstRec := httptest.NewRecorder()
+	handler.ServeHTTP(firstRec, authedRequest("POST", "/api/v1/assistant/ask", jsonBody(map[string]any{
+		"question": "请先总结一次",
+		"scope": map[string]any{
+			"project_id": "project-1",
+		},
+	}), token))
+	firstResult := parseResponse(t, firstRec)
+	firstData, _ := firstResult["data"].(map[string]any)
+	firstRequestID, _ := firstData["request_id"].(string)
+	conversationID, _ := firstData["conversation_id"].(string)
+
+	callbackRec := httptest.NewRecorder()
+	handler.ServeHTTP(callbackRec, workerRequest("POST", "/api/v1/internal/worker-results", jsonBody(map[string]any{
+		"request_id": firstRequestID,
+		"status":     "completed",
+		"output": map[string]any{
+			"answer": "这是上一轮回答",
+		},
+	})))
+
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, authedRequest("POST", "/api/v1/assistant/ask", jsonBody(map[string]any{
+		"conversation_id": conversationID,
+		"question":        "继续追问上一轮内容",
+	}), token))
+	if secondRec.Code != http.StatusOK {
+		t.Fatalf("second ask status = %d, want 200; body = %s", secondRec.Code, secondRec.Body.String())
+	}
+	secondResult := parseResponse(t, secondRec)
+	secondData, _ := secondResult["data"].(map[string]any)
+	secondRequestID, _ := secondData["request_id"].(string)
+
+	pollRec := httptest.NewRecorder()
+	handler.ServeHTTP(pollRec, workerRequest("GET", "/api/v1/internal/poll-tasks", nil))
+	if pollRec.Code != http.StatusOK {
+		t.Fatalf("poll status = %d, want 200; body = %s", pollRec.Code, pollRec.Body.String())
+	}
+	pollResult := parseResponse(t, pollRec)
+	items, _ := pollResult["data"].([]any)
+	if len(items) == 0 {
+		t.Fatal("expected pending task")
+	}
+	var taskPayload map[string]any
+	for _, raw := range items {
+		item, _ := raw.(map[string]any)
+		if item["request_id"] == secondRequestID {
+			taskPayload = item
+			break
+		}
+	}
+	if taskPayload == nil {
+		t.Fatalf("expected task for request_id=%s, got %#v", secondRequestID, items)
+	}
+	payload, _ := taskPayload["payload"].(map[string]any)
+	memory, _ := payload["memory"].(map[string]any)
+	recentMessages, _ := memory["recent_messages"].([]any)
+	memorySources, _ := payload["memory_sources"].([]any)
+	if len(recentMessages) == 0 {
+		t.Fatalf("expected recent_messages in memory payload, got %#v", payload["memory"])
+	}
+	if len(memorySources) == 0 {
+		t.Fatalf("expected memory_sources in payload, got %#v", payload)
+	}
+}
+
 // --- Handovers ---
 
 func TestHandovers_List(t *testing.T) {

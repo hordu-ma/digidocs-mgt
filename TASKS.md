@@ -313,6 +313,13 @@
   - `DocumentsView` 改为团队空间 / 课题 / 目录 / 当前责任人选择器，补齐 `current_owner_id` 提交
   - `DocumentDetailView` 转交流程改为成员选择，不再手填用户 UUID
   - `HandoversView` 补齐交接单管理弹窗、交接清单编辑、确认/完成/取消动作闭环
+- 完成业务侧 AI 记忆架构（一期）
+  - 新增 `assistant_conversations`、`assistant_conversation_messages` 持久化模型和 `assistant_requests.conversation_id`
+  - `POST /api/v1/assistant/ask` 兼容 `conversation_id`，首次提问可自动创建会话
+  - 新增会话列表、会话详情、消息列表接口
+  - Go 侧新增显式记忆装配：最近会话消息、同 scope 历史回答、已确认建议
+  - Worker 继续只消费业务侧显式上下文，不引入宿主环境隐式记忆
+  - `AssistantView` 改为“会话 + 追问”模式，并展示记忆来源提示
 
 ## 进行中
 
@@ -334,27 +341,6 @@
 - ~~增加更完整的审计事件过滤条件与统计聚合~~ ✅ 已完成（过滤条件已补齐，统计聚合待后续细化）
 - ~~增加 dashboard 聚合相关基础测试~~ ✅ 已完成
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
-- 增加业务侧 AI 记忆架构（一期）
-  - 目标：让 OpenClaw 保持无隐式环境记忆，仅消费本系统按 `scope` 装配的显式记忆，避免 p14s 个人环境 `soul.md` 等全局上下文污染业务结果
-  - 记忆分层：
-    - 短期记忆：当前会话最近若干轮问答与回答
-    - 中期记忆：当前 `project/document/handover` 范围内的历史请求、已生成建议、已确认建议
-    - 长期记忆：仅允许人工确认后的建议、摘要结论或后续沉淀的项目知识进入长期记忆，不直接继承 OpenClaw 宿主环境记忆
-  - 数据模型：新增 `assistant_conversations`、`assistant_conversation_messages` 两张表；为会话记录 `scope_type`、`scope_id`、`created_by`、`last_message_at`、`archived_at`
-  - 结果复用：基于现有 `assistant_requests`、`assistant_suggestions`、文档版本/流转/交接数据构建记忆装配器，不新增独立“黑盒记忆库”
-  - 上下文装配：在 `backend-go` 新增 `assistant_guard` / `assistant_memory_assembler` 等价模块，按请求范围拼装“结构化上下文 + 最近会话 + 已确认结论 + 相关业务摘要”后再交给 Worker
-  - 范围隔离：
-    - 会话必须绑定单一 `scope`，禁止跨项目自动串话
-    - `project` 级问答默认不带入无关 `document` 私有会话
-    - `document` 级问答只允许复用当前文档及所属项目的授权记忆
-  - 写入策略：
-    - 普通问答默认只写入会话消息，不自动升级为长期记忆
-    - 仅“用户确认”的建议或显式标记的结论可沉淀为可复用记忆
-    - AI 输出继续保持附属结果，不直接写主业务状态
-  - API：新增会话创建、历史列表、消息列表、继续追问接口；现有 `POST /assistant/ask` 兼容 `conversation_id`
-  - 前端：`AssistantView` 改为“会话 + 追问”模式，支持按项目/文档查看历史会话与记忆来源提示
-  - 可观测性：AI 响应保留 `source_scope`、`conversation_id`、命中的记忆摘要来源，便于审计与排查污染
-  - 验证：补充 handler/service/repository 测试，覆盖 scope 隔离、历史装配、确认后复用、跨 scope 禁止串话等关键路径
 - 增加 OpenClaw skill 复用策略（一期）
   - 目标：复用 OpenClaw 已有的无状态能力型 skills，避免在业务侧重复建设，同时禁止宿主环境型 skills 直接污染业务结果
   - 复用边界：

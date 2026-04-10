@@ -28,42 +28,105 @@ func (h AssistantHandler) Ask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	scope, _ := payload["scope"].(map[string]any)
-	projectID := stringValue(payload["project_id"])
-	documentID := stringValue(payload["document_id"])
-	if scope != nil {
-		if projectID == "" {
-			projectID = stringValue(scope["project_id"])
-		}
-		if documentID == "" {
-			documentID = stringValue(scope["document_id"])
-		}
-	}
-
-	message, err := h.service.QueueTask(
+	result, err := h.service.Ask(
 		r.Context(),
-		task.TaskTypeAssistantAsk,
-		"",
-		"",
 		payload,
 		middleware.UserIDFromContext(r.Context()),
 	)
 	if err != nil {
+		if errors.Is(err, service.ErrValidation) {
+			response.WriteError(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrNotFound) {
+			response.WriteError(w, http.StatusNotFound, "not_found", "assistant conversation not found")
+			return
+		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to queue assistant ask")
 		return
 	}
 
 	response.WriteData(w, http.StatusOK, map[string]any{
-		"request_id":   message.RequestID,
-		"question":     payload["question"],
-		"status":       "queued",
-		"answer":       "",
-		"generated_at": time.Now().UTC().Format(time.RFC3339),
-		"source_scope": map[string]any{
-			"project_id":  projectID,
-			"document_id": documentID,
-		},
+		"request_id":      result.RequestID,
+		"conversation_id": result.ConversationID,
+		"question":        result.Question,
+		"status":          result.Status,
+		"answer":          "",
+		"generated_at":    time.Now().UTC().Format(time.RFC3339),
+		"source_scope":    result.SourceScope,
+		"memory_sources":  result.MemorySources,
 	})
+}
+
+func (h AssistantHandler) CreateConversation(w http.ResponseWriter, r *http.Request) {
+	var payload map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid request body")
+		return
+	}
+
+	conversation, err := h.service.CreateConversation(
+		r.Context(),
+		extractAssistantScopePayload(payload),
+		stringValue(payload["title"]),
+		middleware.UserIDFromContext(r.Context()),
+	)
+	if err != nil {
+		if errors.Is(err, service.ErrValidation) {
+			response.WriteError(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create assistant conversation")
+		return
+	}
+	response.WriteData(w, http.StatusOK, conversation)
+}
+
+func (h AssistantHandler) ListConversations(w http.ResponseWriter, r *http.Request) {
+	scopeType := r.URL.Query().Get("scope_type")
+	if scopeType == "" {
+		if r.URL.Query().Get("document_id") != "" {
+			scopeType = "document"
+		} else if r.URL.Query().Get("project_id") != "" {
+			scopeType = "project"
+		}
+	}
+	items, err := h.service.ListConversations(r.Context(), query.AssistantConversationFilter{
+		ScopeType: scopeType,
+		ScopeID:   firstNonEmpty(r.URL.Query().Get("document_id"), r.URL.Query().Get("project_id"), r.URL.Query().Get("scope_id")),
+		CreatedBy: r.URL.Query().Get("created_by"),
+	})
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list assistant conversations")
+		return
+	}
+	response.WriteData(w, http.StatusOK, items)
+}
+
+func (h AssistantHandler) GetConversation(w http.ResponseWriter, r *http.Request) {
+	item, err := h.service.GetConversation(r.Context(), r.PathValue("conversationID"))
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.WriteError(w, http.StatusNotFound, "not_found", "assistant conversation not found")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to get assistant conversation")
+		return
+	}
+	response.WriteData(w, http.StatusOK, item)
+}
+
+func (h AssistantHandler) ListConversationMessages(w http.ResponseWriter, r *http.Request) {
+	items, err := h.service.ListConversationMessages(r.Context(), r.PathValue("conversationID"))
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.WriteError(w, http.StatusNotFound, "not_found", "assistant conversation not found")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list assistant messages")
+		return
+	}
+	response.WriteData(w, http.StatusOK, items)
 }
 
 func (h AssistantHandler) SummarizeDocument(w http.ResponseWriter, r *http.Request) {
@@ -134,13 +197,14 @@ func (h AssistantHandler) ListRequests(w http.ResponseWriter, r *http.Request) {
 	pageSize := parseIntOrDefault(r.URL.Query().Get("page_size"), 20)
 
 	items, total, err := h.service.ListRequests(r.Context(), query.AssistantRequestFilter{
-		RequestType: r.URL.Query().Get("request_type"),
-		RelatedType: r.URL.Query().Get("related_type"),
-		RelatedID:   r.URL.Query().Get("related_id"),
-		Status:      r.URL.Query().Get("status"),
-		Keyword:     r.URL.Query().Get("keyword"),
-		Page:        page,
-		PageSize:    pageSize,
+		RequestType:    r.URL.Query().Get("request_type"),
+		RelatedType:    r.URL.Query().Get("related_type"),
+		RelatedID:      r.URL.Query().Get("related_id"),
+		ConversationID: r.URL.Query().Get("conversation_id"),
+		Status:         r.URL.Query().Get("status"),
+		Keyword:        r.URL.Query().Get("keyword"),
+		Page:           page,
+		PageSize:       pageSize,
 	})
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list assistant requests")
@@ -152,6 +216,35 @@ func (h AssistantHandler) ListRequests(w http.ResponseWriter, r *http.Request) {
 		PageSize: pageSize,
 		Total:    total,
 	})
+}
+
+func extractAssistantScopePayload(payload map[string]any) map[string]any {
+	if payload == nil {
+		return nil
+	}
+	if scope, ok := payload["scope"].(map[string]any); ok {
+		return scope
+	}
+	scope := map[string]any{}
+	if projectID := stringValue(payload["project_id"]); projectID != "" {
+		scope["project_id"] = projectID
+	}
+	if documentID := stringValue(payload["document_id"]); documentID != "" {
+		scope["document_id"] = documentID
+	}
+	if len(scope) == 0 {
+		return nil
+	}
+	return scope
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func (h AssistantHandler) ListSuggestions(w http.ResponseWriter, r *http.Request) {

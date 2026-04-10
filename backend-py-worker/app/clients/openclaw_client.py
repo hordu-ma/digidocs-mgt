@@ -39,12 +39,16 @@ class OpenClawClient:
         self.timeout_seconds: int = settings.openclaw_timeout_seconds
 
     def ask(self, question: str, scope: ObjectDict, context: ObjectDict) -> ObjectDict:
+        payload = _as_object_dict(context.get("payload")) or {}
+        memory = _as_object_dict(payload.get("memory")) or {}
         prompt = [
             "请基于给定业务上下文回答问题。",
             "如果上下文不足，必须明确指出缺少哪些信息，不要编造未提供的事实。",
             f"问题：{question}",
             "范围：",
             json.dumps(scope, ensure_ascii=False, indent=2),
+            "显式记忆：",
+            json.dumps(memory, ensure_ascii=False, indent=2),
             "业务上下文：",
             json.dumps(context, ensure_ascii=False, indent=2),
         ]

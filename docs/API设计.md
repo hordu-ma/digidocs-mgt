@@ -804,9 +804,43 @@
 
 - Python Worker 通过 OpenClaw Gateway 的 OpenAI 兼容接口 `POST /v1/chat/completions` 调用 AI 能力。
 - Worker 只读取本系统暴露的受控内部上下文，不直接访问业务数据库。
+- 普通问答已进入“会话 + 追问”模式，业务侧显式装配最近会话、历史回答和已确认建议，禁止依赖 OpenClaw 宿主环境隐式记忆。
 - 当前摘要能力优先基于结构化业务上下文；若尚未提供文档正文，则结果属于“元数据级摘要”。
 - 当前正文抽取支持：`txt`、`md`、`csv`、`json`、`docx`、`pdf`。
 - 图片与扫描 PDF OCR 依赖 Worker 主机安装 `tesseract`；若缺失则返回明确错误。
+
+### 9.0 会话接口
+
+#### 9.0.1 创建会话
+
+`POST /api/v1/assistant/conversations`
+
+请求体：
+
+```json
+{
+  "title": "课题A 流转跟踪",
+  "scope": {
+    "project_id": "uuid",
+    "document_id": null
+  }
+}
+```
+
+#### 9.0.2 查询会话列表
+
+`GET /api/v1/assistant/conversations`
+
+查询参数：
+
+- `scope_type`
+- `scope_id`
+- `project_id`
+- `document_id`
+
+#### 9.0.3 查询会话消息列表
+
+`GET /api/v1/assistant/conversations/{conversation_id}/messages`
 
 ### 9.1 发起问答
 
@@ -816,6 +850,7 @@
 
 ```json
 {
+  "conversation_id": "uuid",
   "scope": {
     "project_id": "uuid",
     "document_id": null
@@ -830,6 +865,7 @@
 {
   "data": {
     "request_id": "uuid",
+    "conversation_id": "uuid",
     "question": "课题A 最近一个月有哪些文档在流转？",
     "status": "queued",
     "answer": "",
@@ -837,10 +873,22 @@
       "project_id": "uuid",
       "document_id": null
     },
+    "memory_sources": [
+      {
+        "type": "conversation_messages",
+        "count": 4
+      }
+    ],
     "generated_at": "2026-04-03T16:00:00Z"
   }
 }
 ```
+
+说明：
+
+- 首次提问可不传 `conversation_id`，后端会自动创建会话并返回；
+- 继续追问时传入 `conversation_id` 即可，若未再次传 `scope`，默认沿用会话绑定范围；
+- 会话必须绑定单一 `scope`，不允许跨项目自动串话。
 
 ### 9.1.1 查询问答任务状态
 
@@ -853,12 +901,19 @@
   "data": {
     "id": "uuid",
     "request_type": "assistant.ask",
+    "conversation_id": "uuid",
     "status": "completed",
     "question": "课题A 最近一个月有哪些文档在流转？",
     "source_scope": {
       "project_id": "uuid",
       "document_id": null
     },
+    "memory_sources": [
+      {
+        "type": "confirmed_suggestions",
+        "count": 2
+      }
+    ],
     "error_message": "",
     "output": {
       "answer": "最近一个月共有 4 份文档发生流转……"
@@ -881,6 +936,7 @@
 - `request_type`
 - `status`
 - `keyword`
+- `conversation_id`
 - `related_type`
 - `related_id`
 - `page`

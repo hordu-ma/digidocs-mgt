@@ -202,29 +202,62 @@ type AssistantSuggestionFilter struct {
 }
 
 type AssistantRequestFilter struct {
-	RequestType string
-	RelatedType string
-	RelatedID   string
-	Status      string
-	Keyword     string
-	Page        int
-	PageSize    int
+	RequestType    string
+	RelatedType    string
+	RelatedID      string
+	ConversationID string
+	Status         string
+	Keyword        string
+	Page           int
+	PageSize       int
 }
 
 type AssistantRequestItem struct {
-	ID                   string         `json:"id"`
-	RequestType          string         `json:"request_type"`
-	RelatedType          string         `json:"related_type,omitempty"`
-	RelatedID            string         `json:"related_id,omitempty"`
-	Status               string         `json:"status"`
-	Question             string         `json:"question,omitempty"`
-	SourceScope          map[string]any `json:"source_scope,omitempty"`
-	ErrorMessage         string         `json:"error_message,omitempty"`
-	Output               map[string]any `json:"output,omitempty"`
-	Model                string         `json:"model,omitempty"`
-	UpstreamRequestID    string         `json:"upstream_request_id,omitempty"`
-	Usage                map[string]any `json:"usage,omitempty"`
-	CreatedAt            string         `json:"created_at"`
-	CompletedAt          string         `json:"completed_at,omitempty"`
-	ProcessingDurationMs int64          `json:"processing_duration_ms,omitempty"`
+	ID                   string           `json:"id"`
+	RequestType          string           `json:"request_type"`
+	RelatedType          string           `json:"related_type,omitempty"`
+	RelatedID            string           `json:"related_id,omitempty"`
+	ConversationID       string           `json:"conversation_id,omitempty"`
+	Status               string           `json:"status"`
+	Question             string           `json:"question,omitempty"`
+	SourceScope          map[string]any   `json:"source_scope,omitempty"`
+	MemorySources        []map[string]any `json:"memory_sources,omitempty"`
+	ErrorMessage         string           `json:"error_message,omitempty"`
+	Output               map[string]any   `json:"output,omitempty"`
+	Model                string           `json:"model,omitempty"`
+	UpstreamRequestID    string           `json:"upstream_request_id,omitempty"`
+	Usage                map[string]any   `json:"usage,omitempty"`
+	CreatedAt            string           `json:"created_at"`
+	CompletedAt          string           `json:"completed_at,omitempty"`
+	ProcessingDurationMs int64            `json:"processing_duration_ms,omitempty"`
+}
+
+type AssistantConversationFilter struct {
+	ScopeType       string
+	ScopeID         string
+	CreatedBy       string
+	IncludeArchived bool
+}
+
+type AssistantConversationItem struct {
+	ID            string         `json:"id"`
+	ScopeType     string         `json:"scope_type"`
+	ScopeID       string         `json:"scope_id"`
+	SourceScope   map[string]any `json:"source_scope,omitempty"`
+	Title         string         `json:"title,omitempty"`
+	CreatedBy     string         `json:"created_by,omitempty"`
+	CreatedAt     string         `json:"created_at"`
+	LastMessageAt string         `json:"last_message_at,omitempty"`
+	ArchivedAt    string         `json:"archived_at,omitempty"`
+}
+
+type AssistantConversationMessageItem struct {
+	ID             string         `json:"id"`
+	ConversationID string         `json:"conversation_id"`
+	Role           string         `json:"role"`
+	Content        string         `json:"content"`
+	RequestID      string         `json:"request_id,omitempty"`
+	Metadata       map[string]any `json:"metadata,omitempty"`
+	CreatedBy      string         `json:"created_by,omitempty"`
+	CreatedAt      string         `json:"created_at"`
 }
