@@ -258,5 +258,7 @@ docker compose up -d postgres
 - 已完成前端 P1 交付收口：文档创建改为团队空间/课题/目录/责任人选择器，文档转交改为成员选择，交接页补齐创建后管理、清单编辑、确认、完成、取消闭环
 - 已完成 AI 记忆架构（一期）最小闭环：新增 Assistant 会话/消息持久化、`conversation_id` 兼容问答接口、Go 侧显式记忆装配（最近会话/历史回答/已确认建议）
 - 已完成 Assistant 前端会话化改造：助手页改为“会话列表 + 消息流 + 追问”模式，并展示 AI 响应的记忆来源提示
+- 已完成项目级 Codex skills 运行时接入：本机已安装 `ops/codex/skills/` 到 `~/.codex/skills/`，并补齐 `backend-go` / `worker` / `verify` skill 执行说明
+- 已完成 OpenClaw skill 复用策略（一期）：Worker 新增白名单 `skill_registry` / `skill_adapter`，AI 结果与会话元数据可追踪 `skill_name`、`skill_version`、`source_scope`、`memory_sources`
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

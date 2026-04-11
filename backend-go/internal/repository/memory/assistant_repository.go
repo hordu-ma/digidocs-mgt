@@ -245,6 +245,8 @@ func (r *AssistantRepository) CompleteAssistantRequest(
 				Metadata: map[string]any{
 					"status":                 result.Status,
 					"model":                  stringValue(result.Output["model"]),
+					"skill_name":             stringValue(result.Output["skill_name"]),
+					"skill_version":          stringValue(result.Output["skill_version"]),
 					"upstream_request_id":    stringValue(result.Output["request_id"]),
 					"source_scope":           extractScope(req.Payload, req.Output),
 					"memory_sources":         extractMemorySources(req.Payload),
@@ -460,6 +462,11 @@ func buildSuggestionItems(
 	items := make([]query.AssistantSuggestionItem, 0)
 	now := time.Now().UTC().Format(time.RFC3339)
 	sourceScope := stringifyScope(req.Payload)
+	if outputScope, ok := result.Output["source_scope"].(map[string]any); ok {
+		if raw, err := json.Marshal(outputScope); err == nil {
+			sourceScope = string(raw)
+		}
+	}
 
 	if text := stringValue(result.Output["summary_text"]); text != "" {
 		items = append(items, query.AssistantSuggestionItem{
@@ -571,6 +578,8 @@ func buildAssistantRequestItem(req assistantRequestRecord) query.AssistantReques
 		CompletedAt:    req.CompletedAt,
 	}
 	item.Model = stringValue(req.Output["model"])
+	item.SkillName = stringValue(req.Output["skill_name"])
+	item.SkillVersion = stringValue(req.Output["skill_version"])
 	item.UpstreamRequestID = stringValue(req.Output["request_id"])
 	if usage, ok := req.Output["usage"].(map[string]any); ok {
 		item.Usage = clonePayload(usage)

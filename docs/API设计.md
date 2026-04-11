@@ -805,6 +805,7 @@
 - Python Worker 通过 OpenClaw Gateway 的 OpenAI 兼容接口 `POST /v1/chat/completions` 调用 AI 能力。
 - Worker 只读取本系统暴露的受控内部上下文，不直接访问业务数据库。
 - 普通问答已进入“会话 + 追问”模式，业务侧显式装配最近会话、历史回答和已确认建议，禁止依赖 OpenClaw 宿主环境隐式记忆。
+- Worker 已增加 `skill_registry` / `skill_adapter`，仅允许白名单内的无状态 skill 复用，且统一只消费显式 `scope / context / memory`。
 - 当前摘要能力优先基于结构化业务上下文；若尚未提供文档正文，则结果属于“元数据级摘要”。
 - 当前正文抽取支持：`txt`、`md`、`csv`、`json`、`docx`、`pdf`。
 - 图片与扫描 PDF OCR 依赖 Worker 主机安装 `tesseract`；若缺失则返回明确错误。
@@ -855,6 +856,7 @@
     "project_id": "uuid",
     "document_id": null
   },
+  "skill_name": "answer_with_context",
   "question": "课题A 最近一个月有哪些文档在流转？"
 }
 ```
@@ -879,6 +881,8 @@
         "count": 4
       }
     ],
+    "skill_name": "answer_with_context",
+    "skill_version": "v1",
     "generated_at": "2026-04-03T16:00:00Z"
   }
 }
@@ -889,6 +893,7 @@
 - 首次提问可不传 `conversation_id`，后端会自动创建会话并返回；
 - 继续追问时传入 `conversation_id` 即可，若未再次传 `scope`，默认沿用会话绑定范围；
 - 会话必须绑定单一 `scope`，不允许跨项目自动串话。
+- `skill_name` 为可选字段；若未传，Worker 会按任务类型选取白名单中的默认 skill。
 
 ### 9.1.1 查询问答任务状态
 
@@ -915,6 +920,8 @@
       }
     ],
     "error_message": "",
+    "skill_name": "answer_with_context",
+    "skill_version": "v1",
     "output": {
       "answer": "最近一个月共有 4 份文档发生流转……"
     },
@@ -975,7 +982,8 @@
 
 ```json
 {
-  "version_id": "uuid"
+  "version_id": "uuid",
+  "skill_name": "document_summary"
 }
 ```
 
@@ -990,9 +998,21 @@
 }
 ```
 
+说明：
+
+- `skill_name` 为可选字段；若未传，Worker 会按 `document.summarize` 的白名单选取默认 skill。
+
 ### 9.3 生成交接摘要
 
 `POST /api/v1/assistant/handovers/{handover_id}/summarize`
+
+请求体（可选）：
+
+```json
+{
+  "skill_name": "handover_summary"
+}
+```
 
 ### 9.4 查询建议列表
 

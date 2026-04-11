@@ -224,6 +224,8 @@ type AssistantRequestItem struct {
 	MemorySources        []map[string]any `json:"memory_sources,omitempty"`
 	ErrorMessage         string           `json:"error_message,omitempty"`
 	Output               map[string]any   `json:"output,omitempty"`
+	SkillName            string           `json:"skill_name,omitempty"`
+	SkillVersion         string           `json:"skill_version,omitempty"`
 	Model                string           `json:"model,omitempty"`
 	UpstreamRequestID    string           `json:"upstream_request_id,omitempty"`
 	Usage                map[string]any   `json:"usage,omitempty"`

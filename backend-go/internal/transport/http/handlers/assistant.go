@@ -158,13 +158,18 @@ func (h AssistantHandler) SummarizeDocument(w http.ResponseWriter, r *http.Reque
 }
 
 func (h AssistantHandler) SummarizeHandover(w http.ResponseWriter, r *http.Request) {
+	var payload map[string]any
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+	}
+
 	handoverID := r.PathValue("handoverID")
 	message, err := h.service.QueueTask(
 		r.Context(),
 		task.TaskTypeHandoverSummarize,
 		"handover",
 		handoverID,
-		nil,
+		payload,
 		middleware.UserIDFromContext(r.Context()),
 	)
 	if err != nil {
@@ -176,6 +181,7 @@ func (h AssistantHandler) SummarizeHandover(w http.ResponseWriter, r *http.Reque
 		"handover_id": handoverID,
 		"status":      "queued",
 		"request_id":  message.RequestID,
+		"payload":     payload,
 	})
 }
 

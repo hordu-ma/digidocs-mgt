@@ -320,12 +320,18 @@
   - Go 侧新增显式记忆装配：最近会话消息、同 scope 历史回答、已确认建议
   - Worker 继续只消费业务侧显式上下文，不引入宿主环境隐式记忆
   - `AssistantView` 改为“会话 + 追问”模式，并展示记忆来源提示
+- 完成 Codex 项目技能运行时接入
+  - 已执行 `./scripts/codex/install-project-skills.sh`，项目级 skills 已安装到 `~/.codex/skills/`
+  - 已补齐 `digidocs-backend-go`、`digidocs-worker-python`、`digidocs-verify` 的执行顺序、边界与验证要求
+  - 已通过 `./scripts/codex/doctor.sh`、`./scripts/codex/report.sh`、`./scripts/codex/check-doc-sync.sh` 基础校验
+- 完成 OpenClaw skill 复用策略（一期）
+  - `backend-py-worker` 已新增 `skill_registry` / `skill_adapter`，对白名单 skill 做任务绑定、scope 校验与输出归一化
+  - `assistant_requests` / 会话消息查询已透出 `skill_name`、`skill_version` 等审计字段，无需新增数据库迁移
+  - `.env.example`、`docs/API设计.md`、`docs/项目定义与技术架构.md`、`backend-py-worker/README.md` 已同步 skill 白名单与显式上下文约束
 
 ## 进行中
 
-- Codex 项目技能运行时接入
-  - 待在本机执行 `./scripts/codex/install-project-skills.sh`
-  - 待按实际使用反馈继续补 `backend-go` / `worker` / `verify` skill 内容
+- 无
 
 ## 待办
 
@@ -341,20 +347,6 @@
 - ~~增加更完整的审计事件过滤条件与统计聚合~~ ✅ 已完成（过滤条件已补齐，统计聚合待后续细化）
 - ~~增加 dashboard 聚合相关基础测试~~ ✅ 已完成
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
-- 增加 OpenClaw skill 复用策略（一期）
-  - 目标：复用 OpenClaw 已有的无状态能力型 skills，避免在业务侧重复建设，同时禁止宿主环境型 skills 直接污染业务结果
-  - 复用边界：
-    - 允许复用：摘要模板、结构化抽取、标签建议、风险提示等仅依赖显式输入上下文的 skills
-    - 禁止直连：依赖 `soul.md`、本地知识文件、默认 persona、长期对话历史、宿主文件系统或外部工具副作用的 skills
-  - 适配层：在 `backend-py-worker` 增加 `skill_registry` / `skill_adapter` 等价模块，对业务允许调用的 skill 做白名单注册、版本固定和输入输出归一化
-  - 输入约束：所有 skill 调用统一只接收业务侧装配的 `scope`、`context`、`memory`，不得在 skill 内自行扩展访问范围
-  - 输出约束：所有 skill 输出统一映射到 `assistant_requests`、`assistant_suggestions`、会话消息或后续记忆沉淀流程，不允许绕过业务层直接写主业务状态
-  - 可审计性：记录 `skill_name`、`skill_version`、`source_scope`、`conversation_id`、命中记忆来源和调用时间，便于排查结果漂移
-  - 运行隔离：
-    - 业务系统优先使用独立 OpenClaw service identity / API key
-    - 假设/待确认：若 p14s 上现有 OpenClaw Gateway 会默认注入全局 persona 或本地技能目录，需要为业务流量单独隔离配置或实例
-  - API/配置：新增可用 skill 列表配置与服务端开关；不同业务动作显式绑定允许调用的 skill 集合
-  - 验证：补充测试覆盖 skill 白名单、非法 skill 拒绝、跨 scope 越权拦截、输出归一化与审计字段落库
 - p14s 部署准备
   - 已确认 OpenClaw Gateway 已启用 `GET /v1/models` 与 `POST /v1/chat/completions`
   - 已固化 p14s 上的 `.env`，确认 `OPENCLAW_BASE_URL` / `OPENCLAW_API_KEY` / `CALLBACK_BASE_URL`

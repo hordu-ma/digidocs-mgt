@@ -20,13 +20,18 @@ def test_handle_assistant_ask_task(monkeypatch: MonkeyPatch) -> None:
         lambda project_id: {"available": True, "scope": {"project_id": project_id}},
     )
 
-    def fake_ask(*, question: str, scope: ObjectDict, context: ObjectDict) -> ObjectDict:
-        captured["question"] = question
-        captured["scope"] = scope
+    def fake_run(task: WorkerTask, context: ObjectDict, scope: ObjectDict | None = None) -> ObjectDict:
+        captured["task"] = task
+        captured["scope"] = scope or {}
         captured["context"] = context
-        return {"answer": "这是回答"}
+        return {
+            "answer": "这是回答",
+            "skill_name": "answer_with_context",
+            "skill_version": "v1",
+            "source_scope": scope or {},
+        }
 
-    monkeypatch.setattr(dispatcher.openclaw_client, "ask", fake_ask)
+    monkeypatch.setattr(dispatcher.skill_adapter, "run", fake_run)
 
     result = dispatcher.handle_task(
         WorkerTask(
@@ -42,7 +47,6 @@ def test_handle_assistant_ask_task(monkeypatch: MonkeyPatch) -> None:
     assert result.status == "completed"
     assert result.request_id == "req-1"
     assert result.output["answer"] == "这是回答"
-    assert captured["question"] == "请总结当前文档"
     assert captured["scope"] == {
         "project_id": "00000000-0000-0000-0000-000000000020",
         "document_id": None,
@@ -85,11 +89,14 @@ def test_handle_document_summarize_returns_completed(monkeypatch: MonkeyPatch) -
         ),
     )
     monkeypatch.setattr(
-        dispatcher.openclaw_client,
-        "summarize_document",
-        lambda request_id, payload, context: {
+        dispatcher.skill_adapter,
+        "run",
+        lambda task, context, scope=None: {
             "task_type": "document.summarize",
             "summary_text": "这是测试摘要",
+            "skill_name": "document_summary",
+            "skill_version": "v1",
+            "source_scope": {"document_id": "doc-1"},
             "suggestions": [
                 {
                     "title": "AI 摘要",
@@ -113,14 +120,15 @@ def test_handle_document_summarize_returns_completed(monkeypatch: MonkeyPatch) -
     assert result.status == "completed"
     assert result.output["task_type"] == "document.summarize"
     assert result.output["summary_text"] == "这是测试摘要"
+    assert result.output["skill_name"] == "document_summary"
 
 def test_handle_generate_suggestion_openclaw_error(monkeypatch: MonkeyPatch) -> None:
     dispatcher = WorkerDispatcher()
 
     monkeypatch.setattr(
-        dispatcher.openclaw_client,
-        "generate_suggestion",
-        lambda request_id, payload, context: (_ for _ in ()).throw(OpenClawClientError("boom")),
+        dispatcher.skill_adapter,
+        "run",
+        lambda task, context, scope=None: (_ for _ in ()).throw(OpenClawClientError("boom")),
     )
 
     result = dispatcher.handle_task(

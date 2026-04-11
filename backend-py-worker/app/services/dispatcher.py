@@ -11,6 +11,7 @@ from ..services.document_text_extractor import (
     DocumentTextExtractionError,
     extract_text,
 )
+from ..services.skill_adapter import SkillAdapterError, WorkerSkillAdapter
 from ..tasks.contracts import TaskResult, WorkerTask
 
 type ObjectDict = dict[str, object]
@@ -24,6 +25,7 @@ class WorkerDispatcher:
         self.context_client: BackendContextClient = BackendContextClient()
         self.callback_client: CallbackClient = CallbackClient()
         self.poller: TaskPollerClient = TaskPollerClient()
+        self.skill_adapter: WorkerSkillAdapter = WorkerSkillAdapter(self.openclaw_client)
 
     def describe_startup(self) -> None:
         print(
@@ -52,12 +54,8 @@ class WorkerDispatcher:
             }
             context = self._build_context(task, normalized_scope)
             try:
-                answer = self.openclaw_client.ask(
-                    question=_string_value(task.payload.get("question")),
-                    scope=normalized_scope,
-                    context=context,
-                )
-            except OpenClawClientError as exc:
+                answer = self.skill_adapter.run(task, context, normalized_scope)
+            except (OpenClawClientError, SkillAdapterError) as exc:
                 return TaskResult(
                     request_id=task.request_id,
                     status="failed",
@@ -79,10 +77,8 @@ class WorkerDispatcher:
             if extracted_text:
                 context["document_text"] = extracted_text
             try:
-                output = self.openclaw_client.summarize_document(
-                    task.request_id, task.payload, context
-                )
-            except OpenClawClientError as exc:
+                output = self.skill_adapter.run(task, context)
+            except (OpenClawClientError, SkillAdapterError) as exc:
                 return TaskResult(
                     request_id=task.request_id,
                     status="failed",
@@ -99,10 +95,8 @@ class WorkerDispatcher:
         if task.task_type == "handover.summarize":
             context = self._build_context(task)
             try:
-                output = self.openclaw_client.summarize_handover(
-                    task.request_id, task.payload, context
-                )
-            except OpenClawClientError as exc:
+                output = self.skill_adapter.run(task, context)
+            except (OpenClawClientError, SkillAdapterError) as exc:
                 return TaskResult(
                     request_id=task.request_id,
                     status="failed",
@@ -117,10 +111,8 @@ class WorkerDispatcher:
         if task.task_type == "assistant.generate_suggestion":
             context = self._build_context(task)
             try:
-                output = self.openclaw_client.generate_suggestion(
-                    task.request_id, task.payload, context
-                )
-            except OpenClawClientError as exc:
+                output = self.skill_adapter.run(task, context)
+            except (OpenClawClientError, SkillAdapterError) as exc:
                 return TaskResult(
                     request_id=task.request_id,
                     status="failed",
