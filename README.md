@@ -47,6 +47,7 @@
 - [API 设计](docs/API设计.md)
 - [异步任务消息契约](docs/异步任务消息契约.md)
 - [部署准备与运行说明](docs/部署准备与运行说明.md)
+- [backend-go 核心源码学习导读](docs/backend-go核心源码学习导读.md)
 - [ADR-001 Go-Python 混合迁移方案](docs/adr/001-go-python-hybrid.md)
 - [.github 协作资产索引](.github/INDEX.md)
 
@@ -248,6 +249,7 @@ docker compose up -d postgres
 - 已完成 P1 AI 持久化闭环首轮修复（`assistant_requests` 落库、Worker 回调幂等更新、`assistant_suggestions` 查询/确认/忽略真实接线）
 - 已完成 P2 持久化任务消费与 AI 结果展示首轮修复（PostgreSQL 任务轮询、摘要结果回写、文档详情页 AI 建议展示）
 - 已补 `.github/INDEX.md` 与 GitHub 协作资产入口校验
+- 已新增 `docs/backend-go核心源码学习导读.md`，面向 Go 初学者解释 backend-go 核心文件中的典型函数与关键代码块
 - 已完成 p14s/Linux compose 首轮部署适配（Worker 宿主机 OpenClaw 访问改用 `host-gateway`）
 - 已修复 `backend-go` 运行镜像未携带 `migrations/` 导致容器内自动迁移失效的问题
 - 已完成 Assistant 问答历史列表 / 筛选与 Markdown 结果展示首轮接线
