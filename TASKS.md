@@ -332,7 +332,14 @@
 
 ## 进行中
 
-- 无
+- 部署验收收口（2026-04-12）
+  - 已确认 p14s 当前容器形态可运行：`backend-go / frontend / backend-py-worker / postgres` 存活，`worker -> OpenClaw GET /v1/models` 可达
+  - 已确认核心业务链路通过：`healthz / auth/login / documents / dashboard/overview / handovers / audit-events / audit-events/summary`
+  - 已确认目标群晖 `SYNO.API.Info` 可达，且 `SYNO.API.Auth` 需走 `webapi/entry.cgi`；当前 provider / smoke 仍使用 `webapi/auth.cgi`，登录阶段超时
+  - 已临时手工补齐数据库 migration 3（`assistant_conversations` / `assistant_conversation_messages` / `assistant_requests.conversation_id`）
+  - 阻塞：`backend-go` 运行镜像仍缺 `003_assistant_conversations.sql`，Docker Hub 拉取 `debian:bookworm-slim` 超时，导致最新镜像未成功重建
+  - 阻塞：切换 `STORAGE_BACKEND=synology` 后，版本上传链路仍返回 500，待修正 DSM 登录入口后复验
+  - 阻塞：`GET /api/v1/assistant/requests/{id}` 仍返回 500，待在最新镜像下复验并定位运行二进制与仓库源码偏差
 
 ## 待办
 
@@ -348,19 +355,14 @@
 - ~~增加更完整的审计事件过滤条件与统计聚合~~ ✅ 已完成（过滤条件已补齐，统计聚合待后续细化）
 - ~~增加 dashboard 聚合相关基础测试~~ ✅ 已完成
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
-- p14s 部署准备
-  - 已确认 OpenClaw Gateway 已启用 `GET /v1/models` 与 `POST /v1/chat/completions`
-  - 已固化 p14s 上的 `.env`，确认 `OPENCLAW_BASE_URL` / `OPENCLAW_API_KEY` / `CALLBACK_BASE_URL`
-  - 选择部署方式：`docker compose` 或 `systemd + 反向代理`
-  - 配置 TLS / 反向代理 / 防火墙，仅暴露前端入口
-  - 进行一次更正式的长驻形态端到端烟测（当前 `make smoke` 已覆盖现有文档版本文件链路与 AI 闭环）
-- 群晖 DS925+ 部署准备
-  - 创建 `DigiDocs` 共享目录与最小权限服务账号
-  - 验证 DSM / File Station API 连通性与证书策略
-  - 确认 PostgreSQL 运行位置、备份频率、恢复方式
-  - 确认 p14s 与群晖之间网络可达与地址固定策略
-  - 在真实环境执行 `RUN_SYNOLOGY_PREFLIGHT=1 make smoke`
-  - 进行一次真实上传 / 下载 / 创建目录 / 共享链接烟测
+- 部署验收下一步
+  - 修正 `SynologyStorageProvider` 与 `scripts/codex/smoke-local.sh` 的 DSM 登录入口，按 `SYNO.API.Info` 返回的 `path` 兼容 `entry.cgi`
+  - 在网络恢复后重建 `backend-go` 镜像，确认容器内携带 `003_assistant_conversations.sql`
+  - 以最新镜像重新启动 `backend-go`，确认自动迁移与运行时代码一致
+  - 重新执行 `STRICT_SMOKE=1 RUN_SYNOLOGY_PREFLIGHT=1 make smoke`
+  - 复验 `documents/{id}/versions` 上传、下载、预览闭环
+  - 复验 `GET /api/v1/assistant/requests/{id}` 与 Assistant 历史查询
+  - 完成一次前端人工联调，并记录最终 TLS / 反向代理 / 防火墙部署方式
 - ~~增加群晖 NAS 适配器~~ ✅ 已完成
 - ~~增加基础测试~~ ✅ 已完成
 - ~~增加更细粒度的 smoke test 和分层验证矩阵~~ ✅ 已完成（smoke-local.sh 已覆盖业务端点）

@@ -262,5 +262,9 @@ docker compose up -d postgres
 - 已完成 Assistant 前端会话化改造：助手页改为“会话列表 + 消息流 + 追问”模式，并展示 AI 响应的记忆来源提示
 - 已完成项目级 Codex skills 运行时接入：本机已安装 `ops/codex/skills/` 到 `~/.codex/skills/`，并补齐 `backend-go` / `worker` / `verify` skill 执行说明
 - 已完成 OpenClaw skill 复用策略（一期）：Worker 新增白名单 `skill_registry` / `skill_adapter`，AI 结果与会话元数据可追踪 `skill_name`、`skill_version`、`source_scope`、`memory_sources`
+- 已完成 2026-04-12 首轮部署验收排查：p14s 上 `backend-go / frontend / worker / postgres` 容器可运行，`worker -> OpenClaw GET /v1/models` 可达，`healthz / auth / documents / dashboard / handovers / audit-events` 核心链路通过
+- 已定位群晖前置验收阻塞：目标 DSM 的 `SYNO.API.Auth` 实际需走 `webapi/entry.cgi`，当前 `SynologyStorageProvider` 与 `make smoke` 仍使用 `webapi/auth.cgi`，导致登录超时、群晖预检失败，并进一步阻塞 Synology 后端下的版本上传验收
+- 已定位运行镜像与迁移状态偏差：运行中的 `backend-go` 镜像仍未携带 `003_assistant_conversations.sql`，本次已临时手工补齐数据库 migration 3；但受 Docker Hub 基础镜像拉取超时影响，最新镜像尚未成功重建，`GET /api/v1/assistant/requests/{id}` 仍需在最新镜像下复验
+- 当前下一步聚焦：修正群晖登录入口兼容、成功重建 `backend-go` 镜像，并重新执行 `STRICT_SMOKE=1 RUN_SYNOLOGY_PREFLIGHT=1 make smoke`
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。
