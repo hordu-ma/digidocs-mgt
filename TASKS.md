@@ -345,7 +345,8 @@
   - 已确认 Assistant 闭环恢复：`STRICT_SMOKE=1 RUN_SYNOLOGY_PREFLIGHT=1 make smoke` 中 `assistant.ask -> completed` 已通过
   - 已修复 Synology provider：目录已存在时不再因 `SYNO.FileStation.CreateFolder` 返回 400 而中断版本上传
   - 已修复 `scripts/codex/smoke-local.sh` 的 `healthz` 误报逻辑，宿主机直连成功时不再重复报 unreachable
-  - 当前剩余人工项：补一次前端页面人工联调，并记录最终 TLS / 反向代理 / 防火墙部署方式
+  - 已重建 `frontend` 运行容器到当前仓库版本，并完成一轮前端无头联调：已覆盖 `dashboard / documents / document-detail / handovers / assistant` 页面主路径与助手问答提交
+  - 已在 `docs/部署准备与运行说明.md` 记录最终 TLS / 反向代理 / 防火墙部署口径
 
 ## 待办
 
@@ -362,7 +363,6 @@
 - ~~增加 dashboard 聚合相关基础测试~~ ✅ 已完成
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
 - 部署验收下一步
-  - 完成一次前端人工联调，并记录最终 TLS / 反向代理 / 防火墙部署方式
   - 视目标机器实际运维方式，把当前宿主机 `table 52 -> throw` 路由修正沉淀为持久化脚本或系统配置
 - ~~增加群晖 NAS 适配器~~ ✅ 已完成
 - ~~增加基础测试~~ ✅ 已完成

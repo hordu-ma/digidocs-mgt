@@ -270,6 +270,8 @@ docker compose up -d postgres
 - 已完成 2026-04-13 第三轮部署验收修复：宿主机 `table 52` 已对 Docker / 局域网网段改为 `throw`，`backend-go / backend-py-worker` 已重建到正确环境，`assistant.ask -> completed` 与版本上传/下载/预览严格 smoke 已恢复通过
 - 已修复 Synology provider 目录幂等问题：版本上传前父目录已存在时，不再因 DSM `CreateFolder` 返回 400 而中断
 - 已修复 `make smoke` 的 `healthz` 误报逻辑，宿主机直连成功时不再重复报 unreachable
-- 当前下一步聚焦：完成一次前端人工联调，并把宿主机 `table 52` 路由修正沉淀为持久化运维配置
+- 已重建 `frontend` 运行容器到当前仓库版本，并完成一轮前端无头联调：已覆盖总览、文档列表、文档详情、交接页、助手页与问答提交主路径
+- 已记录最终部署口径：TLS 终止在应用层反向代理，前端/后端容器仅走内网转发；群晖 `5001/5432` 仅对应用层主机放通
+- 当前下一步聚焦：把宿主机 `table 52` 路由修正沉淀为持久化运维配置
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。
