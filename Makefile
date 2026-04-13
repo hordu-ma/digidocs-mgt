@@ -1,4 +1,4 @@
-.PHONY: doctor verify verify-go verify-worker verify-frontend check-doc-sync install-project-skills install-hooks smoke status
+.PHONY: doctor verify verify-go verify-worker verify-frontend check-doc-sync install-project-skills install-hooks install-persistent-routing smoke status
 
 doctor:
 	./scripts/codex/doctor.sh
@@ -28,3 +28,6 @@ install-project-skills:
 
 install-hooks:
 	./scripts/codex/install-hooks.sh
+
+install-persistent-routing:
+	./scripts/codex/install-persistent-routing.sh

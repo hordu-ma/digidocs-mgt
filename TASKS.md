@@ -347,6 +347,8 @@
   - 已修复 `scripts/codex/smoke-local.sh` 的 `healthz` 误报逻辑，宿主机直连成功时不再重复报 unreachable
   - 已重建 `frontend` 运行容器到当前仓库版本，并完成一轮前端无头联调：已覆盖 `dashboard / documents / document-detail / handovers / assistant` 页面主路径与助手问答提交
   - 已在 `docs/部署准备与运行说明.md` 记录最终 TLS / 反向代理 / 防火墙部署口径
+  - 已新增并安装持久化运维资产：`ops/systemd/digidocs-route-fix.sh`、`ops/systemd/tailscaled-digidocs-routing.conf`、`scripts/codex/install-persistent-routing.sh`
+  - 已在当前机器验证 `systemctl restart tailscaled` 后 `table 52` 仍保持 `throw 172.17.0.0/16`、`throw 172.18.0.0/16`、`throw 192.168.1.0/24`
 
 ## 待办
 
@@ -363,7 +365,7 @@
 - ~~增加 dashboard 聚合相关基础测试~~ ✅ 已完成
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
 - 部署验收下一步
-  - 视目标机器实际运维方式，把当前宿主机 `table 52 -> throw` 路由修正沉淀为持久化脚本或系统配置
+  - 在目标正式主机执行 `./scripts/codex/install-persistent-routing.sh` 并复验一次业务联调，确认正式环境与当前 p14s 结果一致
 - ~~增加群晖 NAS 适配器~~ ✅ 已完成
 - ~~增加基础测试~~ ✅ 已完成
 - ~~增加更细粒度的 smoke test 和分层验证矩阵~~ ✅ 已完成（smoke-local.sh 已覆盖业务端点）

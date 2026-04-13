@@ -29,6 +29,10 @@ tasks_phase="$(extract_tasks_phase)"
 project_skill_count="$(find ops/codex/skills -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
 installed_skill_count="$(find "${HOME}/.codex/skills" -mindepth 1 -maxdepth 1 -type l -lname "${ROOT_DIR}/ops/codex/skills/*" 2>/dev/null | wc -l | tr -d ' ')"
 hooks_path="$(git config --get core.hooksPath 2>/dev/null || true)"
+persistent_routing="absent"
+if [[ -f /etc/systemd/system/tailscaled.service.d/digidocs-routing.conf ]]; then
+  persistent_routing="installed"
+fi
 
 printf 'repo: %s\n' "$ROOT_DIR"
 printf 'branch: %s\n' "${current_branch:-<detached>}"
@@ -37,5 +41,6 @@ printf 'tasks_phase: %s\n' "${tasks_phase:-<missing>}"
 printf 'project_skill_count: %s\n' "$project_skill_count"
 printf 'installed_project_skill_count: %s\n' "$installed_skill_count"
 printf 'git_hooks_path: %s\n' "${hooks_path:-<default>}"
+printf 'persistent_routing: %s\n' "$persistent_routing"
 printf 'github_index: %s\n' ".github/INDEX.md"
 printf 'verify_workflow: %s\n' ".github/workflows/verify.yml"

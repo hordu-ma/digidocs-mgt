@@ -44,10 +44,13 @@ ops/codex/skills/index.yaml
 Makefile
 scripts/codex/check-doc-sync.sh
 scripts/codex/install-hooks.sh
+scripts/codex/install-persistent-routing.sh
 scripts/codex/install-project-skills.sh
 scripts/codex/doctor.sh
 scripts/codex/report.sh
 scripts/codex/smoke-local.sh
+ops/systemd/digidocs-route-fix.sh
+ops/systemd/tailscaled-digidocs-routing.conf
 .github/INDEX.md
 .github/workflows/verify.yml
 .githooks/pre-commit

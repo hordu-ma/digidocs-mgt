@@ -174,6 +174,7 @@ make status
 make smoke
 make verify
 ./scripts/codex/install-hooks.sh
+./scripts/codex/install-persistent-routing.sh
 ./scripts/codex/install-project-skills.sh
 ```
 
@@ -183,6 +184,7 @@ make verify
 - `ops/codex/skills/index.yaml`：技能索引
 - `scripts/codex/install-project-skills.sh`：把项目技能安装到 `~/.codex/skills/`
 - `scripts/codex/install-hooks.sh`：启用仓库内 `pre-commit` / `pre-push` hooks
+- `scripts/codex/install-persistent-routing.sh`：为 Linux 宿主机安装 `tailscaled` 持久化路由修正
 - `scripts/codex/doctor.sh`：环境与协作资产体检
 - `scripts/codex/check-doc-sync.sh`：检查 `README.md` / `TASKS.md` / `AGENTS.md` 的阶段与协作约束一致性
 - `scripts/codex/report.sh`：输出当前分支、阶段、技能安装与 hooks 状态
@@ -272,6 +274,7 @@ docker compose up -d postgres
 - 已修复 `make smoke` 的 `healthz` 误报逻辑，宿主机直连成功时不再重复报 unreachable
 - 已重建 `frontend` 运行容器到当前仓库版本，并完成一轮前端无头联调：已覆盖总览、文档列表、文档详情、交接页、助手页与问答提交主路径
 - 已记录最终部署口径：TLS 终止在应用层反向代理，前端/后端容器仅走内网转发；群晖 `5001/5432` 仅对应用层主机放通
-- 当前下一步聚焦：把宿主机 `table 52` 路由修正沉淀为持久化运维配置
+- 已完成宿主机持久化运维配置安装与验证：`install-persistent-routing.sh`、`digidocs-route-fix.sh` 与 `tailscaled` drop-in 已在当前机器落地，`systemctl restart tailscaled` 后 `table 52` 仍保持 `throw 172.17/172.18/192.168.1`
+- 当前下一步聚焦：把当前 Linux 单机运维方案复制到目标正式主机，并复验一次正式环境联调
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。
