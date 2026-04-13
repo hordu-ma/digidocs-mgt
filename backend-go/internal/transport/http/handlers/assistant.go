@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -42,6 +43,7 @@ func (h AssistantHandler) Ask(w http.ResponseWriter, r *http.Request) {
 			response.WriteError(w, http.StatusNotFound, "not_found", "assistant conversation not found")
 			return
 		}
+		log.Printf("[assistant] ask failed actor=%s err=%v", middleware.UserIDFromContext(r.Context()), err)
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to queue assistant ask")
 		return
 	}

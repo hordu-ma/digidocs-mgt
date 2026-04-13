@@ -100,8 +100,9 @@ func (s DocumentService) CreateWithFirstVersion(
 
 	objectKey := fmt.Sprintf("documents/%s/%s", documentID, fileName)
 	uploadResult, err := s.storage.PutObject(ctx, storage.PutObjectInput{
-		ObjectKey: objectKey,
-		Reader:    file,
+		ObjectKey:   objectKey,
+		Reader:      file,
+		CreatePaths: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("file upload failed: %w", err)

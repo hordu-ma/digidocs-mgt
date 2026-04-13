@@ -37,6 +37,8 @@ services:
       SYNOLOGY_SHARE_PATH: ${SYNOLOGY_SHARE_PATH:-/DigiDocs}
     ports:
       - "${BACKEND_GO_PORT:-18081}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - postgres
     profiles:

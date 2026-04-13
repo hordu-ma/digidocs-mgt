@@ -46,8 +46,9 @@ func (s VersionService) UploadAndCreateVersion(
 
 	objectKey := fmt.Sprintf("documents/%s/%s", documentID, fileName)
 	result, err := s.storage.PutObject(ctx, storage.PutObjectInput{
-		ObjectKey: objectKey,
-		Reader:    reader,
+		ObjectKey:   objectKey,
+		Reader:      reader,
+		CreatePaths: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("upload failed: %w", err)

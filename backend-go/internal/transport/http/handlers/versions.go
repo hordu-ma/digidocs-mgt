@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"digidocs-mgt/backend-go/internal/service"
@@ -46,6 +47,7 @@ func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		middleware.UserIDFromContext(r.Context()),
 	)
 	if err != nil {
+		log.Printf("[versions] upload failed document=%s actor=%s err=%v", r.PathValue("documentID"), middleware.UserIDFromContext(r.Context()), err)
 		if errors.Is(err, service.ErrValidation) {
 			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
 			return

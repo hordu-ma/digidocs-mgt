@@ -43,7 +43,9 @@ func newTestProvider(t *testing.T, handler http.HandlerFunc) *Provider {
 func TestProviderPutObjectUploadsMultipartFile(t *testing.T) {
 	provider := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/webapi/auth.cgi":
+		case r.URL.Path == "/webapi/query.cgi":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"SYNO.API.Auth":{"path":"entry.cgi"}}}`))
+		case r.URL.Path == "/webapi/entry.cgi" && r.Method == http.MethodGet && r.URL.Query().Get("api") == "SYNO.API.Auth":
 			_, _ = w.Write([]byte(`{"success":true,"data":{"sid":"sid-1"}}`))
 		case r.URL.Path == "/webapi/entry.cgi" && r.Method == http.MethodPost:
 			if err := r.ParseMultipartForm(1 << 20); err != nil {
@@ -102,7 +104,9 @@ func TestProviderListDirReauthsOnExpiredSession(t *testing.T) {
 	loginCount := 0
 	provider := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/webapi/auth.cgi":
+		case r.URL.Path == "/webapi/query.cgi":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"SYNO.API.Auth":{"path":"webapi/entry.cgi"}}}`))
+		case r.URL.Path == "/webapi/entry.cgi" && r.URL.Query().Get("api") == "SYNO.API.Auth":
 			loginCount++
 			sid := "sid-1"
 			if loginCount > 1 {
@@ -145,7 +149,9 @@ func TestProviderListDirReauthsOnExpiredSession(t *testing.T) {
 func TestProviderGetObjectReturnsStream(t *testing.T) {
 	provider := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/webapi/auth.cgi":
+		case r.URL.Path == "/webapi/query.cgi":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"SYNO.API.Auth":{"path":"webapi/entry.cgi"}}}`))
+		case r.URL.Path == "/webapi/entry.cgi" && r.URL.Query().Get("api") == "SYNO.API.Auth":
 			_, _ = w.Write([]byte(`{"success":true,"data":{"sid":"sid-1"}}`))
 		case r.URL.Path == "/webapi/entry.cgi":
 			if got := r.URL.Query().Get("api"); got != "SYNO.FileStation.Download" {
@@ -179,7 +185,9 @@ func TestProviderGetObjectReturnsStream(t *testing.T) {
 func TestProviderCreateShareLinkParsesExpireDate(t *testing.T) {
 	provider := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/webapi/auth.cgi":
+		case r.URL.Path == "/webapi/query.cgi":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"SYNO.API.Auth":{"path":"webapi/entry.cgi"}}}`))
+		case r.URL.Path == "/webapi/entry.cgi" && r.URL.Query().Get("api") == "SYNO.API.Auth":
 			_, _ = w.Write([]byte(`{"success":true,"data":{"sid":"sid-1"}}`))
 		case r.URL.Path == "/webapi/entry.cgi":
 			if got := r.URL.Query().Get("method"); got != "create" {
@@ -215,7 +223,9 @@ func TestProviderCreateShareLinkParsesExpireDate(t *testing.T) {
 func TestProviderLoginSupportsInsecureSkipVerify(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/webapi/auth.cgi":
+		case r.URL.Path == "/webapi/query.cgi":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"SYNO.API.Auth":{"path":"webapi/entry.cgi"}}}`))
+		case r.URL.Path == "/webapi/entry.cgi" && r.URL.Query().Get("api") == "SYNO.API.Auth":
 			_, _ = w.Write([]byte(`{"success":true,"data":{"sid":"sid-1"}}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
@@ -255,5 +265,32 @@ func TestProviderLoginSupportsInsecureSkipVerify(t *testing.T) {
 	})
 	if err := provider.login(context.Background()); err != nil {
 		t.Fatalf("expected login success with insecure skip verify: %v", err)
+	}
+}
+
+func TestProviderLoginFallsBackToAuthCGIWhenInfoPathUnavailable(t *testing.T) {
+	entryAttempts := 0
+	provider := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/webapi/query.cgi":
+			_, _ = w.Write([]byte(`{"success":false,"error":{"code":999}}`))
+		case r.URL.Path == "/webapi/entry.cgi":
+			entryAttempts++
+			_, _ = w.Write([]byte(`{"success":false,"error":{"code":400}}`))
+		case r.URL.Path == "/webapi/auth.cgi":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"sid":"sid-fallback"}}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	if err := provider.login(context.Background()); err != nil {
+		t.Fatalf("expected fallback login success: %v", err)
+	}
+	if provider.getSID() != "sid-fallback" {
+		t.Fatalf("sid = %s, want sid-fallback", provider.getSID())
+	}
+	if entryAttempts == 0 {
+		t.Fatal("expected entry.cgi to be tried before auth.cgi fallback")
 	}
 }

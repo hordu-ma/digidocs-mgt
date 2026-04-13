@@ -333,13 +333,16 @@
 ## 进行中
 
 - 部署验收收口（2026-04-12）
-  - 已确认 p14s 当前容器形态可运行：`backend-go / frontend / backend-py-worker / postgres` 存活，`worker -> OpenClaw GET /v1/models` 可达
+  - 已确认 p14s 当前容器形态可运行：`backend-go / frontend / backend-py-worker / postgres` 存活
   - 已确认核心业务链路通过：`healthz / auth/login / documents / dashboard/overview / handovers / audit-events / audit-events/summary`
-  - 已确认目标群晖 `SYNO.API.Info` 可达，且 `SYNO.API.Auth` 需走 `webapi/entry.cgi`；当前 provider / smoke 仍使用 `webapi/auth.cgi`，登录阶段超时
-  - 已临时手工补齐数据库 migration 3（`assistant_conversations` / `assistant_conversation_messages` / `assistant_requests.conversation_id`）
-  - 阻塞：`backend-go` 运行镜像仍缺 `003_assistant_conversations.sql`，Docker Hub 拉取 `debian:bookworm-slim` 超时，导致最新镜像未成功重建
-  - 阻塞：切换 `STORAGE_BACKEND=synology` 后，版本上传链路仍返回 500，待修正 DSM 登录入口后复验
-  - 阻塞：`GET /api/v1/assistant/requests/{id}` 仍返回 500，待在最新镜像下复验并定位运行二进制与仓库源码偏差
+  - 已确认目标群晖 `SYNO.API.Info` 可达，且 `SYNO.API.Auth` 需走 `webapi/entry.cgi`；provider 与 smoke 已按 `SYNO.API.Info.path` 做入口兼容
+  - 已确认 `backend-go` 最新运行镜像携带 `003_assistant_conversations.sql`，数据库 `schema_migrations` 已落到 `003`
+  - 已修复 `POST /api/v1/assistant/ask` 的 PostgreSQL enum 过滤报错；当前 `assistant.ask` 可正常返回 `request_id`，`GET /api/v1/assistant/requests/{id}` 返回 200/pending
+  - 已修复 `scripts/codex/smoke-local.sh`：命令行环境变量优先于 `.env`，Synology preflight 固定走宿主机直连，`true/false` 布尔值可直接识别
+  - 已确认 `RUN_SYNOLOGY_PREFLIGHT=1 make smoke` 的 DSM 前置验收通过：登录、建目录、上传、列目录、分享链接、下载、清理均通过
+  - 阻塞：`documents/{id}/versions` 上传仍返回 500；日志显示容器侧到群晖链路在当前机器上仍受宿主机 Tailscale / Docker 路由影响
+  - 阻塞：Assistant 请求在当前机器上停留 `pending`；已确认 `backend-py-worker` 无法访问 `host.docker.internal`，当前环境下 `worker -> OpenClaw` 不可达
+  - 阻塞：宿主机 `ip route show table 52` 仍把 `172.17.0.0/16`、`172.18.0.0/16` 指向 `tailscale0`；当前无 sudo 密码，无法直接修复主机级路由/防火墙
 
 ## 待办
 
@@ -356,12 +359,10 @@
 - ~~增加 dashboard 聚合相关基础测试~~ ✅ 已完成
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
 - 部署验收下一步
-  - 修正 `SynologyStorageProvider` 与 `scripts/codex/smoke-local.sh` 的 DSM 登录入口，按 `SYNO.API.Info` 返回的 `path` 兼容 `entry.cgi`
-  - 在网络恢复后重建 `backend-go` 镜像，确认容器内携带 `003_assistant_conversations.sql`
-  - 以最新镜像重新启动 `backend-go`，确认自动迁移与运行时代码一致
+  - 以 sudo 权限修正宿主机 Tailscale / Docker 路由与防火墙，确保 Docker 容器可访问群晖 Tailscale 地址与 `host.docker.internal`
   - 重新执行 `STRICT_SMOKE=1 RUN_SYNOLOGY_PREFLIGHT=1 make smoke`
   - 复验 `documents/{id}/versions` 上传、下载、预览闭环
-  - 复验 `GET /api/v1/assistant/requests/{id}` 与 Assistant 历史查询
+  - 复验 Assistant 请求从 `queued/pending` 到 `completed` 的闭环，以及历史查询
   - 完成一次前端人工联调，并记录最终 TLS / 反向代理 / 防火墙部署方式
 - ~~增加群晖 NAS 适配器~~ ✅ 已完成
 - ~~增加基础测试~~ ✅ 已完成

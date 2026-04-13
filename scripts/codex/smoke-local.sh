@@ -4,10 +4,33 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
+if [[ -f .env ]]; then
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    key=${line%%=*}
+    if [[ -z "${!key+x}" ]]; then
+      export "$line"
+    fi
+  done < ./.env
+fi
+
 strict="${STRICT_SMOKE:-0}"
 backend_url="${BACKEND_BASE_URL:-http://127.0.0.1:18081}"
 status=0
 tmp_files=()
+use_docker_curl=0
+docker_network_name=""
+
+is_truthy() {
+  case "${1:-}" in
+    1|true|TRUE|True|yes|YES|on|ON)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
 
 cleanup() {
   for file in "${tmp_files[@]:-}"; do
@@ -34,6 +57,28 @@ extract_json_string() {
   grep -o '"'"$key"'":"[^"]*"' | head -1 | cut -d'"' -f4 || true
 }
 
+extract_synology_api_path() {
+  local api_name="$1"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import json,sys; data=json.load(sys.stdin).get("data", {}); print(data.get(sys.argv[1], {}).get("path", ""), end="")' "$api_name" 2>/dev/null || true
+    return
+  fi
+  echo ""
+}
+
+normalize_synology_api_path() {
+  local api_path="${1:-}"
+  if [[ -z "$api_path" ]]; then
+    echo ""
+  elif [[ "$api_path" == /* ]]; then
+    echo "$api_path"
+  elif [[ "$api_path" == webapi/* ]]; then
+    echo "/$api_path"
+  else
+    echo "/webapi/$api_path"
+  fi
+}
+
 extract_response_data_id() {
   if command -v python3 >/dev/null 2>&1; then
     python3 -c 'import json,sys; data=json.load(sys.stdin).get("data"); print(data.get("id", "") if isinstance(data, dict) else "", end="")' 2>/dev/null || true
@@ -53,6 +98,18 @@ extract_version_smoke_document_id() {
 container_running() {
   local name="$1"
   docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null | grep -qx 'true'
+}
+
+smoke_curl() {
+  if [[ "$use_docker_curl" == "1" ]]; then
+    docker run --rm --network "$docker_network_name" -v /tmp:/tmp curlimages/curl:8.7.1 "$@"
+  else
+    curl "$@"
+  fi
+}
+
+synology_curl() {
+  curl "$@"
 }
 
 echo '== smoke prerequisites =='
@@ -79,18 +136,28 @@ for container in digidocs-backend-go digidocs-backend-py-worker; do
 done
 
 echo '== backend healthz =='
-if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
+if smoke_curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
   echo "[OK] $backend_url/healthz"
+elif container_running "digidocs-backend-go"; then
+  docker_network_name=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' digidocs-backend-go 2>/dev/null || true)
+  if [[ -n "$docker_network_name" ]]; then
+    backend_url="http://backend-go:8080"
+    use_docker_curl=1
+  fi
+fi
+
+if [[ "$use_docker_curl" == "1" ]] && smoke_curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
+  echo "[OK] $backend_url/healthz via docker network ($docker_network_name)"
 else
   require_or_skip "$backend_url/healthz is unreachable"
 fi
 
 echo '== business endpoint smoke =='
-if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
+if smoke_curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
   # Login and get a token
-  login_resp=$(curl -sS --max-time 5 -X POST "$backend_url/api/v1/auth/login" \
+  login_resp=$(smoke_curl -sS --max-time 5 -X POST "$backend_url/api/v1/auth/login" \
     -H 'Content-Type: application/json' \
-    -d '{"username":"admin","password":"admin123"}' 2>/dev/null)
+    -d '{"username":"admin","password":"admin123"}' 2>/dev/null || true)
   token=$(echo "$login_resp" | extract_json_string access_token)
 
   if [[ -n "$token" ]]; then
@@ -98,7 +165,7 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
     auth_header="Authorization: Bearer $token"
 
     # GET /documents
-    doc_status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+    doc_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
       -H "$auth_header" "$backend_url/api/v1/documents?page=1&page_size=5" 2>/dev/null)
     if [[ "$doc_status" == "200" ]]; then
       echo "[OK] GET /documents -> $doc_status"
@@ -107,7 +174,7 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
     fi
 
     # GET /dashboard/overview
-    dash_status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+    dash_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
       -H "$auth_header" "$backend_url/api/v1/dashboard/overview" 2>/dev/null)
     if [[ "$dash_status" == "200" ]]; then
       echo "[OK] GET /dashboard/overview -> $dash_status"
@@ -116,7 +183,7 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
     fi
 
     # GET /handovers
-    ho_status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+    ho_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
       -H "$auth_header" "$backend_url/api/v1/handovers" 2>/dev/null)
     if [[ "$ho_status" == "200" ]]; then
       echo "[OK] GET /handovers -> $ho_status"
@@ -125,7 +192,7 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
     fi
 
     # GET /audit-events
-    ae_status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+    ae_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
       -H "$auth_header" "$backend_url/api/v1/audit-events?page=1" 2>/dev/null)
     if [[ "$ae_status" == "200" ]]; then
       echo "[OK] GET /audit-events -> $ae_status"
@@ -134,7 +201,7 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
     fi
 
     # GET /audit-events/summary
-    as_status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+    as_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
       -H "$auth_header" "$backend_url/api/v1/audit-events/summary" 2>/dev/null)
     if [[ "$as_status" == "200" ]]; then
       echo "[OK] GET /audit-events/summary -> $as_status"
@@ -143,24 +210,25 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
     fi
 
     # POST /documents/{id}/versions + GET /versions/{id}/download|preview
-    documents_resp=$(curl -sS --max-time 5 -H "$auth_header" "$backend_url/api/v1/documents?page=1&page_size=5" 2>/dev/null)
+    documents_resp=$(smoke_curl -sS --max-time 5 -H "$auth_header" "$backend_url/api/v1/documents?page=1&page_size=5" 2>/dev/null || true)
     document_id=$(echo "$documents_resp" | extract_version_smoke_document_id)
 
     if [[ -n "$document_id" ]]; then
       upload_tmp=$(mktemp)
       tmp_files+=("$upload_tmp")
       printf 'smoke second version\n' >"$upload_tmp"
+      chmod 644 "$upload_tmp"
 
-      version_resp=$(curl -sS --max-time 10 -X POST "$backend_url/api/v1/documents/$document_id/versions" \
+      version_resp=$(smoke_curl -sS --max-time 10 -X POST "$backend_url/api/v1/documents/$document_id/versions" \
         -H "$auth_header" \
         -F 'commit_message=smoke second upload' \
-        -F "file=@$upload_tmp;filename=smoke-v2.txt;type=text/plain" 2>/dev/null)
+        -F "file=@$upload_tmp;filename=smoke-v2.txt;type=text/plain" 2>/dev/null || true)
       version_id=$(echo "$version_resp" | extract_response_data_id)
 
       if [[ -n "$version_id" ]]; then
         download_tmp=$(mktemp)
         tmp_files+=("$download_tmp")
-        download_status=$(curl -sS -o "$download_tmp" -w '%{http_code}' --max-time 10 \
+        download_status=$(smoke_curl -sS -o "$download_tmp" -w '%{http_code}' --max-time 10 \
           -H "$auth_header" "$backend_url/api/v1/versions/$version_id/download" 2>/dev/null)
         if [[ "$download_status" == "200" && "$(cat "$download_tmp")" == 'smoke second version' ]]; then
           echo "[OK] version upload/download -> $download_status"
@@ -170,7 +238,7 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
 
         preview_tmp=$(mktemp)
         tmp_files+=("$preview_tmp")
-        preview_status=$(curl -sS -o "$preview_tmp" -w '%{http_code}' --max-time 10 \
+        preview_status=$(smoke_curl -sS -o "$preview_tmp" -w '%{http_code}' --max-time 10 \
           -H "$auth_header" "$backend_url/api/v1/versions/$version_id/preview" 2>/dev/null)
         if [[ "$preview_status" == "200" && "$(cat "$preview_tmp")" == 'smoke second version' ]]; then
           echo "[OK] version preview -> $preview_status"
@@ -185,10 +253,10 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
     fi
 
     # POST /assistant/ask + poll /assistant/requests/{id}
-    ask_resp=$(curl -sS --max-time 10 -X POST "$backend_url/api/v1/assistant/ask" \
+    ask_resp=$(smoke_curl -sS --max-time 10 -X POST "$backend_url/api/v1/assistant/ask" \
       -H "$auth_header" \
       -H 'Content-Type: application/json' \
-      -d '{"question":"请用一句话确认 smoke 已打通 AI 链路","scope":{"project_id":null,"document_id":null}}' 2>/dev/null)
+      -d "{\"question\":\"请用一句话确认 smoke 已打通 AI 链路\",\"scope\":{\"document_id\":\"$document_id\"}}" 2>/dev/null || true)
     request_id=$(echo "$ask_resp" | extract_json_string request_id)
 
     if [[ -n "$request_id" ]]; then
@@ -196,7 +264,7 @@ if curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
       final_status=""
       final_body=""
       for _ in 1 2 3 4 5 6 7 8; do
-        final_body=$(curl -sS --max-time 10 -H "$auth_header" "$backend_url/api/v1/assistant/requests/$request_id" 2>/dev/null)
+        final_body=$(smoke_curl -sS --max-time 10 -H "$auth_header" "$backend_url/api/v1/assistant/requests/$request_id" 2>/dev/null || true)
         final_status=$(echo "$final_body" | extract_json_string status)
         if [[ "$final_status" == "completed" || "$final_status" == "failed" ]]; then
           break
@@ -219,11 +287,11 @@ else
   echo "[SKIP] backend not reachable, skipping business endpoint smoke"
 fi
 
-if [[ "${RUN_SYNOLOGY_PREFLIGHT:-0}" == "1" || "${STORAGE_BACKEND:-}" == "synology" ]]; then
+if is_truthy "${RUN_SYNOLOGY_PREFLIGHT:-0}" || [[ "${STORAGE_BACKEND:-}" == "synology" ]]; then
   echo '== synology preflight =='
   synology_scheme="http"
   synology_port="${SYNOLOGY_PORT:-5000}"
-  if [[ "${SYNOLOGY_HTTPS:-false}" == "true" ]]; then
+  if is_truthy "${SYNOLOGY_HTTPS:-false}"; then
     synology_scheme="https"
     if [[ -z "${SYNOLOGY_PORT:-}" ]]; then
       synology_port="5001"
@@ -235,11 +303,11 @@ if [[ "${RUN_SYNOLOGY_PREFLIGHT:-0}" == "1" || "${STORAGE_BACKEND:-}" == "synolo
   else
     synology_base_url="$synology_scheme://$SYNOLOGY_HOST:$synology_port"
     synology_curl_opts=(--silent --show-error --max-time 15)
-    if [[ "${SYNOLOGY_INSECURE_SKIP_VERIFY:-0}" == "1" ]]; then
+    if is_truthy "${SYNOLOGY_INSECURE_SKIP_VERIFY:-0}"; then
       synology_curl_opts+=(-k)
     fi
 
-    info_resp=$(curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/query.cgi" \
+    info_resp=$(synology_curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/query.cgi" \
       --data-urlencode 'api=SYNO.API.Info' \
       --data-urlencode 'version=1' \
       --data-urlencode 'method=query' \
@@ -250,7 +318,14 @@ if [[ "${RUN_SYNOLOGY_PREFLIGHT:-0}" == "1" || "${STORAGE_BACKEND:-}" == "synolo
       require_or_skip 'SYNO.API.Info query failed'
     fi
 
-    login_resp=$(curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/auth.cgi" \
+    auth_path=$(echo "$info_resp" | extract_synology_api_path 'SYNO.API.Auth')
+    if [[ -z "$auth_path" ]]; then
+      auth_path='/webapi/auth.cgi'
+    else
+      auth_path=$(normalize_synology_api_path "$auth_path")
+    fi
+
+    login_resp=$(synology_curl "${synology_curl_opts[@]}" --get "$synology_base_url$auth_path" \
       --data-urlencode 'api=SYNO.API.Auth' \
       --data-urlencode 'version=3' \
       --data-urlencode 'method=login' \
@@ -267,7 +342,7 @@ if [[ "${RUN_SYNOLOGY_PREFLIGHT:-0}" == "1" || "${STORAGE_BACKEND:-}" == "synolo
       smoke_name=$(basename "$smoke_folder")
       smoke_file="${smoke_folder}/smoke.txt"
 
-      create_resp=$(curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/entry.cgi" \
+      create_resp=$(synology_curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/entry.cgi" \
         --data-urlencode 'api=SYNO.FileStation.CreateFolder' \
         --data-urlencode 'version=2' \
         --data-urlencode 'method=create' \
@@ -284,7 +359,8 @@ if [[ "${RUN_SYNOLOGY_PREFLIGHT:-0}" == "1" || "${STORAGE_BACKEND:-}" == "synolo
       synology_tmp=$(mktemp)
       tmp_files+=("$synology_tmp")
       printf 'digidocs synology smoke\n' >"$synology_tmp"
-      upload_resp=$(curl "${synology_curl_opts[@]}" -X POST "$synology_base_url/webapi/entry.cgi?_sid=$synology_sid" \
+      chmod 644 "$synology_tmp"
+      upload_resp=$(synology_curl "${synology_curl_opts[@]}" -X POST "$synology_base_url/webapi/entry.cgi?_sid=$synology_sid" \
         -F 'api=SYNO.FileStation.Upload' \
         -F 'version=2' \
         -F 'method=upload' \
@@ -298,7 +374,7 @@ if [[ "${RUN_SYNOLOGY_PREFLIGHT:-0}" == "1" || "${STORAGE_BACKEND:-}" == "synolo
         require_or_skip 'synology upload failed'
       fi
 
-      list_resp=$(curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/entry.cgi" \
+      list_resp=$(synology_curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/entry.cgi" \
         --data-urlencode 'api=SYNO.FileStation.List' \
         --data-urlencode 'version=2' \
         --data-urlencode 'method=list' \
@@ -311,7 +387,7 @@ if [[ "${RUN_SYNOLOGY_PREFLIGHT:-0}" == "1" || "${STORAGE_BACKEND:-}" == "synolo
         require_or_skip 'synology list/getinfo failed'
       fi
 
-      share_resp=$(curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/entry.cgi" \
+      share_resp=$(synology_curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/entry.cgi" \
         --data-urlencode 'api=SYNO.FileStation.Sharing' \
         --data-urlencode 'version=3' \
         --data-urlencode 'method=create' \
@@ -325,7 +401,7 @@ if [[ "${RUN_SYNOLOGY_PREFLIGHT:-0}" == "1" || "${STORAGE_BACKEND:-}" == "synolo
 
       synology_download=$(mktemp)
       tmp_files+=("$synology_download")
-      download_status=$(curl "${synology_curl_opts[@]}" -o "$synology_download" -w '%{http_code}' --get "$synology_base_url/webapi/entry.cgi" \
+      download_status=$(synology_curl "${synology_curl_opts[@]}" -o "$synology_download" -w '%{http_code}' --get "$synology_base_url/webapi/entry.cgi" \
         --data-urlencode 'api=SYNO.FileStation.Download' \
         --data-urlencode 'version=2' \
         --data-urlencode 'method=download' \
@@ -338,7 +414,7 @@ if [[ "${RUN_SYNOLOGY_PREFLIGHT:-0}" == "1" || "${STORAGE_BACKEND:-}" == "synolo
         require_or_skip 'synology download failed'
       fi
 
-      delete_resp=$(curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/entry.cgi" \
+      delete_resp=$(synology_curl "${synology_curl_opts[@]}" --get "$synology_base_url/webapi/entry.cgi" \
         --data-urlencode 'api=SYNO.FileStation.Delete' \
         --data-urlencode 'version=2' \
         --data-urlencode 'method=delete' \

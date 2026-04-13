@@ -544,8 +544,8 @@ func (r AssistantRepository) ListSuggestions(
 		FROM assistant_suggestions
 		WHERE ($1 = '' OR related_type = $1)
 		  AND ($2 = '' OR related_id::text = $2)
-		  AND ($3 = '' OR status = $3)
-		  AND ($4 = '' OR suggestion_type = $4)
+		  AND ($3 = '' OR status::text = $3)
+		  AND ($4 = '' OR suggestion_type::text = $4)
 		ORDER BY generated_at DESC
 		`,
 		filter.RelatedType,

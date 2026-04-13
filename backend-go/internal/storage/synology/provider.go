@@ -24,6 +24,7 @@ type Provider struct {
 	account   string
 	password  string
 	sharePath string // Synology share root, e.g. "/DigiDocs"
+	authPath  string // resolved auth endpoint path, e.g. "/webapi/entry.cgi"
 
 	mu  sync.RWMutex
 	sid string // DSM session ID; guarded by mu
@@ -82,6 +83,78 @@ func (e *dsmError) Error() string {
 
 // --- Session management ---
 
+func normalizeAPIPath(apiPath string) string {
+	apiPath = strings.TrimSpace(apiPath)
+	if apiPath == "" {
+		return ""
+	}
+	if strings.HasPrefix(apiPath, "/") {
+		return apiPath
+	}
+	if strings.HasPrefix(apiPath, "webapi/") {
+		return "/" + apiPath
+	}
+	return "/webapi/" + apiPath
+}
+
+func (p *Provider) loginURL(ctx context.Context) string {
+	if authPath := p.getAuthPath(); authPath != "" {
+		return p.baseURL + authPath
+	}
+
+	if authPath, err := p.discoverAuthPath(ctx); err == nil && authPath != "" {
+		p.setAuthPath(authPath)
+		return p.baseURL + authPath
+	}
+
+	return p.baseURL + "/webapi/entry.cgi"
+}
+
+func (p *Provider) discoverAuthPath(ctx context.Context) (string, error) {
+	params := url.Values{
+		"api":     {"SYNO.API.Info"},
+		"version": {"1"},
+		"method":  {"query"},
+		"query":   {"SYNO.API.Auth"},
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		p.baseURL+"/webapi/query.cgi?"+params.Encode(), nil)
+	if err != nil {
+		return "", fmt.Errorf("synology query info request: %w", err)
+	}
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("synology query info: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var dr dsmResponse
+	if err := json.NewDecoder(resp.Body).Decode(&dr); err != nil {
+		return "", fmt.Errorf("synology query info decode: %w", err)
+	}
+	if !dr.Success {
+		if dr.Error != nil {
+			return "", dr.Error
+		}
+		return "", fmt.Errorf("synology query info failed")
+	}
+
+	var infoData map[string]struct {
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal(dr.Data, &infoData); err != nil {
+		return "", fmt.Errorf("synology query info unmarshal: %w", err)
+	}
+
+	if authInfo, ok := infoData["SYNO.API.Auth"]; ok && authInfo.Path != "" {
+		return normalizeAPIPath(authInfo.Path), nil
+	}
+
+	return "", fmt.Errorf("synology auth path missing from SYNO.API.Info")
+}
+
 func (p *Provider) login(ctx context.Context) error {
 	params := url.Values{
 		"api":     {"SYNO.API.Auth"},
@@ -93,37 +166,80 @@ func (p *Provider) login(ctx context.Context) error {
 		"format":  {"sid"},
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		p.baseURL+"/webapi/auth.cgi?"+params.Encode(), nil)
-	if err != nil {
-		return fmt.Errorf("synology login request: %w", err)
+	loginPaths := []string{}
+	if authPath := p.getAuthPath(); authPath != "" {
+		loginPaths = append(loginPaths, authPath)
+	} else if authPath, err := p.discoverAuthPath(ctx); err == nil && authPath != "" {
+		loginPaths = append(loginPaths, authPath)
+	}
+	loginPaths = append(loginPaths, "/webapi/entry.cgi", "/webapi/auth.cgi")
+
+	tried := map[string]struct{}{}
+	var lastErr error
+	for _, loginPath := range loginPaths {
+		if loginPath == "" {
+			continue
+		}
+		if _, ok := tried[loginPath]; ok {
+			continue
+		}
+		tried[loginPath] = struct{}{}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+			p.baseURL+loginPath+"?"+params.Encode(), nil)
+		if err != nil {
+			return fmt.Errorf("synology login request: %w", err)
+		}
+
+		resp, err := p.client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("synology login %s: %w", loginPath, err)
+			continue
+		}
+
+		var dr dsmResponse
+		decodeErr := json.NewDecoder(resp.Body).Decode(&dr)
+		resp.Body.Close()
+		if decodeErr != nil {
+			lastErr = fmt.Errorf("synology login decode %s: %w", loginPath, decodeErr)
+			continue
+		}
+		if !dr.Success {
+			lastErr = fmt.Errorf("synology login failed %s: %v", loginPath, dr.Error)
+			continue
+		}
+
+		var authData struct {
+			SID string `json:"sid"`
+		}
+		if err := json.Unmarshal(dr.Data, &authData); err != nil {
+			lastErr = fmt.Errorf("synology login unmarshal sid %s: %w", loginPath, err)
+			continue
+		}
+
+		p.mu.Lock()
+		p.sid = authData.SID
+		p.authPath = loginPath
+		p.mu.Unlock()
+		return nil
 	}
 
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("synology login: %w", err)
+	if lastErr != nil {
+		return lastErr
 	}
-	defer resp.Body.Close()
+	return fmt.Errorf("synology login failed: no login path available")
+}
 
-	var dr dsmResponse
-	if err := json.NewDecoder(resp.Body).Decode(&dr); err != nil {
-		return fmt.Errorf("synology login decode: %w", err)
-	}
-	if !dr.Success {
-		return fmt.Errorf("synology login failed: %v", dr.Error)
-	}
+func (p *Provider) getAuthPath() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.authPath
+}
 
-	var authData struct {
-		SID string `json:"sid"`
-	}
-	if err := json.Unmarshal(dr.Data, &authData); err != nil {
-		return fmt.Errorf("synology login unmarshal sid: %w", err)
-	}
-
+func (p *Provider) setAuthPath(authPath string) {
 	p.mu.Lock()
-	p.sid = authData.SID
+	p.authPath = authPath
 	p.mu.Unlock()
-	return nil
 }
 
 func (p *Provider) getSID() string {
@@ -321,10 +437,10 @@ func (p *Provider) DeleteObject(ctx context.Context, objectKey string) error {
 
 func (p *Provider) Stat(ctx context.Context, objectKey string) (*storage.FileInfo, error) {
 	dr, err := p.callAPI(ctx, url.Values{
-		"api":     {"SYNO.FileStation.List"},
-		"version": {"2"},
-		"method":  {"getinfo"},
-		"path":    {p.absPath(objectKey)},
+		"api":        {"SYNO.FileStation.List"},
+		"version":    {"2"},
+		"method":     {"getinfo"},
+		"path":       {p.absPath(objectKey)},
 		"additional": {"[\"size\",\"time\"]"},
 	})
 	if err != nil {
@@ -333,9 +449,9 @@ func (p *Provider) Stat(ctx context.Context, objectKey string) (*storage.FileInf
 
 	var info struct {
 		Files []struct {
-			Path     string `json:"path"`
-			Name     string `json:"name"`
-			IsDir    bool   `json:"isdir"`
+			Path       string `json:"path"`
+			Name       string `json:"name"`
+			IsDir      bool   `json:"isdir"`
 			Additional struct {
 				Size int64 `json:"size"`
 				Time struct {
@@ -375,9 +491,9 @@ func (p *Provider) ListDir(ctx context.Context, folderPath string) ([]storage.Fi
 
 	var listData struct {
 		Files []struct {
-			Path     string `json:"path"`
-			Name     string `json:"name"`
-			IsDir    bool   `json:"isdir"`
+			Path       string `json:"path"`
+			Name       string `json:"name"`
+			IsDir      bool   `json:"isdir"`
 			Additional struct {
 				Size int64 `json:"size"`
 				Time struct {
@@ -411,11 +527,11 @@ func (p *Provider) CreateFolder(ctx context.Context, folderPath string) error {
 	folderName := path.Base(absFolder)
 
 	_, err := p.callAPI(ctx, url.Values{
-		"api":     {"SYNO.FileStation.CreateFolder"},
-		"version": {"2"},
-		"method":  {"create"},
-		"folder_path": {parentDir},
-		"name":        {folderName},
+		"api":          {"SYNO.FileStation.CreateFolder"},
+		"version":      {"2"},
+		"method":       {"create"},
+		"folder_path":  {parentDir},
+		"name":         {folderName},
 		"force_parent": {"true"},
 	})
 	return err

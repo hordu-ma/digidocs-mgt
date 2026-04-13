@@ -262,9 +262,11 @@ docker compose up -d postgres
 - 已完成 Assistant 前端会话化改造：助手页改为“会话列表 + 消息流 + 追问”模式，并展示 AI 响应的记忆来源提示
 - 已完成项目级 Codex skills 运行时接入：本机已安装 `ops/codex/skills/` 到 `~/.codex/skills/`，并补齐 `backend-go` / `worker` / `verify` skill 执行说明
 - 已完成 OpenClaw skill 复用策略（一期）：Worker 新增白名单 `skill_registry` / `skill_adapter`，AI 结果与会话元数据可追踪 `skill_name`、`skill_version`、`source_scope`、`memory_sources`
-- 已完成 2026-04-12 首轮部署验收排查：p14s 上 `backend-go / frontend / worker / postgres` 容器可运行，`worker -> OpenClaw GET /v1/models` 可达，`healthz / auth / documents / dashboard / handovers / audit-events` 核心链路通过
-- 已定位群晖前置验收阻塞：目标 DSM 的 `SYNO.API.Auth` 实际需走 `webapi/entry.cgi`，当前 `SynologyStorageProvider` 与 `make smoke` 仍使用 `webapi/auth.cgi`，导致登录超时、群晖预检失败，并进一步阻塞 Synology 后端下的版本上传验收
-- 已定位运行镜像与迁移状态偏差：运行中的 `backend-go` 镜像仍未携带 `003_assistant_conversations.sql`，本次已临时手工补齐数据库 migration 3；但受 Docker Hub 基础镜像拉取超时影响，最新镜像尚未成功重建，`GET /api/v1/assistant/requests/{id}` 仍需在最新镜像下复验
-- 当前下一步聚焦：修正群晖登录入口兼容、成功重建 `backend-go` 镜像，并重新执行 `STRICT_SMOKE=1 RUN_SYNOLOGY_PREFLIGHT=1 make smoke`
+- 已完成 2026-04-13 第二轮部署验收排查：`SynologyStorageProvider` 与 `make smoke` 已兼容 `SYNO.API.Info -> entry.cgi`，`backend-go` 运行镜像已确认携带 `003_assistant_conversations.sql`，数据库 `schema_migrations` 已落到 `003`
+- 已完成 `assistant.ask` 500 修复：PostgreSQL `assistant_suggestions.status / suggestion_type` enum 过滤已改为 `::text` 比较，`POST /assistant/ask` 与 `GET /api/v1/assistant/requests/{id}` 已恢复可排队、可查询
+- 已完成 smoke 脚本收口：`.env` 加载不再覆盖命令行环境变量，Synology preflight 改为宿主机直连，`true/false` 布尔环境变量可直接识别
+- 已确认 `STRICT_SMOKE=1 RUN_SYNOLOGY_PREFLIGHT=1 make smoke` 当前结果：核心业务接口通过，DSM preflight 通过，`assistant.ask` 可入队；剩余阻塞为 `documents/{id}/versions` 上传仍返回 500，以及 Assistant 请求在当前机器上停留 `pending`
+- 已定位当前机器的主机级网络阻塞：`ip route show table 52` 仍把 `172.17.0.0/16`、`172.18.0.0/16` 指向 `tailscale0`，导致 Docker 容器既无法直连群晖 Tailscale 地址，也无法访问宿主机 `host.docker.internal`
+- 当前下一步聚焦：在具备 sudo 的前提下修正宿主机 Tailscale / Docker 路由与防火墙，然后重跑严格 smoke，并完成前端人工联调
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。
