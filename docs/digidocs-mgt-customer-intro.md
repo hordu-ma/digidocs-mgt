@@ -8,9 +8,11 @@
 
 `DigiDocs Mgt` 是一套面向课题组日常管理的文档资产管理与智能助理系统。
 
-它由 `DigiDocs Mgt` 负责文档资产、流程和管理闭环，由部署在 `DGX Spark` 上的 `OpenClaw` 提供智能理解与辅助能力。两者结合后，解决的不只是“文档存下来”，而是“文档存下来以后，负责人和团队能不能更高效地使用”。
+由 `DigiDocs Mgt` 负责文档资产、流程和管理闭环;
+由部署在 `DGX Spark` 上的 `OpenClaw` 提供智能理解与辅助能力。
+两者结合后，解决的不只是“文档存下来”，而是“文档存下来以后，负责人和团队能不能更高效地使用”。
 
-它解决的核心问题是：
+由此获得的核心收益：
 
 - 文档掌握在团队手里，而不是散落在个人电脑里；
 - 现在这份材料到底由谁负责、推进到哪一步；
@@ -31,7 +33,7 @@
 
 ### 2.1 系统界面实拍
 
-> 下面 4 张图片为当前系统真实截图，可以快速感知产品界面风格、信息组织方式与管理视角。
+> 下图为当前系统真实截图，可以快速感知产品界面风格、信息组织方式与管理视角。
 
 <table>
   <tr>
@@ -114,7 +116,7 @@
 - 提供负责人总览页，直接看到各课题文档数量、状态分布和近期动态；
 - 自动标出长期未更新、长期无人接手、待交接未完成等风险项；
 - 把审计留痕变成管理信息，而不是一堆难读的日志。
-- `OpenClaw` 还可以把这些动态整理成更容易阅读的管理摘要，例如“本周哪个课题推进最慢、哪些材料存在断点、哪些文档值得优先关注”。
+- `OpenClaw` 可以把这些动态整理成更容易阅读的管理摘要，例如“本周哪个课题推进最慢、哪些材料存在断点、哪些文档值得优先关注”。
 
 ### 3.4 成员毕业、离组、换题时
 
@@ -136,7 +138,7 @@
 
 ### 3.5 结题、复盘、下一轮申报时
 
-团队最怕的不是“材料不存在”，而是“明明做过，却找不到、看不懂、用不上”。
+困扰团队的不是“材料不存在”，而是“明明做过，却找不到、看不懂、用不上”。
 
 `DigiDocs Mgt` 的作用：
 
@@ -166,7 +168,7 @@
 
 `DigiDocs Mgt` 采用的是适合课题组的轻量协作方式，不要求在线共编，也不要求成员改变原有 Office 使用习惯。
 
-核心机制只有四个：
+核心机制有四个：
 
 1. 文档必须挂到团队空间、课题和目录中；
 2. 每次上传形成文件级新版本；
@@ -193,22 +195,22 @@
   <sub>图 5：DigiDocs Mgt + DGX Spark + 群晖 DS925+ 系统总体架构</sub>
 </p>
 
-从客户视角看，这张图可以概括为三句话：
+可以概括为三个要点：
 
-1. `DGX Spark` 负责跑系统前后端、异步任务和 `OpenClaw` 智能能力；
+1. `DGX Spark` 负责承载系统前后端、异步任务和 `OpenClaw` 智能能力；
 2. `群晖 DS925+` 负责承载文件资产与数据库主账本；
-3. `OpenClaw` 只提供摘要、问答、建议等辅助能力，不直接改正式业务状态。
+3. `OpenClaw` 提供摘要、问答、建议等辅助能力，不直接改正式业务状态。
 
 ### 6.2 推荐硬件组合
 
-本项目建议继续采用“两台正式部署机器”的方案：
+建议继续采用“两台正式部署机器”的方案：
 
 - `NVIDIA DGX Spark`
   - 承载应用层、Python Worker、`OpenClaw` 以及相关智能处理任务；
 - `群晖 DS925+`
   - 承载文件存储、数据库与团队资料底座。
 
-这样做的好处是：
+这样做的收益是：
 
 - 结构清晰，便于后续维护；
 - AI 计算和存储职责分开；
@@ -219,35 +221,104 @@
 
 ## 7. 基础硬件与网络清单
 
-下面给出一套适合课题组正式部署的基础清单。分为“必需项”和“选配项”。
+如下是适合课题组正式部署的基础清单。分为“必需项”和“选配项”。
 
 ### 7.1 必需项
 
-| 类别 | 设备 | 建议数量 | 作用 | 公开报价 |
-| --- | --- | --- | --- | --- |
-| 计算主机 | NVIDIA DGX Spark 4TB | 1 | 承载应用服务、Worker、AI 处理 | `$4,699.00`，约 `¥32,261` |
-| 存储主机 | 群晖 DS925+ | 1 | 承载团队文件底座与数据库 | `¥4,999` 起 |
-| 存储推荐组合 | 群晖 DS925+ 32TB 套装（4 x 8TB 原厂盘） | 1 | 直接满足正式落地，不再单独拆盘采购 | `¥11,939` |
-| 内网交换 | Ubiquiti Flex 2.5G PoE（USW-Flex-2.5G-8-PoE） | 1 | 连接 DGX Spark、DS925+ 与办公网络，提供 2.5GbE 接入与 10GbE 组合上行口 | `¥1,999` |
-| 网线 | Ubiquiti Premium Patch Cable（10GbE） | 3 | 设备间短距连接 | `¥49 / 根` |
+<table style="width: 100%; border-collapse: collapse;">
+  <thead>
+    <tr>
+      <th style="border: 1px solid #d1d5db; padding: 8px;">类别</th>
+      <th style="border: 1px solid #d1d5db; padding: 8px;">设备</th>
+      <th style="border: 1px solid #d1d5db; padding: 8px;">建议数量</th>
+      <th style="border: 1px solid #d1d5db; padding: 8px;">作用</th>
+      <th style="border: 1px solid #d1d5db; padding: 8px;">公开报价</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">计算主机</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">NVIDIA DGX Spark 4TB</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">1</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">承载应用服务、Worker、AI 处理</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;"><code>$4,699.00</code>，约 <code>¥32,261</code></td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">存储主机</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">群晖 DS925+</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">1</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">承载团队文件底座与数据库</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;"><code>¥4,999</code> 起</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">存储推荐组合</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">群晖 DS925+ 32TB 套装（4 x 8TB 原厂盘）</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">1</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">直接满足正式落地，不再单独拆盘采购</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;"><code>¥11,939</code></td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">内网交换</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">Ubiquiti Flex 2.5G PoE（USW-Flex-2.5G-8-PoE）</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">1</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">连接 DGX Spark、DS925+ 与办公网络，提供 2.5GbE 接入与 10GbE 组合上行口</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;"><code>¥1,999</code></td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">网线</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">Ubiquiti Premium Patch Cable（10GbE）</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">3</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">设备间短距连接</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;"><code>¥49 / 根</code></td>
+    </tr>
+  </tbody>
+</table>
 
 说明：
 
-- 若按“DS925+ 32TB 套装”采购，存储侧不需要再单独拆分计算硬盘价格；
 - 32TB 是原始容量，正式可用容量取决于 RAID / SHR 策略；
 - 对课题组场景，`DGX Spark + DS925+ 32TB 套装 + 2.5G/10G 交换` 已足以形成一套可正式运行的最小闭环。
 
 ### 7.2 选配项
 
-| 类别 | 设备 | 建议数量 | 适用场景 | 公开报价 |
-| --- | --- | --- | --- | --- |
-| 独立网关 | Ubiquiti Cloud Gateway Fiber | 1 | 现场希望把本系统与办公网逻辑隔离，单独做出口与策略管理 | `¥2,799` |
-| 无线覆盖 | Ubiquiti U7 Lite | 1 | 需要在机房/办公室为运维笔记本或移动终端提供独立无线接入 | `¥999` |
-| 供电保护 | UPS | 1 | 建议给 DGX Spark、DS925+、交换机提供断电保护 | 假设/待确认：未检索到统一公开官方直售价，建议按现场功耗与续航要求询价 |
+<table style="width: 100%; border-collapse: collapse;">
+  <thead>
+    <tr>
+      <th style="border: 1px solid #d1d5db; padding: 8px;">类别</th>
+      <th style="border: 1px solid #d1d5db; padding: 8px;">设备</th>
+      <th style="border: 1px solid #d1d5db; padding: 8px;">建议数量</th>
+      <th style="border: 1px solid #d1d5db; padding: 8px;">适用场景</th>
+      <th style="border: 1px solid #d1d5db; padding: 8px;">公开报价</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">独立网关</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">Ubiquiti Cloud Gateway Fiber</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">1</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">现场希望把本系统与办公网逻辑隔离，单独做出口与策略管理</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;"><code>¥2,799</code></td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">无线覆盖</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">Ubiquiti U7 Lite</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">1</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">需要在机房/办公室为运维笔记本或移动终端提供独立无线接入</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;"><code>¥999</code></td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">供电保护</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">UPS</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">1</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">建议给 DGX Spark、DS925+、交换机提供断电保护</td>
+      <td style="border: 1px solid #d1d5db; padding: 8px;">现场功耗与续航要求定价</td>
+    </tr>
+  </tbody>
+</table>
 
 ### 7.3 预算口径
 
-> `DigiBridge Connect` 套件 是 DigiDocs Mgt 的现场接入组件，用于完成客户组织结构、群晖存储规范、账号口径、AI 网关策略和审计要求的落地对接。
+> `DigiBridge Connect` 套件 是 DigiDocs Mgt 的现场接入组件，用于完成组织结构、存储规范、账号口径、AI 网关策略和审计要求的落地对接。
 
 #### 口径 A：正式最小闭环
 
@@ -271,5 +342,4 @@
 预算约为：`¥78,144`
 
 ---
-
 
