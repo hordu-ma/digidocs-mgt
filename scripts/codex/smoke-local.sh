@@ -17,6 +17,7 @@ fi
 strict="${STRICT_SMOKE:-0}"
 backend_url="${BACKEND_BASE_URL:-http://127.0.0.1:18081}"
 status=0
+backend_ready=0
 tmp_files=()
 use_docker_curl=0
 docker_network_name=""
@@ -138,6 +139,7 @@ done
 echo '== backend healthz =='
 if smoke_curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
   echo "[OK] $backend_url/healthz"
+  backend_ready=1
 elif container_running "digidocs-backend-go"; then
   docker_network_name=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' digidocs-backend-go 2>/dev/null || true)
   if [[ -n "$docker_network_name" ]]; then
@@ -148,12 +150,13 @@ fi
 
 if [[ "$use_docker_curl" == "1" ]] && smoke_curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
   echo "[OK] $backend_url/healthz via docker network ($docker_network_name)"
-else
+  backend_ready=1
+elif [[ "$backend_ready" != "1" ]]; then
   require_or_skip "$backend_url/healthz is unreachable"
 fi
 
 echo '== business endpoint smoke =='
-if smoke_curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
+if [[ "$backend_ready" == "1" ]]; then
   # Login and get a token
   login_resp=$(smoke_curl -sS --max-time 5 -X POST "$backend_url/api/v1/auth/login" \
     -H 'Content-Type: application/json' \

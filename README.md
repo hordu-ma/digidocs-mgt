@@ -267,6 +267,9 @@ docker compose up -d postgres
 - 已完成 smoke 脚本收口：`.env` 加载不再覆盖命令行环境变量，Synology preflight 改为宿主机直连，`true/false` 布尔环境变量可直接识别
 - 已确认 `STRICT_SMOKE=1 RUN_SYNOLOGY_PREFLIGHT=1 make smoke` 当前结果：核心业务接口通过，DSM preflight 通过，`assistant.ask` 可入队；剩余阻塞为 `documents/{id}/versions` 上传仍返回 500，以及 Assistant 请求在当前机器上停留 `pending`
 - 已定位当前机器的主机级网络阻塞：`ip route show table 52` 仍把 `172.17.0.0/16`、`172.18.0.0/16` 指向 `tailscale0`，导致 Docker 容器既无法直连群晖 Tailscale 地址，也无法访问宿主机 `host.docker.internal`
-- 当前下一步聚焦：在具备 sudo 的前提下修正宿主机 Tailscale / Docker 路由与防火墙，然后重跑严格 smoke，并完成前端人工联调
+- 已完成 2026-04-13 第三轮部署验收修复：宿主机 `table 52` 已对 Docker / 局域网网段改为 `throw`，`backend-go / backend-py-worker` 已重建到正确环境，`assistant.ask -> completed` 与版本上传/下载/预览严格 smoke 已恢复通过
+- 已修复 Synology provider 目录幂等问题：版本上传前父目录已存在时，不再因 DSM `CreateFolder` 返回 400 而中断
+- 已修复 `make smoke` 的 `healthz` 误报逻辑，宿主机直连成功时不再重复报 unreachable
+- 当前下一步聚焦：完成一次前端人工联调，并把宿主机 `table 52` 路由修正沉淀为持久化运维配置
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

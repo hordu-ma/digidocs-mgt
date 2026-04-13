@@ -310,7 +310,11 @@ func (p *Provider) callAPI(ctx context.Context, params url.Values) (*dsmResponse
 
 // absPath converts an objectKey to the absolute Synology path.
 func (p *Provider) absPath(objectKey string) string {
-	return p.sharePath + "/" + objectKey
+	cleaned := strings.Trim(strings.TrimSpace(objectKey), "/")
+	if cleaned == "" || cleaned == "." {
+		return p.sharePath
+	}
+	return p.sharePath + "/" + cleaned
 }
 
 // --- Provider interface implementation ---
@@ -322,13 +326,6 @@ func (p *Provider) PutObject(ctx context.Context, input storage.PutObjectInput) 
 
 	destFolder := p.absPath(path.Dir(input.ObjectKey))
 	fileName := path.Base(input.ObjectKey)
-
-	// auto-create parent folder
-	if input.CreatePaths {
-		if err := p.CreateFolder(ctx, path.Dir(input.ObjectKey)); err != nil {
-			return storage.PutObjectResult{}, fmt.Errorf("create parent folder: %w", err)
-		}
-	}
 
 	overwrite := "false"
 	if input.Overwrite {
@@ -342,7 +339,11 @@ func (p *Provider) PutObject(ctx context.Context, input storage.PutObjectInput) 
 	_ = writer.WriteField("version", "2")
 	_ = writer.WriteField("method", "upload")
 	_ = writer.WriteField("path", destFolder)
-	_ = writer.WriteField("create_parents", "true")
+	if input.CreatePaths {
+		_ = writer.WriteField("create_parents", "true")
+	} else {
+		_ = writer.WriteField("create_parents", "false")
+	}
 	_ = writer.WriteField("overwrite", overwrite)
 
 	part, err := writer.CreateFormFile("file", fileName)
@@ -522,6 +523,11 @@ func (p *Provider) ListDir(ctx context.Context, folderPath string) ([]storage.Fi
 }
 
 func (p *Provider) CreateFolder(ctx context.Context, folderPath string) error {
+	folderPath = strings.TrimSpace(folderPath)
+	if folderPath == "" || folderPath == "." || folderPath == "/" {
+		return nil
+	}
+
 	absFolder := p.absPath(folderPath)
 	parentDir := path.Dir(absFolder)
 	folderName := path.Base(absFolder)
@@ -534,7 +540,38 @@ func (p *Provider) CreateFolder(ctx context.Context, folderPath string) error {
 		"name":         {folderName},
 		"force_parent": {"true"},
 	})
+	if err == nil {
+		return nil
+	}
+
+	var dsmErr *dsmError
+	if ok := errorAs(err, &dsmErr); ok && dsmErr.Code == 400 {
+		info, statErr := p.Stat(ctx, folderPath)
+		if statErr == nil && info != nil && info.IsDir {
+			return nil
+		}
+	}
 	return err
+}
+
+func errorAs(err error, target interface{}) bool {
+	switch t := target.(type) {
+	case **dsmError:
+		current := err
+		for current != nil {
+			if matched, ok := current.(*dsmError); ok {
+				*t = matched
+				return true
+			}
+			type unwrapper interface{ Unwrap() error }
+			u, ok := current.(unwrapper)
+			if !ok {
+				return false
+			}
+			current = u.Unwrap()
+		}
+	}
+	return false
 }
 
 func (p *Provider) CreateShareLink(ctx context.Context, objectKey string, expireDays int) (*storage.ShareLinkResult, error) {

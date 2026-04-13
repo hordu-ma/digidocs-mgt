@@ -294,3 +294,32 @@ func TestProviderLoginFallsBackToAuthCGIWhenInfoPathUnavailable(t *testing.T) {
 		t.Fatal("expected entry.cgi to be tried before auth.cgi fallback")
 	}
 }
+
+func TestProviderCreateFolderTreatsExistingDirectoryAsSuccess(t *testing.T) {
+	createCalls := 0
+	provider := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/webapi/query.cgi":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"SYNO.API.Auth":{"path":"webapi/entry.cgi"}}}`))
+		case r.URL.Path == "/webapi/entry.cgi" && r.URL.Query().Get("api") == "SYNO.API.Auth":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"sid":"sid-1"}}`))
+		case r.URL.Path == "/webapi/entry.cgi" && r.URL.Query().Get("api") == "SYNO.FileStation.CreateFolder":
+			createCalls++
+			_, _ = w.Write([]byte(`{"success":false,"error":{"code":400}}`))
+		case r.URL.Path == "/webapi/entry.cgi" && r.URL.Query().Get("api") == "SYNO.FileStation.List":
+			if got := r.URL.Query().Get("method"); got != "getinfo" {
+				t.Fatalf("method = %s, want getinfo", got)
+			}
+			_, _ = w.Write([]byte(`{"success":true,"data":{"files":[{"path":"/DigiDocs/documents/doc-1","name":"doc-1","isdir":true,"additional":{"size":0,"time":{"mtime":1712448000}}}]}}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	if err := provider.CreateFolder(context.Background(), "documents/doc-1"); err != nil {
+		t.Fatalf("expected existing folder to be treated as success: %v", err)
+	}
+	if createCalls != 1 {
+		t.Fatalf("create calls = %d, want 1", createCalls)
+	}
+}

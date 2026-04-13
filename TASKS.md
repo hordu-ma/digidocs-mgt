@@ -340,9 +340,12 @@
   - 已修复 `POST /api/v1/assistant/ask` 的 PostgreSQL enum 过滤报错；当前 `assistant.ask` 可正常返回 `request_id`，`GET /api/v1/assistant/requests/{id}` 返回 200/pending
   - 已修复 `scripts/codex/smoke-local.sh`：命令行环境变量优先于 `.env`，Synology preflight 固定走宿主机直连，`true/false` 布尔值可直接识别
   - 已确认 `RUN_SYNOLOGY_PREFLIGHT=1 make smoke` 的 DSM 前置验收通过：登录、建目录、上传、列目录、分享链接、下载、清理均通过
-  - 阻塞：`documents/{id}/versions` 上传仍返回 500；日志显示容器侧到群晖链路在当前机器上仍受宿主机 Tailscale / Docker 路由影响
-  - 阻塞：Assistant 请求在当前机器上停留 `pending`；已确认 `backend-py-worker` 无法访问 `host.docker.internal`，当前环境下 `worker -> OpenClaw` 不可达
-  - 阻塞：宿主机 `ip route show table 52` 仍把 `172.17.0.0/16`、`172.18.0.0/16` 指向 `tailscale0`；当前无 sudo 密码，无法直接修复主机级路由/防火墙
+  - 已用 sudo 修正宿主机 `ip route show table 52`：`172.17.0.0/16`、`172.18.0.0/16`、`192.168.1.0/24` 已改为 `throw`，容器到 `host.docker.internal` 与群晖 Tailscale 地址的主机级回流恢复
+  - 已重建 `backend-go / backend-py-worker` 容器，使运行时环境与仓库 `.env` 对齐；`backend-go` 不再误连 `host.docker.internal:15001`
+  - 已确认 Assistant 闭环恢复：`STRICT_SMOKE=1 RUN_SYNOLOGY_PREFLIGHT=1 make smoke` 中 `assistant.ask -> completed` 已通过
+  - 已修复 Synology provider：目录已存在时不再因 `SYNO.FileStation.CreateFolder` 返回 400 而中断版本上传
+  - 已修复 `scripts/codex/smoke-local.sh` 的 `healthz` 误报逻辑，宿主机直连成功时不再重复报 unreachable
+  - 当前剩余人工项：补一次前端页面人工联调，并记录最终 TLS / 反向代理 / 防火墙部署方式
 
 ## 待办
 
@@ -359,11 +362,8 @@
 - ~~增加 dashboard 聚合相关基础测试~~ ✅ 已完成
 - ~~补充数据库种子数据与真实业务链路联调~~ ✅ 已完成
 - 部署验收下一步
-  - 以 sudo 权限修正宿主机 Tailscale / Docker 路由与防火墙，确保 Docker 容器可访问群晖 Tailscale 地址与 `host.docker.internal`
-  - 重新执行 `STRICT_SMOKE=1 RUN_SYNOLOGY_PREFLIGHT=1 make smoke`
-  - 复验 `documents/{id}/versions` 上传、下载、预览闭环
-  - 复验 Assistant 请求从 `queued/pending` 到 `completed` 的闭环，以及历史查询
   - 完成一次前端人工联调，并记录最终 TLS / 反向代理 / 防火墙部署方式
+  - 视目标机器实际运维方式，把当前宿主机 `table 52 -> throw` 路由修正沉淀为持久化脚本或系统配置
 - ~~增加群晖 NAS 适配器~~ ✅ 已完成
 - ~~增加基础测试~~ ✅ 已完成
 - ~~增加更细粒度的 smoke test 和分层验证矩阵~~ ✅ 已完成（smoke-local.sh 已覆盖业务端点）
