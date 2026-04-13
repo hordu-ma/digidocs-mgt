@@ -233,6 +233,7 @@ docker compose up -d postgres
 - 已完成 JWT 用户 ID 透传至所有审计事件写入（middleware → handlers → repositories）
 - 已完成前端四个页面接入真实后端 API（仪表盘、文档列表、文档详情、交接单）
 - 已修复宿主机 Docker 端口转发问题（Tailscale 路由表与 Docker 网桥冲突）
+- 已完善客户介绍文档展示素材，补充系统架构图与系统截图，便于客户侧方案说明与 PDF 输出准备
 - 已通过宿主机验证所有 API 端点：login、auth/me、documents、dashboard、versions、flows、handovers
 - 已完成前后端联调验证（Vite proxy → backend-go → PostgreSQL 全链路通过）
 - 已修复 `DocumentDetail` API 返回 `current_owner` 含 display_name（与 `DocumentListItem` 对齐）

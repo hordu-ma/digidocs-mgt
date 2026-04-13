@@ -143,6 +143,10 @@
 - 完成前后端联调验证
   - Vite dev server 代理至后端，所有页面 API 端点验证通过
   - 修复 `DocumentDetail` API 返回 `current_owner`（含 display_name）替代原 `current_owner_id`
+- 完成客户介绍文档首轮视觉增强
+  - `docs/digidocs-mgt-customer-intro.md` 新增 4 张系统截图展示
+  - 新增 `DGX Spark + 群晖 DS925+ + OpenClaw` 系统架构图
+  - 为后续导出 PDF 预留统一文档资产目录
 - 完成 Go 后端核心业务服务层单元测试
   - `auth_service_test.go`：登录成功、用户不存在、密码错误、仓库层错误传播（4 用例）
   - `action_service_test.go`：ApplyFlow/CreateHandover/UpdateHandoverItems/ApplyHandover 委托验证与错误传播（5 用例）

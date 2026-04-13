@@ -29,6 +29,39 @@
 - 以“负责人总览”看到各课题当前进度、风险点和长期未处理文档；
 - 以 `OpenClaw` 为智能助理，对已有材料提供摘要、问答、归类建议、交接梳理和风险提示。
 
+### 2.1 系统界面实拍
+
+下面 4 张图片为当前系统真实截图，用于帮助客户快速感知产品界面风格、信息组织方式与管理视角。正式落地时，页面中的组织名称、字段口径和接入配置可按客户现场环境调整。
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="assets/customer-intro/2026-04-13_09-12.png" alt="DigiDocs Mgt 系统界面实拍 1" />
+      <br />
+      <sub>图 1：DigiDocs Mgt 系统界面实拍 1</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="assets/customer-intro/2026-04-13_09-13.png" alt="DigiDocs Mgt 系统界面实拍 2" />
+      <br />
+      <sub>图 2：DigiDocs Mgt 系统界面实拍 2</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="assets/customer-intro/2026-04-13_09-14.png" alt="DigiDocs Mgt 系统界面实拍 3" />
+      <br />
+      <sub>图 3：DigiDocs Mgt 系统界面实拍 3</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="assets/customer-intro/2026-04-13_09-15.png" alt="DigiDocs Mgt 系统界面实拍 4" />
+      <br />
+      <sub>图 4：DigiDocs Mgt 系统界面实拍 4</sub>
+    </td>
+  </tr>
+</table>
+
+> 这组截图建议保留在客户版方案中：一方面能降低“纯概念方案”带来的距离感，另一方面也为后续导出 PDF 提供更直观的展示素材。
+
 ## 3. 应用场景
 
 ### 3.1 课题启动阶段
@@ -150,6 +183,25 @@
 
 ## 6. 推荐部署方案
 
+### 6.1 系统总体架构
+
+下图展示 `DigiDocs Mgt`、`DGX Spark`、`OpenClaw` 与 `群晖 DS925+` 的协同方式。整体思路是“DGX Spark 负责应用与智能处理，群晖负责文件与数据库底座”，这样既便于后续运维，也能保持 AI 能力与正式业务状态的边界清晰。
+
+<p align="center">
+  <img src="assets/customer-intro/system-architecture.svg" alt="DigiDocs Mgt 系统总体架构图" width="100%" />
+</p>
+<p align="center">
+  <sub>图 5：DigiDocs Mgt + DGX Spark + 群晖 DS925+ 系统总体架构</sub>
+</p>
+
+从客户视角看，这张图可以概括为三句话：
+
+1. `DGX Spark` 负责跑系统前后端、异步任务和 `OpenClaw` 智能能力；
+2. `群晖 DS925+` 负责承载文件资产与数据库主账本；
+3. `OpenClaw` 只提供摘要、问答、建议等辅助能力，不直接改正式业务状态。
+
+### 6.2 推荐硬件组合
+
 本项目建议继续采用“两台正式部署机器”的方案：
 
 - `NVIDIA DGX Spark`
@@ -163,6 +215,7 @@
 - AI 计算和存储职责分开；
 - `OpenClaw` 与业务平台协同运行，但不直接改正式业务状态，边界清晰；
 - 负责人更容易理解“哪台机器负责算、哪台机器负责存”；
+- 业务元数据与文件资产分层放置，便于后续扩容、备份与审计；
 - 现场扩容时也更容易分步升级。
 
 ## 7. 基础硬件与网络清单
