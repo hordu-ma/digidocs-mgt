@@ -443,16 +443,16 @@ onBeforeUnmount(() => {
           >
             {{ act.label }}
           </ElButton>
+          <ElButton @click="openEdit">
+            <ElIcon><EditPen /></ElIcon>
+            档案编辑
+          </ElButton>
           <ElButton
             v-if="doc.current_version_id"
             @click="downloadVersion(doc.current_version_id, versions[0]?.file_name)"
           >
             <ElIcon><Download /></ElIcon>
             下载当前版本
-          </ElButton>
-          <ElButton @click="openEdit">
-            <ElIcon><EditPen /></ElIcon>
-            编辑信息
           </ElButton>
           <ElButton @click="openUpload">
             <ElIcon><Upload /></ElIcon>
