@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Setting, User, OfficeBuilding, FolderOpened } from "@element-plus/icons-vue";
 import { useAuthStore } from "@/stores/auth";
+import AppLayout from "@/components/AppLayout.vue";
 
 const auth = useAuthStore();
 const API = "/api/v1";
@@ -237,6 +238,7 @@ onMounted(() => {
 </script>
 
 <template>
+  <AppLayout>
   <div class="admin-view">
     <h2 class="page-title">
       <ElIcon :size="22"><Setting /></ElIcon>
@@ -430,6 +432,7 @@ onMounted(() => {
       </ElTabPane>
     </ElTabs>
   </div>
+  </AppLayout>
 </template>
 
 <style scoped>

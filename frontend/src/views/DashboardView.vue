@@ -79,6 +79,11 @@ onMounted(async () => {
         <ElCard class="page-card">
           <template #header>近期流转</template>
           <ElTable :data="recentFlows" style="width: 100%">
+            <template #empty>
+              <div style="padding: 32px 0; color: #909399; font-size: 13px">
+                暂无流转记录
+              </div>
+            </template>
             <ElTableColumn prop="title" label="文档" />
             <ElTableColumn label="操作">
               <template #default="{ row }">
