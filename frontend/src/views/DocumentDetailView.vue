@@ -415,7 +415,7 @@ onBeforeUnmount(() => {
 
       <ElCard class="page-card">
         <template #header>版本历史</template>
-        <ElTable :data="versions">
+        <ElTable :data="versions" empty-text="暂无版本记录">
           <ElTableColumn prop="version_no" label="版本号" />
           <ElTableColumn prop="file_name" label="文件名" />
           <ElTableColumn prop="summary_status" label="摘要状态" />
@@ -425,7 +425,7 @@ onBeforeUnmount(() => {
 
       <ElCard class="page-card">
         <template #header>流转历史</template>
-        <ElTable :data="flows">
+        <ElTable :data="flows" empty-text="暂无流转记录">
           <ElTableColumn prop="action" label="操作" />
           <ElTableColumn label="来源状态">
             <template #default="{ row }">{{

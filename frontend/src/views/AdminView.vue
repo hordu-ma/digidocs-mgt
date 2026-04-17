@@ -254,7 +254,7 @@ onMounted(() => {
             <ElIcon><OfficeBuilding /></ElIcon> 新建空间
           </ElButton>
         </div>
-        <ElTable :data="teamSpaces" v-loading="tsLoading" stripe style="width:100%">
+        <ElTable :data="teamSpaces" v-loading="tsLoading" stripe style="width:100%" empty-text="暂无团队空间">
           <ElTableColumn prop="name" label="名称" />
           <ElTableColumn prop="code" label="代码" width="180" />
         </ElTable>
@@ -280,7 +280,7 @@ onMounted(() => {
             <ElIcon><FolderOpened /></ElIcon> 新建项目
           </ElButton>
         </div>
-        <ElTable :data="projects" v-loading="projLoading" stripe style="width:100%">
+        <ElTable :data="projects" v-loading="projLoading" stripe style="width:100%" empty-text="暂无项目">
           <ElTableColumn prop="name" label="项目名称" />
           <ElTableColumn prop="code" label="代码" width="160" />
           <ElTableColumn label="负责人" width="140">
@@ -319,7 +319,7 @@ onMounted(() => {
             <ElIcon><User /></ElIcon> 新建用户
           </ElButton>
         </div>
-        <ElTable :data="users" v-loading="userLoading" stripe style="width:100%">
+        <ElTable :data="users" v-loading="userLoading" stripe style="width:100%" empty-text="暂无用户">
           <ElTableColumn prop="display_name" label="姓名" width="120" />
           <ElTableColumn prop="username" label="账号" width="120" />
           <ElTableColumn label="角色" width="120">
@@ -384,7 +384,7 @@ onMounted(() => {
           </ElButton>
         </div>
 
-        <ElTable v-if="memberProjectId" :data="members" v-loading="memberLoading" stripe style="width:100%">
+        <ElTable v-if="memberProjectId" :data="members" v-loading="memberLoading" stripe style="width:100%" empty-text="暂无成员">
           <ElTableColumn prop="display_name" label="姓名" width="120" />
           <ElTableColumn prop="username" label="账号" width="120" />
           <ElTableColumn label="项目角色" width="180">

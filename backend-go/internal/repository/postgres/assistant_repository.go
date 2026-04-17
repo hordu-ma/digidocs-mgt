@@ -971,7 +971,7 @@ func buildSuggestionItems(
 				ID:             newID(),
 				RelatedType:    req.RelatedType,
 				RelatedID:      req.RelatedID,
-				SuggestionType: fallbackString(stringValue(m["suggestion_type"]), suggestionTypeForRequest(req.RequestType)),
+				SuggestionType: normalizeSuggestionType(stringValue(m["suggestion_type"]), suggestionTypeForRequest(req.RequestType)),
 				Status:         "pending",
 				Title:          fallbackString(stringValue(m["title"]), defaultSuggestionTitle(req.RequestType)+"-"+strconv.Itoa(i+1)),
 				Content:        content,
@@ -1000,6 +1000,23 @@ func suggestionTypeForRequest(requestType string) string {
 	default:
 		return "document_summary"
 	}
+}
+
+var validSuggestionTypes = map[string]bool{
+	"document_summary":          true,
+	"document_tag":              true,
+	"risk_alert":                true,
+	"handover_summary":          true,
+	"archive_recommendation":    true,
+	"structure_recommendation":  true,
+}
+
+// normalizeSuggestionType returns raw if it's a valid enum value, otherwise fallback.
+func normalizeSuggestionType(raw, fallback string) string {
+	if validSuggestionTypes[raw] {
+		return raw
+	}
+	return fallback
 }
 
 func defaultSuggestionTitle(requestType string) string {

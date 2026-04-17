@@ -47,7 +47,9 @@ class CallbackClient:
                 if parsed_dict is not None:
                     return parsed_dict
         except Exception:
-            logger.warning("callback failed for request_id=%s", result.request_id)
+            logger.warning(
+                "callback failed for request_id=%s", result.request_id, exc_info=True
+            )
 
         return {
             "callback_base_url": self.base_url,

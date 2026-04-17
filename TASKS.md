@@ -430,6 +430,15 @@
   - `DocumentDetailView` 提交摘要后捕获 `request_id`，启动 2.5 秒间隔轮询
   - 轮询期间显示动画提示（"AI 正在分析文档并生成摘要"），完成后自动刷新建议列表
   - 页面卸载时清理轮询定时器
+- 修复文档摘要回调失败（P0 阻塞性 Bug）
+  - 根因：Worker 回调 `POST /internal/worker-results` 返回 500，因 OpenClaw 返回的 `suggestion_type`（如 `"clarity"`）不在 PostgreSQL `suggestion_type` 枚举范围内
+  - 修复：`buildSuggestionItems` 新增 `normalizeSuggestionType()` 验证函数，非法值回退到请求类型默认值
+  - 同步增强 `callback_client.py` 日志（`exc_info=True`）和 `internal_worker.go` 错误日志
+  - 已重新处理全部 4 个卡住的 `document.summarize` 任务，全部 `completed`
+  - 端到端验证通过：摘要文本写入 `document_versions.summary_text`，建议写入 `assistant_suggestions`
+- 全局优化表格空状态显示
+  - `DocumentDetailView`：版本记录表 → "暂无版本记录"，流转记录表 → "暂无流转记录"
+  - `AdminView`：团队空间 → "暂无团队空间"，项目 → "暂无项目"，用户 → "暂无用户"，成员 → "暂无成员"
 
 ## 待办
 

@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 
 	"digidocs-mgt/backend-go/internal/config"
@@ -43,6 +44,7 @@ func (h InternalWorkerHandler) ReceiveResult(w http.ResponseWriter, r *http.Requ
 			response.WriteError(w, http.StatusNotFound, "not_found", "assistant request not found")
 			return
 		}
+		log.Printf("[worker-callback] error persisting result request_id=%s: %v", result.RequestID, err)
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to persist worker result")
 		return
 	}
