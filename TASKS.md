@@ -414,6 +414,13 @@
   - P1：文档上传（`DocumentHandler.Create`、`VersionHandler.Upload`）成功后自动队列 `document.extract_text` 任务，新文档无需手动触发即可被助手读取
   - Worker Dockerfile 增加 `poppler-utils`，支持 PDF 正文抽取（`pdftotext`）
   - 已为现有 15 份文档批量补发抽取任务，12 份成功（3 份为 .pptx/.xlsx/.doc 暂不支持）
+- 完成 .xlsx/.pptx/.doc 文档正文抽取支持
+  - `.xlsx`：解析 sheet XML 按行列顺序提取单元格文本，支持 sharedStrings 与 inlineStr
+  - `.pptx`：逐页提取幻灯片文本，保留段落与页面边界
+  - `.doc`：通过 `antiword` CLI 抽取旧版 Word 二进制格式正文
+  - Worker Dockerfile 新增 `antiword` 系统依赖
+  - 新增 7 个单元测试覆盖三种格式（含边界与缺失依赖场景）
+  - 已为之前失败的 3 份文档重新抽取，全部 15/15 成功
 
 ## 待办
 

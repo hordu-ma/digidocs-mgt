@@ -290,6 +290,7 @@ docker compose up -d postgres
 - 已修复管理页面布局（AppLayout 包裹）与总览页近期流转空状态中文化
 - 已完成权限过滤：非 admin 用户仅可见其所属项目及关联空间；文档页空项目也显示占位卡片
 - 已完成 AI 助手文档内容读取能力修复：`assistant.ask` 自动内联抽取文档正文（P0）、文档上传自动触发文本抽取任务（P1）、Worker 新增 PDF 正文抽取支持（`poppler-utils`）
+- 已完成 .xlsx/.pptx/.doc 文档正文抽取支持，Worker 新增 `antiword` 依赖，全部 15 份文档抽取成功
 - 当前下一步聚焦：把当前 Linux 单机运维方案复制到目标正式主机，并复验一次正式环境联调
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。
