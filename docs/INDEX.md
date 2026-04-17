@@ -11,6 +11,7 @@
 | [API设计.md](API设计.md) | REST 接口契约、请求/响应结构、错误码 |
 | [异步任务消息契约.md](异步任务消息契约.md) | Go → Python Worker 任务消息与结果回写结构 |
 | [部署准备与运行说明.md](部署准备与运行说明.md) | 仓库内部署资产、环境模板与启动顺序 |
+| [现场部署逐条清单.md](现场部署逐条清单.md) | 给现场同事逐条执行的部署清单 |
 | [backend-go代码说明.md](backend-go代码说明.md) | backend-go 目录逐文件职责说明与主业务链路说明 |
 | [backend-go核心源码学习导读.md](backend-go核心源码学习导读.md) | 面向 Go 初学者的 backend-go 核心文件函数级与代码块级学习导读 |
 | [backend-py-worker代码说明.md](backend-py-worker代码说明.md) | backend-py-worker 目录逐文件职责说明与 Worker 链路说明 |
