@@ -6,14 +6,22 @@ BEGIN;
 
 -- ========== 用户 ==========
 -- 所有用户密码均为 admin123
-INSERT INTO users (id, username, password_hash, display_name, role, status)
+INSERT INTO users (id, username, password_hash, display_name, role, email, phone, wechat, status)
 VALUES
-  ('00000000-0000-0000-0000-000000000001', 'admin',    '$2a$10$pdsqFlKnIy5xlyBaH4c/N.4nI.wOZ2G9pQFx9VlznVFFBnwbgW7iu', '系统管理员', 'admin',        'active'),
-  ('00000000-0000-0000-0000-000000000010', 'zhangsan', '$2a$10$pdsqFlKnIy5xlyBaH4c/N.4nI.wOZ2G9pQFx9VlznVFFBnwbgW7iu', '张三',       'project_lead', 'active'),
-  ('00000000-0000-0000-0000-000000000011', 'lisi',     '$2a$10$pdsqFlKnIy5xlyBaH4c/N.4nI.wOZ2G9pQFx9VlznVFFBnwbgW7iu', '李四',       'member',       'active'),
-  ('00000000-0000-0000-0000-000000000012', 'wangwu',   '$2a$10$pdsqFlKnIy5xlyBaH4c/N.4nI.wOZ2G9pQFx9VlznVFFBnwbgW7iu', '王五',       'member',       'active'),
-  ('00000000-0000-0000-0000-000000000013', 'zhaoliu',  '$2a$10$pdsqFlKnIy5xlyBaH4c/N.4nI.wOZ2G9pQFx9VlznVFFBnwbgW7iu', '赵六',       'member',       'active')
-ON CONFLICT (username) DO NOTHING;
+  ('00000000-0000-0000-0000-000000000001', 'admin',       '$2a$10$pdsqFlKnIy5xlyBaH4c/N.4nI.wOZ2G9pQFx9VlznVFFBnwbgW7iu', '系统管理员', 'admin',        NULL, NULL, NULL, 'active'),
+  ('00000000-0000-0000-0000-000000000010', 'maliguo',     '$2a$10$pdsqFlKnIy5xlyBaH4c/N.4nI.wOZ2G9pQFx9VlznVFFBnwbgW7iu', '马立国',     'project_lead', NULL, NULL, NULL, 'active'),
+  ('00000000-0000-0000-0000-000000000011', 'qiaoanqiang', '$2a$10$pdsqFlKnIy5xlyBaH4c/N.4nI.wOZ2G9pQFx9VlznVFFBnwbgW7iu', '乔安强',     'member',       NULL, NULL, NULL, 'active'),
+  ('00000000-0000-0000-0000-000000000012', 'wangzhao',    '$2a$10$pdsqFlKnIy5xlyBaH4c/N.4nI.wOZ2G9pQFx9VlznVFFBnwbgW7iu', '王钊',       'member',       NULL, NULL, NULL, 'active'),
+  ('00000000-0000-0000-0000-000000000013', 'liuzongyou',  '$2a$10$pdsqFlKnIy5xlyBaH4c/N.4nI.wOZ2G9pQFx9VlznVFFBnwbgW7iu', '刘宗优',     'member',       NULL, NULL, NULL, 'active')
+ON CONFLICT (id) DO UPDATE
+SET username = EXCLUDED.username,
+    display_name = EXCLUDED.display_name,
+    role = EXCLUDED.role,
+    email = COALESCE(users.email, EXCLUDED.email),
+    phone = COALESCE(users.phone, EXCLUDED.phone),
+    wechat = COALESCE(users.wechat, EXCLUDED.wechat),
+    status = EXCLUDED.status,
+    updated_at = NOW();
 
 -- ========== 团队空间 ==========
 INSERT INTO team_spaces (id, name, code, description, created_by)
@@ -29,6 +37,20 @@ VALUES
   ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', '课题B-鲁棒控制', 'proj-b', '00000000-0000-0000-0000-000000000010'),
   ('20000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000002', '课题C-强化学习', 'proj-c', '00000000-0000-0000-0000-000000000011')
 ON CONFLICT ON CONSTRAINT uq_projects_team_space_code DO NOTHING;
+
+-- ========== 项目成员 ==========
+INSERT INTO project_members (project_id, user_id, project_role)
+VALUES
+  ('20000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'owner'),
+  ('20000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'contributor'),
+  ('20000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000012', 'contributor'),
+  ('20000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000013', 'contributor'),
+  ('20000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000010', 'owner'),
+  ('20000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000012', 'contributor'),
+  ('20000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000011', 'owner')
+ON CONFLICT ON CONSTRAINT uq_project_members_project_user DO UPDATE
+SET project_role = EXCLUDED.project_role,
+    updated_at = NOW();
 
 -- ========== 目录 ==========
 INSERT INTO folders (id, project_id, parent_id, name, path)

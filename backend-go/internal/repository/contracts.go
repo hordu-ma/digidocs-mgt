@@ -62,6 +62,17 @@ type ActionWriter interface {
 	ApplyHandover(ctx context.Context, input command.HandoverActionInput) (map[string]any, error)
 }
 
+type PermissionReader interface {
+	CanCreateDocument(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
+	CanUpdateDocument(ctx context.Context, actorID string, actorRole string, documentID string) (bool, error)
+	CanDeleteDocument(ctx context.Context, actorID string, actorRole string, documentID string) (bool, error)
+	CanUploadVersion(ctx context.Context, actorID string, actorRole string, documentID string) (bool, error)
+	CanFlowDocument(ctx context.Context, actorID string, actorRole string, documentID string, action string) (bool, error)
+	CanCreateHandover(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
+	CanUpdateHandoverItems(ctx context.Context, actorID string, actorRole string, handoverID string) (bool, error)
+	CanApplyHandover(ctx context.Context, actorID string, actorRole string, handoverID string, action string) (bool, error)
+}
+
 type DocumentReader interface {
 	ListDocuments(ctx context.Context, filter query.DocumentListFilter) ([]query.DocumentListItem, int, error)
 	GetDocument(ctx context.Context, documentID string) (*query.DocumentDetail, error)

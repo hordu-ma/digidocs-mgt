@@ -8,6 +8,7 @@ type DocumentCreateInput struct {
 	Description    string
 	CurrentOwnerID string
 	ActorID        string
+	ActorRole      string
 }
 
 type DocumentUpdateInput struct {
@@ -16,12 +17,14 @@ type DocumentUpdateInput struct {
 	Description string
 	FolderID    string
 	ActorID     string
+	ActorRole   string
 }
 
 type DocumentDeleteInput struct {
 	DocumentID string
 	Reason     string
 	ActorID    string
+	ActorRole  string
 }
 
 type FlowActionInput struct {
@@ -30,6 +33,7 @@ type FlowActionInput struct {
 	Note       string
 	ToUserID   string
 	ActorID    string
+	ActorRole  string
 }
 
 type VersionCreateInput struct {
@@ -40,6 +44,7 @@ type VersionCreateInput struct {
 	StorageObjectKey string
 	StorageProvider  string
 	ActorID          string
+	ActorRole        string
 }
 
 type HandoverCreateInput struct {
@@ -48,6 +53,7 @@ type HandoverCreateInput struct {
 	ProjectID      string
 	Remark         string
 	ActorID        string
+	ActorRole      string
 }
 
 type HandoverItemInput struct {
@@ -60,6 +66,7 @@ type HandoverItemUpdateInput struct {
 	HandoverID string
 	Items      []HandoverItemInput
 	ActorID    string
+	ActorRole  string
 }
 
 type HandoverActionInput struct {
@@ -68,4 +75,5 @@ type HandoverActionInput struct {
 	Note       string
 	Reason     string
 	ActorID    string
+	ActorRole  string
 }

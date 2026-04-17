@@ -18,7 +18,15 @@ func (r UserQueryRepository) ListUsers(ctx context.Context) ([]query.UserOption,
 	rows, err := r.db.QueryContext(
 		ctx,
 		`
-		SELECT id::text, display_name, role::text
+		SELECT
+			id::text,
+			username,
+			display_name,
+			role::text,
+			COALESCE(email, ''),
+			COALESCE(phone, ''),
+			COALESCE(wechat, ''),
+			status
 		FROM users
 		WHERE status = 'active'
 		ORDER BY
@@ -38,7 +46,16 @@ func (r UserQueryRepository) ListUsers(ctx context.Context) ([]query.UserOption,
 	items := make([]query.UserOption, 0)
 	for rows.Next() {
 		var item query.UserOption
-		if err := rows.Scan(&item.ID, &item.DisplayName, &item.Role); err != nil {
+		if err := rows.Scan(
+			&item.ID,
+			&item.Username,
+			&item.DisplayName,
+			&item.Role,
+			&item.Email,
+			&item.Phone,
+			&item.Wechat,
+			&item.Status,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, item)

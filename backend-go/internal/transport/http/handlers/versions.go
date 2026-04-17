@@ -45,11 +45,16 @@ func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		r.FormValue("commit_message"),
 		file,
 		middleware.UserIDFromContext(r.Context()),
+		middleware.UserRoleFromContext(r.Context()),
 	)
 	if err != nil {
 		log.Printf("[versions] upload failed document=%s actor=%s err=%v", r.PathValue("documentID"), middleware.UserIDFromContext(r.Context()), err)
 		if errors.Is(err, service.ErrValidation) {
 			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrForbidden) {
+			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
 			return
 		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to upload version")

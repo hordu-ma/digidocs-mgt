@@ -102,6 +102,21 @@
 - 完成数据库种子数据与 PostgreSQL 端到端验证
   - 创建 `backend-go/sql/seed.sql`（5 用户、2 团队空间、3 项目、5 文件夹、7 文档、8 版本、4 流转记录、9 审计事件）
   - 已在 Docker 容器内加载种子数据并验证
+- 完成 `wuhao-ai` 测试项目数据补充
+  - 新增 `backend-go/sql/wuhao_ai_seed.sql`
+  - 新增 `scripts/codex/load-wuhao-ai-fixtures.sh`
+  - 已加载五好爱学测试项目、5 个目录、11 份文档、11 个版本、3 条流转记录、14 条审计事件
+  - 当前 `.env` 使用 `STORAGE_BACKEND=synology`，若群晖链路不可达，fixture 默认加载文档元数据；设置 `WUHAO_LOAD_MODE=upload` 可尝试通过现有上传 API 推送真实文件
+- 完成测试用户实名与联系方式字段补强
+  - 现有测试用户更新为：`maliguo / 马立国`、`qiaoanqiang / 乔安强`、`wangzhao / 王钊`、`liuzongyou / 刘宗优`
+  - 新增迁移 `004_user_wechat.sql`，为 `users` 表增加 `wechat`
+  - `/api/v1/users` 已扩展返回 `username / email / phone / wechat / status`
+- 完成首期角色与权限矩阵落地
+  - 新增迁移 `005_project_members_permissions.sql`，引入 `project_members.project_role`
+  - 项目角色固定为 `owner / manager / contributor / viewer`
+  - 后端新增权限查询仓储与 `PermissionService`
+  - 文档创建、元数据修改、删除/恢复、版本上传、流转动作、交接创建/清单编辑/状态动作已接入权限校验
+  - 已完成容器内权限烟测：文档当前责任人可修改元数据，但无法删除文档
 - 完成 JWT 用户 ID 透传至审计事件写入
   - `auth.go` 中间件解析 Claims 注入请求上下文
   - `handlers/flows.go`、`handlers/handovers.go`、`handlers/versions.go` 从上下文提取 ActorID

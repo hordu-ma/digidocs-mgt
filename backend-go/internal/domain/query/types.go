@@ -7,8 +7,13 @@ type UserSummary struct {
 
 type UserOption struct {
 	ID          string `json:"id"`
+	Username    string `json:"username"`
 	DisplayName string `json:"display_name"`
 	Role        string `json:"role"`
+	Email       string `json:"email,omitempty"`
+	Phone       string `json:"phone,omitempty"`
+	Wechat      string `json:"wechat,omitempty"`
+	Status      string `json:"status,omitempty"`
 }
 
 type TeamSpaceSummary struct {

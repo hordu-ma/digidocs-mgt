@@ -12,17 +12,23 @@ import (
 )
 
 type VersionService struct {
-	storage  storage.Provider
-	workflow repository.VersionWorkflow
-	reader   repository.VersionReader
+	storage     storage.Provider
+	workflow    repository.VersionWorkflow
+	reader      repository.VersionReader
+	permissions PermissionService
 }
 
 func NewVersionService(
 	storage storage.Provider,
 	workflow repository.VersionWorkflow,
 	reader repository.VersionReader,
+	permissions ...PermissionService,
 ) VersionService {
-	return VersionService{storage: storage, workflow: workflow, reader: reader}
+	permissionService := PermissionService{}
+	if len(permissions) > 0 {
+		permissionService = permissions[0]
+	}
+	return VersionService{storage: storage, workflow: workflow, reader: reader, permissions: permissionService}
 }
 
 func (s VersionService) UploadAndCreateVersion(
@@ -33,6 +39,7 @@ func (s VersionService) UploadAndCreateVersion(
 	commitMessage string,
 	reader io.Reader,
 	actorID string,
+	actorRoles ...string,
 ) (map[string]any, error) {
 	if documentID == "" {
 		return nil, fmt.Errorf("%w: document_id is required", ErrValidation)
@@ -42,6 +49,13 @@ func (s VersionService) UploadAndCreateVersion(
 	}
 	if actorID == "" {
 		return nil, fmt.Errorf("%w: actor_id is required", ErrValidation)
+	}
+	actorRole := ""
+	if len(actorRoles) > 0 {
+		actorRole = actorRoles[0]
+	}
+	if err := s.permissions.EnsureUploadVersion(ctx, actorID, actorRole, documentID); err != nil {
+		return nil, err
 	}
 
 	objectKey := fmt.Sprintf("documents/%s/%s", documentID, fileName)

@@ -16,12 +16,17 @@ var validHandoverActions = map[string]bool{
 }
 
 type HandoverService struct {
-	reader repository.HandoverReader
-	writer repository.ActionWriter
+	reader      repository.HandoverReader
+	writer      repository.ActionWriter
+	permissions PermissionService
 }
 
-func NewHandoverService(reader repository.HandoverReader, writer repository.ActionWriter) HandoverService {
-	return HandoverService{reader: reader, writer: writer}
+func NewHandoverService(reader repository.HandoverReader, writer repository.ActionWriter, permissions ...PermissionService) HandoverService {
+	permissionService := PermissionService{}
+	if len(permissions) > 0 {
+		permissionService = permissions[0]
+	}
+	return HandoverService{reader: reader, writer: writer, permissions: permissionService}
 }
 
 func (s HandoverService) Create(ctx context.Context, input command.HandoverCreateInput) (map[string]any, error) {
@@ -34,6 +39,9 @@ func (s HandoverService) Create(ctx context.Context, input command.HandoverCreat
 	if input.ActorID == "" {
 		return nil, fmt.Errorf("%w: actor_id is required", ErrValidation)
 	}
+	if err := s.permissions.EnsureCreateHandover(ctx, input.ActorID, input.ActorRole, input.ProjectID); err != nil {
+		return nil, err
+	}
 	return s.writer.CreateHandover(ctx, input)
 }
 
@@ -43,6 +51,9 @@ func (s HandoverService) UpdateItems(ctx context.Context, input command.Handover
 	}
 	if len(input.Items) == 0 {
 		return nil, fmt.Errorf("%w: items must not be empty", ErrValidation)
+	}
+	if err := s.permissions.EnsureUpdateHandoverItems(ctx, input.ActorID, input.ActorRole, input.HandoverID); err != nil {
+		return nil, err
 	}
 	return s.writer.UpdateHandoverItems(ctx, input)
 }
@@ -56,6 +67,9 @@ func (s HandoverService) ApplyAction(ctx context.Context, input command.Handover
 	}
 	if input.ActorID == "" {
 		return nil, fmt.Errorf("%w: actor_id is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureApplyHandover(ctx, input.ActorID, input.ActorRole, input.HandoverID, input.Action); err != nil {
+		return nil, err
 	}
 	return s.writer.ApplyHandover(ctx, input)
 }

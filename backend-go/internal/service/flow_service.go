@@ -19,12 +19,17 @@ var validFlowActions = map[string]bool{
 }
 
 type FlowService struct {
-	reader repository.FlowReader
-	writer repository.ActionWriter
+	reader      repository.FlowReader
+	writer      repository.ActionWriter
+	permissions PermissionService
 }
 
-func NewFlowService(reader repository.FlowReader, writer repository.ActionWriter) FlowService {
-	return FlowService{reader: reader, writer: writer}
+func NewFlowService(reader repository.FlowReader, writer repository.ActionWriter, permissions ...PermissionService) FlowService {
+	permissionService := PermissionService{}
+	if len(permissions) > 0 {
+		permissionService = permissions[0]
+	}
+	return FlowService{reader: reader, writer: writer, permissions: permissionService}
 }
 
 func (s FlowService) ApplyAction(ctx context.Context, input command.FlowActionInput) (map[string]any, error) {
@@ -42,6 +47,9 @@ func (s FlowService) ApplyAction(ctx context.Context, input command.FlowActionIn
 	}
 	if input.ActorID == "" {
 		return nil, fmt.Errorf("%w: actor_id is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureFlowDocument(ctx, input.ActorID, input.ActorRole, input.DocumentID, input.Action); err != nil {
+		return nil, err
 	}
 	return s.writer.CreateFlowRecord(ctx, input)
 }

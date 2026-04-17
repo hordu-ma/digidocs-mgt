@@ -109,8 +109,13 @@
   "data": [
     {
       "id": "uuid",
+      "username": "zhangsan",
       "display_name": "张三",
-      "role": "member"
+      "role": "member",
+      "email": "zhangsan@example.com",
+      "phone": "13800000000",
+      "wechat": "zhangsan_wechat",
+      "status": "active"
     }
   ]
 }
@@ -173,6 +178,38 @@
       "children": []
     }
   ]
+}
+```
+
+### 3.5 首期权限矩阵
+
+首期权限由后端固定矩阵判断，不提供可配置 RBAC 后台。判断依据为：
+
+- JWT 中的全局角色：`admin` / `project_lead` / `member`
+- `project_members.project_role`：`owner` / `manager` / `contributor` / `viewer`
+- 文档当前责任人：`documents.current_owner_id`
+
+写操作权限：
+
+| 接口/动作 | 授权规则 |
+| --- | --- |
+| 创建文档 | `admin`、项目 `owner/manager/contributor` |
+| 修改文档元数据 | `admin`、项目 `owner/manager`、文档当前责任人 |
+| 删除 / 恢复文档 | `admin`、项目 `owner/manager` |
+| 上传新版本 | `admin`、项目 `owner/manager`、文档当前责任人 |
+| 普通流转动作 | `admin`、项目 `owner/manager`、文档当前责任人 |
+| 定稿 / 归档 / 取消归档 | `admin`、项目 `owner/manager` |
+| 发起交接 | `admin`、项目 `owner/manager` |
+| 编辑交接清单 | `admin`、项目 `owner/manager` |
+| 确认交接 | `admin`、项目 `owner/manager`、交接接收人 |
+| 完成交接 / 取消交接 | `admin`、项目 `owner/manager` |
+
+权限不足时统一返回：
+
+```json
+{
+  "code": "forbidden",
+  "message": "permission denied"
 }
 ```
 

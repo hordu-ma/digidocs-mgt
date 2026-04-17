@@ -12,10 +12,11 @@ import (
 )
 
 type DocumentService struct {
-	reader   repository.DocumentReader
-	writer   repository.DocumentWriter
-	storage  storage.Provider
-	workflow repository.VersionWorkflow
+	reader      repository.DocumentReader
+	writer      repository.DocumentWriter
+	storage     storage.Provider
+	workflow    repository.VersionWorkflow
+	permissions PermissionService
 }
 
 func NewDocumentService(
@@ -23,12 +24,18 @@ func NewDocumentService(
 	writer repository.DocumentWriter,
 	storage storage.Provider,
 	workflow repository.VersionWorkflow,
+	permissions ...PermissionService,
 ) DocumentService {
+	permissionService := PermissionService{}
+	if len(permissions) > 0 {
+		permissionService = permissions[0]
+	}
 	return DocumentService{
-		reader:   reader,
-		writer:   writer,
-		storage:  storage,
-		workflow: workflow,
+		reader:      reader,
+		writer:      writer,
+		storage:     storage,
+		workflow:    workflow,
+		permissions: permissionService,
 	}
 }
 
@@ -47,6 +54,9 @@ func (s DocumentService) UpdateDocument(ctx context.Context, input command.Docum
 	if input.Title == "" && input.Description == "" && input.FolderID == "" {
 		return nil, fmt.Errorf("%w: at least one field (title, description, folder_id) must be provided", ErrValidation)
 	}
+	if err := s.permissions.EnsureUpdateDocument(ctx, input.ActorID, input.ActorRole, input.DocumentID); err != nil {
+		return nil, err
+	}
 	return s.writer.UpdateDocument(ctx, input)
 }
 
@@ -54,12 +64,22 @@ func (s DocumentService) DeleteDocument(ctx context.Context, input command.Docum
 	if input.DocumentID == "" {
 		return fmt.Errorf("%w: document_id is required", ErrValidation)
 	}
+	if err := s.permissions.EnsureDeleteDocument(ctx, input.ActorID, input.ActorRole, input.DocumentID); err != nil {
+		return err
+	}
 	return s.writer.DeleteDocument(ctx, input)
 }
 
-func (s DocumentService) RestoreDocument(ctx context.Context, documentID string, actorID string) error {
+func (s DocumentService) RestoreDocument(ctx context.Context, documentID string, actorID string, actorRoles ...string) error {
 	if documentID == "" {
 		return fmt.Errorf("%w: document_id is required", ErrValidation)
+	}
+	actorRole := ""
+	if len(actorRoles) > 0 {
+		actorRole = actorRoles[0]
+	}
+	if err := s.permissions.EnsureDeleteDocument(ctx, actorID, actorRole, documentID); err != nil {
+		return err
 	}
 	return s.writer.RestoreDocument(ctx, documentID, actorID)
 }
@@ -89,6 +109,9 @@ func (s DocumentService) CreateWithFirstVersion(
 	}
 	if fileName == "" {
 		return nil, fmt.Errorf("%w: file is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureCreateDocument(ctx, input.ActorID, input.ActorRole, input.ProjectID); err != nil {
+		return nil, err
 	}
 
 	docData, err := s.writer.CreateDocument(ctx, input)

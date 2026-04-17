@@ -41,6 +41,7 @@ func (h DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actorID := middleware.UserIDFromContext(r.Context())
+	actorRole := middleware.UserRoleFromContext(r.Context())
 	ownerID := r.FormValue("current_owner_id")
 	if ownerID == "" {
 		ownerID = actorID
@@ -56,6 +57,7 @@ func (h DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 			Description:    r.FormValue("description"),
 			CurrentOwnerID: ownerID,
 			ActorID:        actorID,
+			ActorRole:      actorRole,
 		},
 		header.Filename,
 		header.Size,
@@ -65,6 +67,10 @@ func (h DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, service.ErrValidation) {
 			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrForbidden) {
+			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
 			return
 		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create document")
@@ -126,12 +132,14 @@ func (h DocumentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actorID := middleware.UserIDFromContext(r.Context())
+	actorRole := middleware.UserRoleFromContext(r.Context())
 	data, err := h.service.UpdateDocument(r.Context(), command.DocumentUpdateInput{
 		DocumentID:  r.PathValue("documentID"),
 		Title:       body.Title,
 		Description: body.Description,
 		FolderID:    body.FolderID,
 		ActorID:     actorID,
+		ActorRole:   actorRole,
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrValidation) {
@@ -140,6 +148,10 @@ func (h DocumentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, service.ErrNotFound) {
 			response.WriteError(w, http.StatusNotFound, "not_found", "document not found")
+			return
+		}
+		if errors.Is(err, service.ErrForbidden) {
+			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
 			return
 		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update document")
@@ -159,15 +171,21 @@ func (h DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actorID := middleware.UserIDFromContext(r.Context())
+	actorRole := middleware.UserRoleFromContext(r.Context())
 	documentID := r.PathValue("documentID")
 	err := h.service.DeleteDocument(r.Context(), command.DocumentDeleteInput{
 		DocumentID: documentID,
 		Reason:     body.Reason,
 		ActorID:    actorID,
+		ActorRole:  actorRole,
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			response.WriteError(w, http.StatusNotFound, "not_found", "document not found")
+			return
+		}
+		if errors.Is(err, service.ErrForbidden) {
+			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
 			return
 		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to delete document")
@@ -179,11 +197,16 @@ func (h DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h DocumentHandler) Restore(w http.ResponseWriter, r *http.Request) {
 	actorID := middleware.UserIDFromContext(r.Context())
+	actorRole := middleware.UserRoleFromContext(r.Context())
 	documentID := r.PathValue("documentID")
-	err := h.service.RestoreDocument(r.Context(), documentID, actorID)
+	err := h.service.RestoreDocument(r.Context(), documentID, actorID, actorRole)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			response.WriteError(w, http.StatusNotFound, "not_found", "document not found")
+			return
+		}
+		if errors.Is(err, service.ErrForbidden) {
+			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
 			return
 		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to restore document")

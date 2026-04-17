@@ -67,6 +67,7 @@ func (h FlowHandler) writeAction(w http.ResponseWriter, r *http.Request, action 
 		Note:       stringValue(payload["note"]),
 		ToUserID:   stringValue(payload["to_user_id"]),
 		ActorID:    middleware.UserIDFromContext(r.Context()),
+		ActorRole:  middleware.UserRoleFromContext(r.Context()),
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrValidation) {
@@ -75,6 +76,10 @@ func (h FlowHandler) writeAction(w http.ResponseWriter, r *http.Request, action 
 		}
 		if errors.Is(err, service.ErrInvalidTransition) {
 			response.WriteError(w, http.StatusBadRequest, "invalid_status_transition", "invalid flow transition")
+			return
+		}
+		if errors.Is(err, service.ErrForbidden) {
+			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
 			return
 		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to apply flow action")

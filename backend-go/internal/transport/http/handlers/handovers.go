@@ -32,10 +32,15 @@ func (h HandoverHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ProjectID:      stringValue(payload["project_id"]),
 		Remark:         stringValue(payload["remark"]),
 		ActorID:        middleware.UserIDFromContext(r.Context()),
+		ActorRole:      middleware.UserRoleFromContext(r.Context()),
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrValidation) {
 			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrForbidden) {
+			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
 			return
 		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create handover")
@@ -95,10 +100,15 @@ func (h HandoverHandler) UpdateItems(w http.ResponseWriter, r *http.Request) {
 		HandoverID: r.PathValue("handoverID"),
 		Items:      items,
 		ActorID:    middleware.UserIDFromContext(r.Context()),
+		ActorRole:  middleware.UserRoleFromContext(r.Context()),
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrValidation) {
 			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrForbidden) {
+			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
 			return
 		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update handover items")
@@ -132,6 +142,7 @@ func (h HandoverHandler) writeAction(w http.ResponseWriter, r *http.Request, act
 		Note:       stringValue(payload["note"]),
 		Reason:     stringValue(payload["reason"]),
 		ActorID:    middleware.UserIDFromContext(r.Context()),
+		ActorRole:  middleware.UserRoleFromContext(r.Context()),
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrValidation) {
@@ -140,6 +151,10 @@ func (h HandoverHandler) writeAction(w http.ResponseWriter, r *http.Request, act
 		}
 		if errors.Is(err, service.ErrInvalidTransition) {
 			response.WriteError(w, http.StatusBadRequest, "handover_status_invalid", "invalid handover transition")
+			return
+		}
+		if errors.Is(err, service.ErrForbidden) {
+			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
 			return
 		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to apply handover action")

@@ -61,6 +61,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 		versionRepo := pgrepo.NewVersionRepository(postgresDB)
 		docRepo := pgrepo.NewDocumentRepository(postgresDB)
 		versionWorkflow := pgrepo.NewVersionWorkflow(postgresDB)
+		permissionService := service.NewPermissionService(pgrepo.NewPermissionRepository(postgresDB))
 
 		return Container{
 			DB:            postgresDB,
@@ -71,12 +72,12 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				pgrepo.NewProjectRepository(postgresDB),
 			),
 			AssistantService:      service.NewAssistantService(noopqueue.NewPublisher(), pgrepo.NewAssistantRepository(postgresDB), docRepo),
-			DocumentService:       service.NewDocumentService(docRepo, docRepo, storageProvider, versionWorkflow),
+			DocumentService:       service.NewDocumentService(docRepo, docRepo, storageProvider, versionWorkflow, permissionService),
 			AuditQueryService:     service.NewAuditQueryService(pgrepo.NewAuditRepository(postgresDB)),
 			DashboardQueryService: service.NewDashboardQueryService(pgrepo.NewDashboardRepository(postgresDB)),
-			VersionService:        service.NewVersionService(storageProvider, versionWorkflow, versionRepo),
-			FlowService:           service.NewFlowService(pgrepo.NewFlowRepository(postgresDB), actionRepo),
-			HandoverService:       service.NewHandoverService(pgrepo.NewHandoverRepository(postgresDB), actionRepo),
+			VersionService:        service.NewVersionService(storageProvider, versionWorkflow, versionRepo, permissionService),
+			FlowService:           service.NewFlowService(pgrepo.NewFlowRepository(postgresDB), actionRepo, permissionService),
+			HandoverService:       service.NewHandoverService(pgrepo.NewHandoverRepository(postgresDB), actionRepo, permissionService),
 			AuthService:           authService,
 			TokenService:          tokenService,
 			AuditService:          auditService,
@@ -87,6 +88,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 		docRepo := memory.NewDocumentRepository()
 		versionRepo := memory.NewVersionRepository()
 		versionWorkflow := memory.NewVersionWorkflow(versionRepo)
+		permissionService := service.NewPermissionService(memory.NewPermissionRepository())
 		return Container{
 			QueueConsumer: publisher,
 			QueryService: service.NewQueryService(
@@ -95,12 +97,12 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				memory.NewProjectRepository(),
 			),
 			AssistantService:      service.NewAssistantService(publisher, memory.NewAssistantRepository(), docRepo),
-			DocumentService:       service.NewDocumentService(docRepo, docRepo, storageProvider, versionWorkflow),
+			DocumentService:       service.NewDocumentService(docRepo, docRepo, storageProvider, versionWorkflow, permissionService),
 			AuditQueryService:     service.NewAuditQueryService(memory.NewAuditRepository()),
 			DashboardQueryService: service.NewDashboardQueryService(memory.NewDashboardRepository()),
-			VersionService:        service.NewVersionService(storageProvider, versionWorkflow, versionRepo),
-			FlowService:           service.NewFlowService(memory.NewFlowRepository(), actionRepo),
-			HandoverService:       service.NewHandoverService(memory.NewHandoverRepository(), actionRepo),
+			VersionService:        service.NewVersionService(storageProvider, versionWorkflow, versionRepo, permissionService),
+			FlowService:           service.NewFlowService(memory.NewFlowRepository(), actionRepo, permissionService),
+			HandoverService:       service.NewHandoverService(memory.NewHandoverRepository(), actionRepo, permissionService),
 			AuthService:           authService,
 			TokenService:          tokenService,
 			AuditService:          auditService,

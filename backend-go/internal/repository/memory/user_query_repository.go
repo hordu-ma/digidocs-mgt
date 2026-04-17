@@ -18,23 +18,38 @@ func (r UserQueryRepository) ListUsers(ctx context.Context) ([]query.UserOption,
 	return []query.UserOption{
 		{
 			ID:          "00000000-0000-0000-0000-000000000001",
+			Username:    "admin",
 			DisplayName: "开发管理员",
 			Role:        "admin",
+			Status:      "active",
 		},
 		{
 			ID:          "00000000-0000-0000-0000-000000000010",
-			DisplayName: "李老师",
+			Username:    "maliguo",
+			DisplayName: "马立国",
 			Role:        "project_lead",
+			Status:      "active",
 		},
 		{
 			ID:          "00000000-0000-0000-0000-000000000011",
-			DisplayName: "张三",
+			Username:    "qiaoanqiang",
+			DisplayName: "乔安强",
 			Role:        "member",
+			Status:      "active",
 		},
 		{
 			ID:          "00000000-0000-0000-0000-000000000012",
-			DisplayName: "王五",
+			Username:    "wangzhao",
+			DisplayName: "王钊",
 			Role:        "member",
+			Status:      "active",
+		},
+		{
+			ID:          "00000000-0000-0000-0000-000000000013",
+			Username:    "liuzongyou",
+			DisplayName: "刘宗优",
+			Role:        "member",
+			Status:      "active",
 		},
 	}, nil
 }
