@@ -287,6 +287,7 @@ docker compose up -d postgres
 - 已完成 AI 思考中交互优化（三点呼吸动画占位气泡 + 按钮状态）与全局空状态轻量化替换（AssistantView、HandoversView）
 - 已完成总览页近期流转操作中文化、文档页按课题分组显示、数据库测试数据清理
 - 已完成管理员功能模块：后端 9 个 admin API 端点（团队空间/项目/用户/成员 CRUD），RequireAdmin 中间件，前端四标签页管理界面与侧边栏角色感知入口
+- 已修复管理页面布局（AppLayout 包裹）与总览页近期流转空状态中文化
 - 当前下一步聚焦：把当前 Linux 单机运维方案复制到目标正式主机，并复验一次正式环境联调
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。
