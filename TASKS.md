@@ -439,6 +439,14 @@
 - 全局优化表格空状态显示
   - `DocumentDetailView`：版本记录表 → "暂无版本记录"，流转记录表 → "暂无流转记录"
   - `AdminView`：团队空间 → "暂无团队空间"，项目 → "暂无项目"，用户 → "暂无用户"，成员 → "暂无成员"
+- 修复 `unarchive` 状态回退错误
+  - 根因：flow 状态映射把 `unarchive` 错误写成 `in_progress`，导致取消归档后丢失 `finalized` 语义
+  - 修复：同步调整 postgres / memory 两套 `flowActionToStatus` 映射，`unarchive` 统一恢复到 `finalized`
+  - 已修正测试数据中受影响文档状态，并重跑归档/取消归档验证
+- 完成文档流转与毕业交接接口实测
+  - 文档流转验证通过：`finalize / archive / unarchive / transfer / accept-transfer`
+  - 交接流程验证通过：`POST /handovers`、`PATCH /handovers/{id}/items`、`POST /handovers/{id}/confirm`、`POST /handovers/{id}/complete`
+  - 同时确认流转字段名与交接字段名差异：流转使用 `to_user_id`，交接使用 `target_user_id / receiver_user_id`
 
 ## 待办
 

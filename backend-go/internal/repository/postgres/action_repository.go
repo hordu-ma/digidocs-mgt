@@ -568,7 +568,7 @@ func flowActionToStatus(action string) string {
 	case "accept_transfer", "mark_in_progress":
 		return "in_progress"
 	case "unarchive":
-		return "in_progress"
+		return "finalized"
 	default:
 		return "in_progress"
 	}

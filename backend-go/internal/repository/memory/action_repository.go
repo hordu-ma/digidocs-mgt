@@ -64,8 +64,10 @@ func memFlowActionToStatus(action string) string {
 		return "finalized"
 	case "transfer":
 		return "pending_handover"
-	case "accept_transfer", "mark_in_progress", "unarchive":
+	case "accept_transfer", "mark_in_progress":
 		return "in_progress"
+	case "unarchive":
+		return "finalized"
 	default:
 		return "in_progress"
 	}

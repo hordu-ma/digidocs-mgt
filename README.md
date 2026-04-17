@@ -296,6 +296,8 @@ docker compose up -d postgres
 - 已完成文档摘要轮询显示：生成摘要后启动轮询并显示动画等待提示，完成后自动刷新建议列表
 - 已修复文档摘要回调失败（P0 阻塞性 Bug）：Worker 成功调用 OpenClaw 但回调返回 500，根因是 OpenClaw 返回的 `suggestion_type` 不在 PostgreSQL 枚举范围内，新增 `normalizeSuggestionType()` 验证并回退到默认值；增强 Worker 与 Go 端的回调错误日志
 - 已完成全局表格空状态中文化：文档详情（版本/流转）、管理页面（空间/项目/用户/成员）的空表格提示从 "No Data" 改为中文友好文案
+- 已修复流转状态机细节缺陷：`unarchive` 现从 `archived` 正确恢复到 `finalized`，不再错误回退到 `in_progress`
+- 已完成文档流转与毕业交接接口实测：验证 `finalize / archive / unarchive / transfer / accept-transfer` 与 `handover create / items / confirm / complete` 全链路通过
 - 当前下一步聚焦：把当前 Linux 单机运维方案复制到目标正式主机，并复验一次正式环境联调
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。
