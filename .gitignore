@@ -17,3 +17,4 @@ components.d.ts
 .env
 .DS_Store
 .vscode
+.codex
