@@ -302,5 +302,10 @@ docker compose up -d postgres
 - 已完成文档流转与毕业交接接口实测：验证 `finalize / archive / unarchive / transfer / accept-transfer` 与 `handover create / items / confirm / complete` 全链路通过
 - 已完成**数据资产模块**首期实现（T1–T5）：新增 `data_folders` / `data_assets` / `graduation_handover_data_items` 数据库表，后端存储层、权限层、domain、repository、service、handler、路由全栈落地；前端新增"数据"页面（位于文档与交接之间），含文件列表、课题/文件夹过滤、XHR 大文件上传进度条、文件夹管理；已通过 `go test ./...` + 前端构建验证
 - 当前下一步聚焦：把当前 Linux 单机运维方案复制到目标正式主机，并复验一次正式环境联调
+- 已完成**数据资产模块 T6/T7 与 UI 收口**：
+  - T6：交接详情弹窗新增文档/数据资产双 Tab，支持数据资产交接清单编辑
+  - T7：`docs/数据库设计.md` 与 `docs/API设计.md` 补充数据资产模块全量内容
+  - DataView 页面 UI 全面产品化：改用 `page-shell / page-header / page-card / asset-workspace` 布局，左侧课题 Rail、文件类型徽标色系、`--dd-*` 设计变量、自定义行布局替代 el-table，消除"样品感"
+  - DocumentDetailView 补充下载按钮：hero-actions 新增"下载当前版本"，版本历史每行新增下载图标按钮，使用 blob 流方式下载，复用已有 `GET /api/v1/versions/{versionID}/download` 端点
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

@@ -108,9 +108,22 @@ function onFolderSelect(id: string) {
 }
 
 async function onProjectFilterChange(projectID: string) {
+  filterProjectID.value = projectID;
   selectedFolderID.value = "";
   filterFolderID.value = "";
   await fetchFolders(projectID);
+  fetchAssets();
+}
+
+function clearProjectFilter() {
+  filterProjectID.value = "";
+  selectedFolderID.value = "";
+  folders.value = [];
+  fetchAssets();
+}
+
+function clearFolderSelect() {
+  selectedFolderID.value = "";
   fetchAssets();
 }
 
@@ -370,6 +383,23 @@ function formatDate(s: string): string {
   return s.slice(0, 10);
 }
 
+function inferAssetFileType(fileName: string): string {
+  const ext = fileName?.split(".").pop()?.toLowerCase() ?? "";
+  if (["jpg", "jpeg", "png", "gif", "svg", "webp", "tiff", "bmp", "heic", "raw"].includes(ext)) return "img";
+  if (["mp4", "mov", "avi", "mkv", "webm", "flv", "m4v", "wmv"].includes(ext)) return "vid";
+  if (["zip", "tar", "gz", "rar", "7z", "bz2", "xz", "tgz"].includes(ext)) return "zip";
+  if (["pt", "pth", "pkl", "onnx", "h5", "pb", "safetensors", "bin", "npz", "npy", "ckpt"].includes(ext)) return "mdl";
+  if (["csv", "json", "jsonl", "parquet", "hdf5", "tsv"].includes(ext)) return "dat";
+  if (["py", "js", "ts", "sh", "ipynb", "r", "m", "cpp", "c", "java", "go"].includes(ext)) return "code";
+  if (["pdf", "docx", "doc", "pptx", "ppt", "txt", "md"].includes(ext)) return "doc";
+  return "file";
+}
+
+function getFileExt(fileName: string): string {
+  const ext = fileName?.split(".").pop()?.toUpperCase() ?? "FILE";
+  return ext.length > 5 ? ext.slice(0, 4) + "…" : ext;
+}
+
 // ─────────────────────────── lifecycle ───────────────────────────
 
 onMounted(async () => {
@@ -381,307 +411,468 @@ onMounted(async () => {
 
 <template>
   <AppLayout>
-    <!-- toolbar -->
-    <div class="toolbar">
-      <el-input
-        v-model="keyword"
-        placeholder="搜索文件名称…"
-        clearable
-        style="width: 260px"
-        @keyup.enter="handleSearch"
-        @clear="handleSearch"
-      >
-        <template #prefix><el-icon><Search /></el-icon></template>
-      </el-input>
-
-      <el-select
-        v-model="filterProjectID"
-        placeholder="筛选课题"
-        clearable
-        style="width: 200px"
-        @change="onProjectFilterChange"
-      >
-        <el-option
-          v-for="p in allProjects"
-          :key="p.id"
-          :label="p.name"
-          :value="p.id"
-        />
-      </el-select>
-
-      <div style="flex:1" />
-
-      <el-button type="primary" @click="openUpload">
-        <el-icon><Upload /></el-icon>&nbsp;上传文件
-      </el-button>
-      <el-button @click="openNewFolder">
-        <el-icon><FolderAdd /></el-icon>&nbsp;新建文件夹
-      </el-button>
-    </div>
-
-    <!-- main content -->
-    <div class="content-area">
-      <!-- folder sidebar -->
-      <aside v-if="filterProjectID && folderTree.length" class="folder-sidebar">
-        <div class="sidebar-title"><el-icon><FolderOpened /></el-icon> 文件夹</div>
-        <div
-          class="folder-item"
-          :class="{ active: !selectedFolderID }"
-          @click="onFolderSelect('')"
-        >全部</div>
-        <template v-for="node in folderTree" :key="node.id">
-          <div
-            class="folder-item depth-0"
-            :class="{ active: selectedFolderID === node.id }"
-            @click="onFolderSelect(node.id)"
-          >
-            <el-icon><FolderOpened /></el-icon>
-            {{ node.name }}
-            <el-icon class="folder-del" @click.stop="deleteFolder(node)"><Delete /></el-icon>
-          </div>
-          <template v-for="child in node.children" :key="child.id">
-            <div
-              class="folder-item depth-1"
-              :class="{ active: selectedFolderID === child.id }"
-              @click="onFolderSelect(child.id)"
-            >
-              <el-icon><FolderOpened /></el-icon>
-              {{ child.name }}
-              <el-icon class="folder-del" @click.stop="deleteFolder(child)"><Delete /></el-icon>
-            </div>
-            <template v-for="leaf in child.children" :key="leaf.id">
-              <div
-                class="folder-item depth-2"
-                :class="{ active: selectedFolderID === leaf.id }"
-                @click="onFolderSelect(leaf.id)"
-              >
-                <el-icon><FolderOpened /></el-icon>
-                {{ leaf.name }}
-                <el-icon class="folder-del" @click.stop="deleteFolder(leaf)"><Delete /></el-icon>
-              </div>
-            </template>
-          </template>
-        </template>
-      </aside>
-
-      <!-- asset list -->
-      <div class="asset-list">
-        <div class="list-header">
-          <span class="count">共 {{ total }} 个文件</span>
+    <div class="page-shell">
+      <div class="page-header">
+        <div>
+          <div class="page-eyebrow">数据资产库</div>
+          <h1>数据管理</h1>
+          <p>按课题统一存储图片、视频、压缩文件、模型等数据文件，快速检索，不依赖复杂目录体系。</p>
         </div>
-
-        <el-empty v-if="!assets.length" description="暂无数据文件" />
-
-        <el-table v-else :data="assets" style="width:100%" stripe>
-          <el-table-column label="文件名称" min-width="200">
-            <template #default="{ row }">
-              <div class="asset-name">{{ row.display_name }}</div>
-              <div class="asset-filename">{{ row.file_name }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column label="课题" prop="project_name" min-width="140" />
-          <el-table-column label="文件夹" prop="folder_name" min-width="120" />
-          <el-table-column label="大小" min-width="100">
-            <template #default="{ row }">{{ formatSize(row.file_size) }}</template>
-          </el-table-column>
-          <el-table-column label="上传者" prop="created_by_name" min-width="100" />
-          <el-table-column label="上传时间" min-width="110">
-            <template #default="{ row }">{{ formatDate(row.created_at) }}</template>
-          </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right">
-            <template #default="{ row }">
-              <el-button type="primary" link @click="downloadAsset(row)">
-                <el-icon><Download /></el-icon>
-              </el-button>
-              <el-button type="danger" link @click="deleteAsset(row)">
-                <el-icon><Delete /></el-icon>
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+        <div class="header-actions">
+          <ElButton @click="openNewFolder">
+            <ElIcon><FolderAdd /></ElIcon>
+            新建文件夹
+          </ElButton>
+          <ElButton type="primary" @click="openUpload">
+            <ElIcon><Upload /></ElIcon>
+            上传数据文件
+          </ElButton>
+        </div>
       </div>
-    </div>
 
-    <!-- Upload Dialog -->
-    <el-dialog v-model="showUploadDialog" title="上传数据文件" width="520px" :close-on-click-modal="false">
-      <el-form label-width="90px">
-        <el-form-item label="团队空间" required>
-          <el-select v-model="uploadForm.team_space_id" @change="loadProjects" style="width:100%">
-            <el-option v-for="ts in teamSpaces" :key="ts.id" :label="ts.name" :value="ts.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="关联课题" required>
-          <el-select v-model="uploadForm.project_id" @change="onUploadProjectChange" style="width:100%">
-            <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="文件夹">
-          <el-select v-model="uploadForm.folder_id" clearable style="width:100%">
-            <el-option
-              v-for="f in uploadFolderOptions"
-              :key="f.id"
-              :label="'  '.repeat(f.depth) + f.name"
-              :value="f.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="文件名称" required>
-          <el-input v-model="uploadForm.display_name" placeholder="为文件取一个有意义的名称" />
-          <div class="field-hint">{{ FILE_NAME_HINT }}</div>
-        </el-form-item>
-        <el-form-item label="说明">
-          <el-input v-model="uploadForm.description" type="textarea" :rows="2" placeholder="可选" />
-        </el-form-item>
-        <el-form-item label="选择文件" required>
-          <input type="file" @change="onFileChange" style="width:100%" />
-          <div v-if="uploadFile" class="file-info">
-            {{ uploadFile.name }} ({{ formatSize(uploadFile.size) }})
+      <div class="asset-workspace">
+        <!-- project rail -->
+        <aside class="project-rail page-card">
+          <div class="rail-title">
+            <ElIcon><FolderOpened /></ElIcon>
+            课题
           </div>
-        </el-form-item>
-        <el-form-item v-if="uploadLoading" label="上传进度">
-          <el-progress :percentage="uploadProgress" style="width:100%" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showUploadDialog = false" :disabled="uploadLoading">取消</el-button>
-        <el-button type="primary" :loading="uploadLoading" @click="submitUpload">上传</el-button>
-      </template>
-    </el-dialog>
+          <button
+            class="project-filter"
+            :class="{ active: filterProjectID === '' }"
+            type="button"
+            @click="clearProjectFilter"
+          >
+            <span>全部文件</span>
+            <strong v-if="filterProjectID === ''">{{ total }}</strong>
+          </button>
+          <button
+            v-for="p in allProjects"
+            :key="p.id"
+            class="project-filter"
+            :class="{ active: filterProjectID === p.id }"
+            type="button"
+            @click="onProjectFilterChange(p.id)"
+          >
+            <span>{{ p.name }}</span>
+          </button>
+        </aside>
 
-    <!-- New Folder Dialog -->
-    <el-dialog v-model="showFolderDialog" title="新建文件夹" width="420px">
-      <el-form label-width="90px">
-        <el-form-item label="课题" required>
-          <el-select v-model="newFolderForm.project_id" @change="onFolderProjectChange" style="width:100%">
-            <el-option v-for="p in folderProjects" :key="p.id" :label="p.name" :value="p.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="父文件夹">
-          <el-select v-model="newFolderForm.parent_id" clearable style="width:100%" placeholder="顶层文件夹">
-            <el-option v-for="f in folderParentOptions" :key="f.id" :label="f.name" :value="f.id" />
-          </el-select>
-          <div class="field-hint">最多 2 层，选择父文件夹后可创建子文件夹</div>
-        </el-form-item>
-        <el-form-item label="名称" required>
-          <el-input v-model="newFolderForm.name" placeholder="文件夹名称" maxlength="128" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showFolderDialog = false">取消</el-button>
-        <el-button type="primary" @click="submitNewFolder">创建</el-button>
-      </template>
-    </el-dialog>
+        <div class="asset-column">
+          <!-- folder strip (only when project selected and has folders) -->
+          <div v-if="filterProjectID && folderTree.length" class="folder-strip page-card">
+            <button
+              class="folder-chip"
+              :class="{ active: selectedFolderID === '' }"
+              type="button"
+              @click="clearFolderSelect"
+            >全部</button>
+            <template v-for="node in folderTree" :key="node.id">
+              <button
+                class="folder-chip"
+                :class="{ active: selectedFolderID === node.id }"
+                type="button"
+                @click="onFolderSelect(node.id)"
+              >
+                <ElIcon><FolderOpened /></ElIcon>
+                {{ node.name }}
+                <span class="chip-del" @click.stop="deleteFolder(node)">✕</span>
+              </button>
+              <template v-for="child in node.children" :key="child.id">
+                <button
+                  class="folder-chip sub"
+                  :class="{ active: selectedFolderID === child.id }"
+                  type="button"
+                  @click="onFolderSelect(child.id)"
+                >
+                  <ElIcon><FolderOpened /></ElIcon>
+                  {{ child.name }}
+                  <span class="chip-del" @click.stop="deleteFolder(child)">✕</span>
+                </button>
+              </template>
+            </template>
+          </div>
+
+          <!-- asset panel -->
+          <section class="page-card asset-panel">
+            <div class="toolbar">
+              <ElInput
+                v-model="keyword"
+                placeholder="搜索文件名称…"
+                clearable
+                @keyup.enter="handleSearch"
+                @clear="handleSearch"
+              >
+                <template #prefix><ElIcon><Search /></ElIcon></template>
+              </ElInput>
+              <span class="file-count">共 {{ total }} 个文件</span>
+            </div>
+
+            <div v-if="assets.length === 0" class="empty-state">
+              <p class="empty-title">暂无数据文件</p>
+              <p class="empty-hint">上传后，文件会按课题自动归入数据资产库</p>
+            </div>
+
+            <div v-else class="asset-list">
+              <div v-for="row in assets" :key="row.id" class="asset-row">
+                <span class="file-badge" :class="inferAssetFileType(row.file_name)">
+                  {{ getFileExt(row.file_name) }}
+                </span>
+                <div class="asset-main">
+                  <strong>{{ row.display_name }}</strong>
+                  <span>
+                    {{ row.file_name }}
+                    <template v-if="row.project_name"> · {{ row.project_name }}</template>
+                    <template v-if="row.folder_name"> / {{ row.folder_name }}</template>
+                  </span>
+                </div>
+                <span class="asset-meta size">{{ formatSize(row.file_size) }}</span>
+                <span class="asset-meta owner">{{ row.created_by_name }}</span>
+                <span class="asset-meta date">{{ formatDate(row.created_at) }}</span>
+                <div class="asset-actions">
+                  <ElButton size="small" text title="下载" @click="downloadAsset(row)">
+                    <ElIcon><Download /></ElIcon>
+                  </ElButton>
+                  <ElButton size="small" text type="danger" title="删除" @click="deleteAsset(row)">
+                    <ElIcon><Delete /></ElIcon>
+                  </ElButton>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- Upload Dialog -->
+      <ElDialog v-model="showUploadDialog" title="上传数据文件" width="520px" :close-on-click-modal="false">
+        <ElForm label-position="top">
+          <ElFormItem label="团队空间" required>
+            <ElSelect v-model="uploadForm.team_space_id" @change="loadProjects" style="width:100%">
+              <ElOption v-for="ts in teamSpaces" :key="ts.id" :label="ts.name" :value="ts.id" />
+            </ElSelect>
+          </ElFormItem>
+          <ElFormItem label="关联课题" required>
+            <ElSelect v-model="uploadForm.project_id" @change="onUploadProjectChange" style="width:100%">
+              <ElOption v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
+            </ElSelect>
+          </ElFormItem>
+          <ElFormItem label="文件夹">
+            <ElSelect v-model="uploadForm.folder_id" clearable style="width:100%">
+              <ElOption
+                v-for="f in uploadFolderOptions"
+                :key="f.id"
+                :label="'　'.repeat(f.depth) + f.name"
+                :value="f.id"
+              />
+            </ElSelect>
+          </ElFormItem>
+          <ElFormItem label="文件名称" required>
+            <ElInput v-model="uploadForm.display_name" placeholder="为文件取一个有意义的名称" />
+            <p class="field-hint">{{ FILE_NAME_HINT }}</p>
+          </ElFormItem>
+          <ElFormItem label="说明">
+            <ElInput v-model="uploadForm.description" type="textarea" :rows="2" placeholder="可选" />
+          </ElFormItem>
+          <ElFormItem label="选择文件" required>
+            <input type="file" @change="onFileChange" style="width:100%" />
+            <p v-if="uploadFile" class="field-hint">{{ uploadFile.name }} ({{ formatSize(uploadFile.size) }})</p>
+          </ElFormItem>
+          <ElFormItem v-if="uploadLoading" label="上传进度">
+            <ElProgress :percentage="uploadProgress" style="width:100%" />
+          </ElFormItem>
+        </ElForm>
+        <template #footer>
+          <ElButton @click="showUploadDialog = false" :disabled="uploadLoading">取消</ElButton>
+          <ElButton type="primary" :loading="uploadLoading" @click="submitUpload">上传</ElButton>
+        </template>
+      </ElDialog>
+
+      <!-- New Folder Dialog -->
+      <ElDialog v-model="showFolderDialog" title="新建文件夹" width="420px">
+        <ElForm label-position="top">
+          <ElFormItem label="课题" required>
+            <ElSelect v-model="newFolderForm.project_id" @change="onFolderProjectChange" style="width:100%">
+              <ElOption v-for="p in folderProjects" :key="p.id" :label="p.name" :value="p.id" />
+            </ElSelect>
+          </ElFormItem>
+          <ElFormItem label="父文件夹">
+            <ElSelect v-model="newFolderForm.parent_id" clearable style="width:100%" placeholder="顶层文件夹">
+              <ElOption v-for="f in folderParentOptions" :key="f.id" :label="f.name" :value="f.id" />
+            </ElSelect>
+            <p class="field-hint">最多 2 层，选择父文件夹后可创建子文件夹</p>
+          </ElFormItem>
+          <ElFormItem label="名称" required>
+            <ElInput v-model="newFolderForm.name" placeholder="文件夹名称" maxlength="128" />
+          </ElFormItem>
+        </ElForm>
+        <template #footer>
+          <ElButton @click="showFolderDialog = false">取消</ElButton>
+          <ElButton type="primary" @click="submitNewFolder">创建</ElButton>
+        </template>
+      </ElDialog>
+    </div>
   </AppLayout>
 </template>
 
 <style scoped>
-.toolbar {
+.asset-workspace {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.project-rail {
+  position: sticky;
+  top: 92px;
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+}
+
+.rail-title {
   display: flex;
   align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--dd-ink);
+  font-weight: 750;
+}
+
+.project-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
-}
-
-.content-area {
-  display: flex;
-  gap: 16px;
-  min-height: 400px;
-}
-
-.folder-sidebar {
-  width: 200px;
-  flex-shrink: 0;
-  border: 1px solid var(--el-border-color);
-  border-radius: 6px;
-  padding: 12px 0;
-  background: var(--el-bg-color);
-}
-
-.sidebar-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--el-text-color-secondary);
-  padding: 0 14px 8px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.folder-item {
-  padding: 6px 14px;
-  font-size: 13px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dd-ink-2);
+  text-align: left;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--el-text-color-primary);
-  position: relative;
 }
 
-.folder-item:hover {
-  background: var(--el-fill-color-light);
+.project-filter span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.folder-item.active {
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
-}
-
-.folder-item.depth-1 { padding-left: 28px; }
-.folder-item.depth-2 { padding-left: 42px; }
-
-.folder-del {
-  margin-left: auto;
-  color: var(--el-text-color-placeholder);
+.project-filter strong {
+  color: var(--dd-muted);
   font-size: 12px;
-  opacity: 0;
+  flex-shrink: 0;
 }
 
-.folder-item:hover .folder-del {
-  opacity: 1;
+.project-filter:hover,
+.project-filter.active {
+  border-color: #c8ddf2;
+  background: var(--dd-primary-soft);
+  color: var(--dd-primary-strong);
 }
 
-.folder-del:hover {
-  color: var(--el-color-danger);
-}
-
-.asset-list {
-  flex: 1;
+.asset-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   min-width: 0;
 }
 
-.list-header {
+/* Folder strip */
+.folder-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  align-items: center;
+}
+
+.folder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border: 1px solid var(--dd-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dd-ink-2);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.folder-chip:hover,
+.folder-chip.active {
+  border-color: #c8ddf2;
+  background: var(--dd-primary-soft);
+  color: var(--dd-primary-strong);
+}
+
+.folder-chip.sub {
+  font-size: 12px;
+  opacity: 0.85;
+  padding-left: 18px;
+}
+
+.chip-del {
+  margin-left: 2px;
+  font-size: 10px;
+  opacity: 0.35;
+}
+
+.chip-del:hover {
+  opacity: 1;
+  color: var(--el-color-danger);
+}
+
+/* Asset panel */
+.asset-panel {
+  padding: 20px;
+}
+
+.toolbar {
   display: flex;
   align-items: center;
-  margin-bottom: 12px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
-.count {
+.toolbar .el-input {
+  max-width: 420px;
+}
+
+.file-count {
+  white-space: nowrap;
   font-size: 13px;
-  color: var(--el-text-color-secondary);
+  color: var(--dd-muted);
 }
 
-.asset-name {
-  font-weight: 500;
+/* Asset rows */
+.asset-list {
+  display: grid;
+}
+
+.asset-row {
+  display: grid;
+  grid-template-columns: 64px minmax(200px, 1fr) 80px 100px 90px 76px;
+  gap: 12px;
+  align-items: center;
+  min-height: 68px;
+  padding: 10px 4px;
+  border-top: 1px solid var(--dd-line-soft);
+}
+
+.asset-row:first-child {
+  border-top: none;
+}
+
+.asset-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.asset-main strong {
+  overflow: hidden;
+  color: var(--dd-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 14px;
 }
 
-.asset-filename {
+.asset-main span {
+  overflow: hidden;
+  color: var(--dd-muted);
   font-size: 12px;
-  color: var(--el-text-color-secondary);
-  margin-top: 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+.asset-meta {
+  font-size: 12px;
+  color: var(--dd-muted);
+  white-space: nowrap;
+}
+
+.asset-actions {
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+}
+
+/* File type badge colors */
+.file-badge.img  { background: #fff0e6; color: #c0570a; }
+.file-badge.vid  { background: #f3edff; color: #6839d4; }
+.file-badge.zip  { background: #e6f5f0; color: #1a7a5e; }
+.file-badge.mdl  { background: #e6eeff; color: #1d42a2; }
+.file-badge.dat  { background: #e6f7ea; color: #1a7a40; }
+.file-badge.code { background: #f0f4ff; color: #3d61b0; }
+.file-badge.doc  { background: #f5f5f5; color: #555;    }
+.file-badge.file { background: #f5f5f5; color: #888;    }
 
 .field-hint {
   font-size: 11px;
-  color: var(--el-text-color-placeholder);
+  color: var(--dd-muted);
   margin-top: 4px;
   line-height: 1.4;
 }
 
-.file-info {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  margin-top: 4px;
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1080px) {
+  .asset-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .project-rail {
+    position: static;
+  }
+
+  .asset-row {
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+  }
+
+  .asset-meta.owner,
+  .asset-meta.date {
+    display: none;
+  }
+
+  .asset-meta.size {
+    grid-column: 3;
+  }
+
+  .asset-actions {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .toolbar .el-input {
+    max-width: none;
+    width: 100%;
+  }
 }
 </style>

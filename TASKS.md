@@ -470,6 +470,13 @@
   - 前端路由：`router/index.ts` 新增 `/data` 路由
   - 已通过 `cd backend-go && go build ./...` + `go test ./...` + `cd frontend && npm run build` 全量验证
 
+- 完成数据资产模块 T6/T7 与 UI 打磨收口
+  - T6：HandoversView 交接详情弹窗新增文档/数据资产双 Tab，`openDetail` 并发拉取数据资产清单，`saveDataItems()` 调用 `PUT /handovers/{id}/data-items`
+  - T7：`docs/数据库设计.md` 新增第 7 节（三张新表），`docs/API设计.md` 新增第 13 节（11 个端点）
+  - DataView UI 产品化重构：`page-shell / page-header / page-card / asset-workspace` 布局，左侧课题 Rail，自定义 `asset-row` 行替代 `el-table`，文件类型徽标八色系（img/vid/zip/mdl/dat/code/doc/file），`--dd-*` 设计变量，消除 el-table 样品感
+  - DocumentDetailView 补充下载按钮：hero-actions 区新增"下载当前版本"按钮，版本历史每行右侧新增下载图标，使用 `api.get(..., { responseType: 'blob' })` 触发文件下载，复用已有 `GET /api/v1/versions/{versionID}/download` 端点
+  - 已通过 `cd frontend && npm run build` 验证，容器已重建，18080 前端服务正常
+
 ## 待办
 
 - ~~跑通 Alembic 初始迁移~~ ✅ 已完成

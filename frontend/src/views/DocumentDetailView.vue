@@ -4,6 +4,7 @@ import {
   Clock,
   Delete,
   Document,
+  Download,
   EditPen,
   Memo,
   Upload,
@@ -136,6 +137,20 @@ function formatTime(value?: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+async function downloadVersion(versionID: string, fileName: string) {
+  try {
+    const res = await api.get(`/versions/${versionID}/download`, { responseType: "blob" });
+    const url = URL.createObjectURL(new Blob([res.data]));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName || "download";
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    ElMessage.error("下载失败，请稍后再试");
+  }
 }
 
 async function loadData() {
@@ -428,6 +443,13 @@ onBeforeUnmount(() => {
           >
             {{ act.label }}
           </ElButton>
+          <ElButton
+            v-if="doc.current_version_id"
+            @click="downloadVersion(doc.current_version_id, versions[0]?.file_name)"
+          >
+            <ElIcon><Download /></ElIcon>
+            下载当前版本
+          </ElButton>
           <ElButton @click="openEdit">
             <ElIcon><EditPen /></ElIcon>
             编辑信息
@@ -488,6 +510,15 @@ onBeforeUnmount(() => {
                   <strong>{{ item.file_name || "未命名文件" }}</strong>
                   <span>{{ item.summary_status || "未生成摘要" }} · {{ formatTime(item.created_at) }}</span>
                 </div>
+                <ElButton
+                  v-if="item.id"
+                  size="small"
+                  text
+                  title="下载此版本"
+                  @click="downloadVersion(item.id, item.file_name)"
+                >
+                  <ElIcon><Download /></ElIcon>
+                </ElButton>
               </div>
             </div>
           </section>
@@ -819,7 +850,7 @@ onBeforeUnmount(() => {
 
 .version-item {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
+  grid-template-columns: 58px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   padding: 14px;
