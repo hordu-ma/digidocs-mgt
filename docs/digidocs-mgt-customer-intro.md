@@ -2,7 +2,7 @@
 
 面向对象：课题组负责人 /  团队管理者
 
-更新时间：2026-04-12
+更新时间：2026-04-17
 
 ## 1. 产品定位
 
@@ -38,24 +38,24 @@
 <table>
   <tr>
     <td width="50%" align="center">
-      <img src="assets/customer-intro/2026-04-13_09-12.png" alt="DigiDocs Mgt 系统界面实拍 1" />
+      <img src="assets/customer-intro/2026-04-17_17-34.png" alt="DigiDocs Mgt 系统界面实拍 1" />
       <br />
       <sub>图 1：DigiDocs Mgt 系统界面实拍 1</sub>
     </td>
     <td width="50%" align="center">
-      <img src="assets/customer-intro/2026-04-13_09-13.png" alt="DigiDocs Mgt 系统界面实拍 2" />
+      <img src="assets/customer-intro/2026-04-17_17-35.png" alt="DigiDocs Mgt 系统界面实拍 2" />
       <br />
       <sub>图 2：DigiDocs Mgt 系统界面实拍 2</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="assets/customer-intro/2026-04-13_09-14.png" alt="DigiDocs Mgt 系统界面实拍 3" />
+      <img src="assets/customer-intro/2026-04-17_17-36.png" alt="DigiDocs Mgt 系统界面实拍 3" />
       <br />
       <sub>图 3：DigiDocs Mgt 系统界面实拍 3</sub>
     </td>
     <td width="50%" align="center">
-      <img src="assets/customer-intro/2026-04-13_09-15.png" alt="DigiDocs Mgt 系统界面实拍 4" />
+      <img src="assets/customer-intro/2026-04-17_17-37.png" alt="DigiDocs Mgt 系统界面实拍 4" />
       <br />
       <sub>图 4：DigiDocs Mgt 系统界面实拍 4</sub>
     </td>
@@ -342,4 +342,3 @@
 预算约为：`¥78,144`
 
 ---
-
