@@ -1,4 +1,14 @@
 <script setup lang="ts">
+import {
+  ArrowLeft,
+  Clock,
+  Delete,
+  Document,
+  EditPen,
+  Memo,
+  Upload,
+  UserFilled,
+} from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import type { UploadRawFile } from "element-plus";
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
@@ -36,6 +46,32 @@ const statusLabel: Record<string, string> = {
   archived: "已归档",
 };
 
+const statusClass: Record<string, string> = {
+  draft: "status-draft",
+  in_progress: "status-in-progress",
+  pending_handover: "status-pending-handover",
+  handed_over: "status-handed-over",
+  finalized: "status-finalized",
+  archived: "status-archived",
+};
+
+const flowActionLabel: Record<string, string> = {
+  transfer: "转交",
+  accept_transfer: "接受转交",
+  finalize: "定稿",
+  archive: "归档",
+  unarchive: "取消归档",
+  mark_in_progress: "开始处理",
+  create: "创建",
+};
+
+const suggestionStatusLabel: Record<string, string> = {
+  pending: "待确认",
+  confirmed: "已确认",
+  dismissed: "已忽略",
+  expired: "已过期",
+};
+
 // Map current status → available flow actions
 const flowActions: Record<
   string,
@@ -71,6 +107,36 @@ const availableActions = computed(() => {
 const selectableUsers = computed(() =>
   users.value.filter((item) => item.id !== doc.value?.current_owner?.id),
 );
+
+const currentVersionNo = computed(
+  () => doc.value?.current_version_no ?? versions.value[0]?.version_no ?? "-",
+);
+
+function ownerInitial() {
+  return (doc.value?.current_owner?.display_name || "责").slice(0, 1);
+}
+
+function inferFileType(value?: string) {
+  const raw = `${value || versions.value[0]?.file_name || doc.value?.file_type || doc.value?.title || ""}`.toLowerCase();
+  const match = raw.match(/\.(docx|xlsx|pptx|pdf|txt|md)$/);
+  if (match) return match[1];
+  if (raw.includes("pdf")) return "pdf";
+  if (raw.includes("xlsx") || raw.includes("表")) return "xlsx";
+  if (raw.includes("pptx") || raw.includes("汇报")) return "pptx";
+  if (raw.includes("docx") || raw.includes("文档")) return "docx";
+  return "doc";
+}
+
+function formatTime(value?: string) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 async function loadData() {
   const [docRes, versionsRes, flowsRes, suggestionsRes] = await Promise.all([
@@ -325,121 +391,200 @@ onBeforeUnmount(() => {
 
 <template>
   <AppLayout>
-    <div class="page-shell detail-grid">
-      <ElCard class="page-card">
-        <template #header>文档基本信息</template>
-        <ElDescriptions v-if="doc" :column="2" border>
-          <ElDescriptionsItem label="标题">{{ doc.title }}</ElDescriptionsItem>
-          <ElDescriptionsItem label="当前责任人">{{
-            doc.current_owner?.display_name ?? "-"
-          }}</ElDescriptionsItem>
-          <ElDescriptionsItem label="状态"
-            ><ElTag>{{
-              statusLabel[doc.current_status] ?? doc.current_status
-            }}</ElTag></ElDescriptionsItem
-          >
-          <ElDescriptionsItem label="描述">{{
-            doc.description || "-"
-          }}</ElDescriptionsItem>
-        </ElDescriptions>
-        <div v-if="availableActions.length > 0" class="action-bar">
+    <div class="page-shell document-detail-shell">
+      <button class="back-link" type="button" @click="router.push('/documents')">
+        <ElIcon><ArrowLeft /></ElIcon>
+        返回文档资产库
+      </button>
+
+      <section v-if="doc" class="document-hero page-card">
+        <div class="document-identity">
+          <span class="file-badge file-badge-large" :class="inferFileType()">
+            {{ inferFileType().toUpperCase() }}
+          </span>
+          <div class="identity-copy">
+            <div class="page-eyebrow">文档档案</div>
+            <h1>{{ doc.title }}</h1>
+            <p>{{ doc.description || "暂无文档描述" }}</p>
+            <div class="identity-meta">
+              <span class="status-pill" :class="statusClass[doc.current_status]">
+                {{ statusLabel[doc.current_status] ?? doc.current_status }}
+              </span>
+              <span class="person-chip">
+                <span class="person-avatar">{{ ownerInitial() }}</span>
+                {{ doc.current_owner?.display_name ?? "-" }}
+              </span>
+              <span class="version-chip">当前版本 v{{ currentVersionNo }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="hero-actions">
           <ElButton
             v-for="act in availableActions"
             :key="act.action"
             type="primary"
             :loading="actionLoading"
             @click="applyFlowAction(act.endpoint, act.label)"
-            >{{ act.label }}</ElButton
           >
-          <ElButton @click="openEdit">编辑信息</ElButton>
-          <ElButton @click="openUpload">上传新版本</ElButton>
-          <ElButton
-            type="danger"
-            :loading="actionLoading"
-            @click="deleteDocument"
-            >删除</ElButton
-          >
-        </div>
-        <div v-else class="action-bar">
-          <ElButton @click="openEdit">编辑信息</ElButton>
-          <ElButton @click="openUpload">上传新版本</ElButton>
-          <ElButton
-            type="danger"
-            :loading="actionLoading"
-            @click="deleteDocument"
-            >删除</ElButton
-          >
-        </div>
-      </ElCard>
-
-      <ElCard class="page-card">
-        <template #header>AI 摘要与建议</template>
-        <div class="assistant-toolbar">
-          <ElButton type="primary" :loading="summaryLoading || summaryPolling" @click="requestSummary">
-            {{ summaryPolling ? 'AI 正在生成摘要…' : '生成摘要' }}
+            {{ act.label }}
+          </ElButton>
+          <ElButton @click="openEdit">
+            <ElIcon><EditPen /></ElIcon>
+            编辑信息
+          </ElButton>
+          <ElButton @click="openUpload">
+            <ElIcon><Upload /></ElIcon>
+            上传新版本
           </ElButton>
         </div>
-        <div v-if="summaryPolling" class="summary-polling-hint">
-          <div class="thinking-dots">
-            <span class="dot"></span>
-            <span class="dot"></span>
-            <span class="dot"></span>
-          </div>
-          <span>AI 正在分析文档并生成摘要，请稍候…</span>
-        </div>
-        <div v-if="suggestions.length === 0" class="summary-text">
-          暂无 AI 摘要与建议
-        </div>
-        <div v-else class="suggestion-list">
-          <div v-for="item in suggestions" :key="item.id" class="suggestion-item">
-            <div class="suggestion-head">
-              <div class="suggestion-title">
-                {{ item.title || item.suggestion_type }}
+      </section>
+
+      <div class="detail-layout">
+        <main class="detail-main">
+          <section class="page-card info-panel">
+            <div class="panel-head">
+              <div>
+                <h2 class="section-title">正式事实</h2>
+                <p class="section-note">来自主业务账本，不混入 AI 建议</p>
               </div>
-              <ElTag :type="item.status === 'pending' ? 'warning' : item.status === 'confirmed' ? 'success' : 'info'">
-                {{ item.status }}
-              </ElTag>
+              <ElIcon :size="20"><Memo /></ElIcon>
             </div>
-            <div class="summary-text">{{ item.content }}</div>
-            <div v-if="item.status === 'pending'" class="suggestion-actions">
-              <ElButton size="small" type="success" @click="updateSuggestionStatus(item.id, 'confirm')">
-                确认
-              </ElButton>
-              <ElButton size="small" @click="updateSuggestionStatus(item.id, 'dismiss')">
-                忽略
-              </ElButton>
+            <div v-if="doc" class="fact-grid">
+              <div class="fact-item">
+                <span>文档标题</span>
+                <strong>{{ doc.title }}</strong>
+              </div>
+              <div class="fact-item">
+                <span>当前责任人</span>
+                <strong>{{ doc.current_owner?.display_name ?? "-" }}</strong>
+              </div>
+              <div class="fact-item">
+                <span>当前状态</span>
+                <strong>{{ statusLabel[doc.current_status] ?? doc.current_status }}</strong>
+              </div>
+              <div class="fact-item">
+                <span>当前版本</span>
+                <strong>v{{ currentVersionNo }}</strong>
+              </div>
             </div>
-          </div>
-        </div>
-      </ElCard>
+          </section>
 
-      <ElCard class="page-card">
-        <template #header>版本历史</template>
-        <ElTable :data="versions" empty-text="暂无版本记录">
-          <ElTableColumn prop="version_no" label="版本号" />
-          <ElTableColumn prop="file_name" label="文件名" />
-          <ElTableColumn prop="summary_status" label="摘要状态" />
-          <ElTableColumn prop="created_at" label="提交时间" />
-        </ElTable>
-      </ElCard>
+          <section class="page-card timeline-panel">
+            <div class="panel-head">
+              <div>
+                <h2 class="section-title">版本历史</h2>
+                <p class="section-note">每次文件更新都会形成独立版本记录</p>
+              </div>
+              <ElIcon :size="20"><Document /></ElIcon>
+            </div>
+            <div v-if="versions.length === 0" class="empty-state compact">
+              <p class="empty-title">暂无版本记录</p>
+              <p class="empty-hint">上传首个文件版本后会出现在这里</p>
+            </div>
+            <div v-else class="version-timeline">
+              <div v-for="item in versions" :key="item.id || item.version_no" class="version-item">
+                <span class="version-chip">v{{ item.version_no }}</span>
+                <div class="version-body">
+                  <strong>{{ item.file_name || "未命名文件" }}</strong>
+                  <span>{{ item.summary_status || "未生成摘要" }} · {{ formatTime(item.created_at) }}</span>
+                </div>
+              </div>
+            </div>
+          </section>
 
-      <ElCard class="page-card">
-        <template #header>流转历史</template>
-        <ElTable :data="flows" empty-text="暂无流转记录">
-          <ElTableColumn prop="action" label="操作" />
-          <ElTableColumn label="来源状态">
-            <template #default="{ row }">{{
-              statusLabel[row.from_status] ?? (row.from_status || "-")
-            }}</template>
-          </ElTableColumn>
-          <ElTableColumn label="目标状态">
-            <template #default="{ row }">{{
-              statusLabel[row.to_status] ?? row.to_status
-            }}</template>
-          </ElTableColumn>
-          <ElTableColumn prop="created_at" label="时间" />
-        </ElTable>
-      </ElCard>
+          <section class="page-card timeline-panel">
+            <div class="panel-head">
+              <div>
+                <h2 class="section-title">流转历史</h2>
+                <p class="section-note">记录责任人处理、转交、定稿和归档过程</p>
+              </div>
+              <ElIcon :size="20"><Clock /></ElIcon>
+            </div>
+            <div v-if="flows.length === 0" class="empty-state compact">
+              <p class="empty-title">暂无流转记录</p>
+              <p class="empty-hint">开始处理、转交或归档后会形成记录</p>
+            </div>
+            <div v-else class="flow-history">
+              <div v-for="item in flows" :key="item.id || `${item.action}-${item.created_at}`" class="flow-history-item">
+                <div class="flow-icon">
+                  <ElIcon><UserFilled /></ElIcon>
+                </div>
+                <div class="flow-history-body">
+                  <strong>{{ flowActionLabel[item.action] ?? item.action }}</strong>
+                  <div class="flow-status-row">
+                    <span class="status-pill" :class="statusClass[item.from_status]">
+                      {{ statusLabel[item.from_status] ?? (item.from_status || "原状态") }}
+                    </span>
+                    <span>→</span>
+                    <span class="status-pill" :class="statusClass[item.to_status]">
+                      {{ statusLabel[item.to_status] ?? item.to_status }}
+                    </span>
+                  </div>
+                  <span>{{ formatTime(item.created_at) }}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <aside class="detail-side">
+          <section class="page-card ai-panel">
+            <div class="panel-head">
+              <div>
+                <h2 class="section-title">AI 摘要与建议</h2>
+                <p class="section-note">仅作为辅助建议，正式动作需人工确认</p>
+              </div>
+            </div>
+            <ElButton type="primary" :loading="summaryLoading || summaryPolling" @click="requestSummary">
+              {{ summaryPolling ? "正在生成摘要" : "生成摘要" }}
+            </ElButton>
+            <div v-if="summaryPolling" class="summary-polling-hint">
+              <div class="thinking-dots">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+              </div>
+              <span>OpenClaw 正在分析当前版本</span>
+            </div>
+            <div v-if="suggestions.length === 0" class="empty-state compact">
+              <p class="empty-title">暂无 AI 建议</p>
+              <p class="empty-hint">生成摘要后，建议会作为辅助信息显示</p>
+            </div>
+            <div v-else class="suggestion-list">
+              <div v-for="item in suggestions" :key="item.id" class="suggestion-item">
+                <div class="suggestion-head">
+                  <div class="suggestion-title">
+                    {{ item.title || item.suggestion_type }}
+                  </div>
+                  <span class="status-pill" :class="item.status === 'pending' ? 'status-pending-handover' : 'status-finalized'">
+                    {{ suggestionStatusLabel[item.status] ?? item.status }}
+                  </span>
+                </div>
+                <div class="summary-text">{{ item.content }}</div>
+                <div v-if="item.status === 'pending'" class="suggestion-actions">
+                  <ElButton size="small" type="success" @click="updateSuggestionStatus(item.id, 'confirm')">
+                    确认
+                  </ElButton>
+                  <ElButton size="small" @click="updateSuggestionStatus(item.id, 'dismiss')">
+                    忽略
+                  </ElButton>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="page-card danger-panel">
+            <div>
+              <h2 class="section-title">危险操作</h2>
+              <p class="section-note">删除为业务软删除，可按权限恢复。</p>
+            </div>
+            <ElButton type="danger" plain :loading="actionLoading" @click="deleteDocument">
+              <ElIcon><Delete /></ElIcon>
+              删除文档
+            </ElButton>
+          </section>
+        </aside>
+      </div>
     </div>
 
     <ElDialog v-model="showEditDialog" title="编辑文档信息" width="480px">
@@ -520,18 +665,236 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.detail-grid {
+.document-detail-shell {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 18px;
 }
 
-.summary-text {
-  color: #31465e;
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dd-primary);
+  font-weight: 700;
+  cursor: pointer;
 }
 
-.assistant-toolbar {
-  margin-bottom: 12px;
+.document-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px;
+}
+
+.document-identity {
+  display: flex;
+  gap: 18px;
+  min-width: 0;
+}
+
+.file-badge-large {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  font-size: 14px;
+}
+
+.identity-copy {
+  min-width: 0;
+}
+
+.identity-copy h1 {
+  margin: 0;
+  color: var(--dd-ink);
+  font-size: 28px;
+  font-weight: 780;
+  letter-spacing: 0;
+}
+
+.identity-copy p {
+  max-width: 720px;
+  margin: 8px 0 0;
+  color: var(--dd-muted);
+}
+
+.identity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.version-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: var(--dd-ink-2);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  max-width: 440px;
+}
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+}
+
+.detail-main,
+.detail-side {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.info-panel,
+.timeline-panel,
+.ai-panel,
+.danger-panel {
+  padding: 20px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.fact-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fact-item {
+  display: grid;
+  gap: 8px;
+  min-height: 86px;
+  padding: 14px;
+  border: 1px solid var(--dd-line-soft);
+  border-radius: 8px;
+  background: var(--dd-surface-soft);
+}
+
+.fact-item span {
+  color: var(--dd-muted);
+  font-size: 12px;
+}
+
+.fact-item strong {
+  overflow-wrap: anywhere;
+  color: var(--dd-ink);
+  font-size: 15px;
+}
+
+.summary-text {
+  color: var(--dd-ink-2);
+  line-height: 1.7;
+}
+
+.version-timeline,
+.flow-history {
+  display: grid;
+  gap: 12px;
+}
+
+.version-item {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--dd-line-soft);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.version-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.version-body strong {
+  overflow: hidden;
+  color: var(--dd-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.version-body span {
+  color: var(--dd-muted);
+  font-size: 12px;
+}
+
+.flow-history-item {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--dd-line-soft);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.flow-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--dd-primary-soft);
+  color: var(--dd-primary);
+}
+
+.flow-history-body {
+  display: grid;
+  gap: 8px;
+}
+
+.flow-history-body strong {
+  color: var(--dd-ink);
+}
+
+.flow-history-body > span {
+  color: var(--dd-muted);
+  font-size: 12px;
+}
+
+.flow-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--dd-subtle);
+}
+
+.ai-panel {
+  border-top: 4px solid var(--dd-ai);
+}
+
+.ai-panel > .el-button {
+  width: 100%;
+  margin-bottom: 14px;
 }
 
 .suggestion-list {
@@ -541,8 +904,9 @@ onBeforeUnmount(() => {
 
 .suggestion-item {
   padding: 14px;
-  border-radius: 12px;
-  background: #f7f9fc;
+  border: 1px solid #c5e6eb;
+  border-radius: 8px;
+  background: var(--dd-ai-soft);
 }
 
 .suggestion-head {
@@ -554,7 +918,8 @@ onBeforeUnmount(() => {
 }
 
 .suggestion-title {
-  font-weight: 600;
+  color: var(--dd-ink);
+  font-weight: 750;
 }
 
 .suggestion-actions {
@@ -563,10 +928,13 @@ onBeforeUnmount(() => {
   margin-top: 12px;
 }
 
-.action-bar {
+.danger-panel {
   display: flex;
-  gap: 10px;
-  margin-top: 16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-color: #f3c3bd;
+  background: #fffafa;
 }
 
 .summary-polling-hint {
@@ -574,9 +942,9 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  background: #f0f6ff;
-  border-radius: 10px;
-  color: var(--el-color-primary);
+  background: var(--dd-ai-soft);
+  border-radius: 8px;
+  color: var(--dd-ai);
   font-size: 13px;
   margin-bottom: 12px;
 }
@@ -590,7 +958,7 @@ onBeforeUnmount(() => {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--el-color-primary);
+  background: var(--dd-ai);
   opacity: 0.4;
   animation: thinking-bounce 1.4s infinite ease-in-out both;
 }
@@ -604,16 +972,42 @@ onBeforeUnmount(() => {
   40% { opacity: 1; transform: scale(1); }
 }
 
-.tag-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 14px;
+.compact {
+  padding: 34px 12px;
 }
 
-@media (max-width: 900px) {
-  .detail-grid {
+@media (max-width: 1100px) {
+  .document-hero,
+  .detail-layout {
     grid-template-columns: 1fr;
+  }
+
+  .document-hero {
+    display: grid;
+  }
+
+  .hero-actions {
+    justify-content: flex-start;
+    max-width: none;
+  }
+
+  .fact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .document-identity {
+    display: grid;
+  }
+
+  .fact-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .danger-panel {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

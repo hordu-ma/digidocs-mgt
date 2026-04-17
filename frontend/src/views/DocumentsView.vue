@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import {
+  DocumentAdd,
+  FolderOpened,
+  Search,
+} from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import type { UploadRawFile } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
@@ -48,6 +53,7 @@ const folderOptions = ref<FolderOption[]>([]);
 const referenceLoading = ref(false);
 const collapsedGroups = ref<Set<string>>(new Set());
 const allProjects = ref<{ id: string; name: string }[]>([]);
+const selectedProjectName = ref("");
 
 const statusLabel: Record<string, string> = {
   draft: "草稿",
@@ -56,6 +62,15 @@ const statusLabel: Record<string, string> = {
   handed_over: "已交接",
   finalized: "定稿",
   archived: "已归档",
+};
+
+const statusClass: Record<string, string> = {
+  draft: "status-draft",
+  in_progress: "status-in-progress",
+  pending_handover: "status-pending-handover",
+  handed_over: "status-handed-over",
+  finalized: "status-finalized",
+  archived: "status-archived",
 };
 
 async function fetchDocuments() {
@@ -91,6 +106,19 @@ const groupedDocuments = computed<DocumentGroup[]>(() => {
     .map(([name, docs]) => ({ projectName: name, documents: docs }));
 });
 
+const displayedGroupedDocuments = computed(() => {
+  if (!selectedProjectName.value) {
+    return groupedDocuments.value;
+  }
+  return groupedDocuments.value.filter(
+    (group) => group.projectName === selectedProjectName.value,
+  );
+});
+
+const visibleDocumentTotal = computed(() =>
+  displayedGroupedDocuments.value.reduce((sum, group) => sum + group.documents.length, 0),
+);
+
 function toggleGroup(name: string) {
   if (collapsedGroups.value.has(name)) {
     collapsedGroups.value.delete(name);
@@ -105,6 +133,21 @@ function handleSearch() {
 
 function goDetail(row: any) {
   router.push(`/documents/${row.id}`);
+}
+
+function ownerInitial(row: any) {
+  return (row.current_owner?.display_name || "责").slice(0, 1);
+}
+
+function inferFileType(row: any) {
+  const raw = `${row.file_type || row.title || ""}`.toLowerCase();
+  const match = raw.match(/\.(docx|xlsx|pptx|pdf|txt|md)$/);
+  if (match) return match[1];
+  if (raw.includes("pdf")) return "pdf";
+  if (raw.includes("xlsx") || raw.includes("表")) return "xlsx";
+  if (raw.includes("pptx") || raw.includes("汇报")) return "pptx";
+  if (raw.includes("docx") || raw.includes("文档")) return "docx";
+  return "doc";
 }
 
 // --- Create document dialog ---
@@ -263,77 +306,120 @@ onMounted(async () => {
     <div class="page-shell">
       <div class="page-header">
         <div>
+          <div class="page-eyebrow">文档资产库</div>
           <h1>文档管理</h1>
-          <p>按团队空间、课题和目录组织文档，并管理责任人和版本。</p>
+          <p>按课题沉淀文档资产，快速查看责任人、版本和当前流转状态。</p>
         </div>
-        <ElButton type="primary" @click="openCreate">新建文档</ElButton>
+        <ElButton type="primary" @click="openCreate">
+          <ElIcon><DocumentAdd /></ElIcon>
+          新建文档
+        </ElButton>
       </div>
-      <ElCard class="page-card">
-        <div class="toolbar">
-          <ElInput
-            v-model="keyword"
-            placeholder="搜索文档标题"
-            clearable
-            @keyup.enter="handleSearch"
-            @clear="handleSearch"
-          />
-          <span class="doc-count">共 {{ total }} 篇文档，{{ groupedDocuments.length }} 个课题</span>
-        </div>
 
-        <div v-if="groupedDocuments.length === 0" class="empty-state">
-          <p class="empty-title">暂无文档</p>
-          <p class="empty-hint">点击右上角「新建文档」创建第一篇文档</p>
-        </div>
-
-        <div v-else class="project-groups">
-          <div
+      <div class="asset-workspace">
+        <aside class="project-rail page-card">
+          <div class="rail-title">
+            <ElIcon><FolderOpened /></ElIcon>
+            课题
+          </div>
+          <button
+            class="project-filter"
+            :class="{ active: selectedProjectName === '' }"
+            type="button"
+            @click="selectedProjectName = ''"
+          >
+            <span>全部课题</span>
+            <strong>{{ total }}</strong>
+          </button>
+          <button
             v-for="group in groupedDocuments"
             :key="group.projectName"
-            class="project-group"
+            class="project-filter"
+            :class="{ active: selectedProjectName === group.projectName }"
+            type="button"
+            @click="selectedProjectName = group.projectName"
           >
-            <div
-              class="group-header"
-              @click="toggleGroup(group.projectName)"
+            <span>{{ group.projectName }}</span>
+            <strong>{{ group.documents.length }}</strong>
+          </button>
+        </aside>
+
+        <section class="page-card asset-panel">
+          <div class="toolbar">
+            <ElInput
+              v-model="keyword"
+              placeholder="搜索文档标题"
+              clearable
+              @keyup.enter="handleSearch"
+              @clear="handleSearch"
             >
-              <span class="group-toggle">{{ collapsedGroups.has(group.projectName) ? '▶' : '▼' }}</span>
-              <span class="group-name">{{ group.projectName }}</span>
-              <ElTag size="small" type="info" disable-transitions>{{ group.documents.length }} 篇</ElTag>
-            </div>
-            <div
-              v-if="group.documents.length === 0 && !collapsedGroups.has(group.projectName)"
-              class="empty-project-hint"
-            >
-              暂无文档，点击右上角「新建文档」添加
-            </div>
-            <ElTable
-              v-show="!collapsedGroups.has(group.projectName) && group.documents.length > 0"
-              :data="group.documents"
-              style="width: 100%"
-              @row-click="goDetail"
-            >
-              <ElTableColumn prop="title" label="文档标题" min-width="200" />
-              <ElTableColumn label="当前责任人" width="140">
-                <template #default="{ row }">{{
-                  row.current_owner?.display_name ?? "-"
-                }}</template>
-              </ElTableColumn>
-              <ElTableColumn label="当前版本" width="100">
-                <template #default="{ row }">{{
-                  row.current_version_no ?? "-"
-                }}</template>
-              </ElTableColumn>
-              <ElTableColumn label="状态" width="120">
-                <template #default="{ row }">
-                  <ElTag>{{
-                    statusLabel[row.current_status] ?? row.current_status
-                  }}</ElTag>
-                </template>
-              </ElTableColumn>
-              <ElTableColumn prop="updated_at" label="更新时间" width="180" />
-            </ElTable>
+              <template #prefix>
+                <ElIcon><Search /></ElIcon>
+              </template>
+            </ElInput>
+            <span class="doc-count">
+              当前显示 {{ visibleDocumentTotal }} 篇文档，共 {{ groupedDocuments.length }} 个课题
+            </span>
           </div>
-        </div>
-      </ElCard>
+
+          <div v-if="displayedGroupedDocuments.length === 0" class="empty-state">
+            <p class="empty-title">暂无文档资产</p>
+            <p class="empty-hint">新建文档后会按课题自动归入资产库</p>
+          </div>
+
+          <div v-else class="project-groups">
+            <div
+              v-for="group in displayedGroupedDocuments"
+              :key="group.projectName"
+              class="project-group"
+            >
+              <button
+                class="group-header"
+                type="button"
+                @click="toggleGroup(group.projectName)"
+              >
+                <span class="group-toggle">{{ collapsedGroups.has(group.projectName) ? "›" : "⌄" }}</span>
+                <span class="group-name">{{ group.projectName }}</span>
+                <span class="group-count">{{ group.documents.length }} 篇</span>
+              </button>
+              <div
+                v-if="group.documents.length === 0 && !collapsedGroups.has(group.projectName)"
+                class="empty-project-hint"
+              >
+                该课题尚未沉淀文档资产
+              </div>
+              <div
+                v-show="!collapsedGroups.has(group.projectName) && group.documents.length > 0"
+                class="document-list"
+              >
+                <button
+                  v-for="row in group.documents"
+                  :key="row.id"
+                  class="document-row"
+                  type="button"
+                  @click="goDetail(row)"
+                >
+                  <span class="file-badge" :class="inferFileType(row)">
+                    {{ inferFileType(row).toUpperCase() }}
+                  </span>
+                  <span class="document-main">
+                    <strong>{{ row.title }}</strong>
+                    <span>{{ row.project_name || group.projectName }} · {{ row.updated_at || "暂无更新时间" }}</span>
+                  </span>
+                  <span class="person-chip">
+                    <span class="person-avatar">{{ ownerInitial(row) }}</span>
+                    {{ row.current_owner?.display_name ?? "-" }}
+                  </span>
+                  <span class="version-chip">v{{ row.current_version_no ?? "-" }}</span>
+                  <span class="status-pill" :class="statusClass[row.current_status]">
+                    {{ statusLabel[row.current_status] ?? row.current_status }}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
 
       <ElDialog v-model="showCreateDialog" title="新建文档" width="520px">
         <ElForm label-position="top" v-loading="referenceLoading">
@@ -439,13 +525,65 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-h1 {
-  margin: 0;
-  font-size: 32px;
+.asset-workspace {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
 }
 
-p {
-  color: #61748d;
+.project-rail {
+  position: sticky;
+  top: 92px;
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+}
+
+.rail-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--dd-ink);
+  font-weight: 750;
+}
+
+.project-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dd-ink-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-filter span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-filter strong {
+  color: var(--dd-muted);
+  font-size: 12px;
+}
+
+.project-filter:hover,
+.project-filter.active {
+  border-color: #c8ddf2;
+  background: var(--dd-primary-soft);
+  color: var(--dd-primary-strong);
+}
+
+.asset-panel {
+  padding: 20px;
 }
 
 .toolbar {
@@ -455,70 +593,170 @@ p {
   margin-bottom: 16px;
 }
 
+.toolbar .el-input {
+  max-width: 420px;
+}
+
 .doc-count {
   white-space: nowrap;
   font-size: 13px;
-  color: var(--el-text-color-secondary);
+  color: var(--dd-muted);
 }
 
 .project-groups {
   display: grid;
-  gap: 20px;
+  gap: 14px;
 }
 
 .project-group {
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 12px;
+  border: 1px solid var(--dd-line);
+  border-radius: 10px;
   overflow: hidden;
+  background: #fff;
 }
 
 .group-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 16px;
-  background: var(--el-fill-color-light);
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 0;
+  background: var(--dd-surface-soft);
+  color: var(--dd-ink);
   cursor: pointer;
   user-select: none;
-  font-weight: 600;
+  font-weight: 750;
 }
 
 .group-toggle {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  width: 16px;
+  width: 18px;
+  color: var(--dd-muted);
+  font-size: 20px;
+  line-height: 1;
 }
 
 .group-name {
   flex: 1;
+  text-align: left;
 }
 
-.empty-state {
+.group-count {
+  color: var(--dd-muted);
+  font-size: 12px;
+}
+
+.document-list {
+  display: grid;
+}
+
+.document-row {
+  display: grid;
+  grid-template-columns: 64px minmax(220px, 1fr) minmax(120px, auto) 72px minmax(86px, auto);
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  min-height: 74px;
+  padding: 12px 16px;
+  border: 0;
+  border-top: 1px solid var(--dd-line-soft);
+  background: #fff;
+  color: var(--dd-ink-2);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    transform 0.16s ease;
+}
+
+.document-row:hover {
+  background: #f8fbff;
+}
+
+.document-main {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.document-main strong {
+  overflow: hidden;
+  color: var(--dd-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-main span {
+  overflow: hidden;
+  color: var(--dd-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.version-chip {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 44px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: var(--dd-ink-2);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.empty-project-hint {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--dd-muted);
+  font-size: 13px;
+}
+
+@media (max-width: 1080px) {
+  .asset-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .project-rail {
+    position: static;
+  }
+
+  .document-row {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .person-chip,
+  .version-chip,
+  .document-row > .status-pill {
+    justify-self: start;
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 720px) {
+  .toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .toolbar .el-input {
+    max-width: none;
+  }
+
+  .doc-count {
+    white-space: normal;
+  }
+}
+
+/* Keep dialog empty states isolated from the global product empty state. */
+.asset-panel .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 40px 16px;
   text-align: center;
-}
-
-.empty-title {
-  margin: 12px 0 4px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--el-text-color-regular);
-}
-
-.empty-hint {
-  margin: 0;
-  font-size: 13px;
-  color: var(--el-text-color-placeholder);
-}
-
-.empty-project-hint {
-  padding: 24px 16px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--el-text-color-placeholder);
 }
 </style>

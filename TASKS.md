@@ -257,6 +257,10 @@
 - 完成前端视图功能补全
   - `DocumentsView`：新建文档 Dialog（multipart 上传），接入 `POST /documents`
   - `DocumentDetailView`：编辑信息 Dialog（PATCH）、删除/恢复按钮、上传新版本 Dialog
+- 完成前端 P0/P1 产品化体验改版首轮
+  - P0：统一全局视觉 token、页面底色、卡片层级、状态色、文件类型徽标、空状态和应用外壳导航
+  - P1：重构负责人总览、文档资产库、文档档案页，强化工作台、资产库、版本/流转时间线和 AI 建议隔离
+  - 已完成 `cd frontend && npm run build` 验证
 - 完成 Handler 层集成测试
   - 新增 `handlers_test.go`，基于 memory 仓储的端到端 HTTP 测试
   - 覆盖 18 个测试用例：文档 CRUD、Dashboard、交接、审计、认证、鉴权拦截

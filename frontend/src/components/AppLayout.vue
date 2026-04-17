@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { ArrowDown, Setting } from "@element-plus/icons-vue";
+import {
+  ArrowDown,
+  ChatDotRound,
+  Connection,
+  DataBoard,
+  Document,
+  Setting,
+} from "@element-plus/icons-vue";
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -12,11 +19,64 @@ const auth = useAuthStore();
 const isAdmin = computed(() => auth.role === "admin");
 
 const menus = [
-  { label: "总览", path: "/dashboard" },
-  { label: "文档", path: "/documents" },
-  { label: "交接", path: "/handovers" },
-  { label: "助手", path: "/assistant" },
+  { label: "总览", path: "/dashboard", icon: DataBoard },
+  { label: "文档", path: "/documents", icon: Document },
+  { label: "交接", path: "/handovers", icon: Connection },
+  { label: "助手", path: "/assistant", icon: ChatDotRound },
 ];
+
+const routeMeta = computed(() => {
+  const path = route.path;
+  if (path.startsWith("/documents/")) {
+    return {
+      title: "文档档案",
+      caption: "版本、责任人与流转记录",
+    };
+  }
+  if (path.startsWith("/documents")) {
+    return {
+      title: "文档资产库",
+      caption: "按课题沉淀团队文档",
+    };
+  }
+  if (path.startsWith("/handovers")) {
+    return {
+      title: "毕业交接",
+      caption: "确认资料范围与接收责任",
+    };
+  }
+  if (path.startsWith("/assistant")) {
+    return {
+      title: "OpenClaw 助手",
+      caption: "基于受控上下文生成建议",
+    };
+  }
+  if (path.startsWith("/admin")) {
+    return {
+      title: "系统管理",
+      caption: "用户、空间与项目成员",
+    };
+  }
+  if (path.startsWith("/profile")) {
+    return {
+      title: "个人信息",
+      caption: "联系方式与账号资料",
+    };
+  }
+  return {
+    title: "负责人总览",
+    caption: "课题文档、流转和交接风险",
+  };
+});
+
+const roleLabel = computed(() => {
+  const labels: Record<string, string> = {
+    admin: "平台管理员",
+    project_lead: "课题负责人",
+    member: "成员",
+  };
+  return labels[auth.role || ""] || auth.role || "-";
+});
 
 function handleUserCommand(command: string) {
   if (command === "profile") {
@@ -37,7 +97,7 @@ function handleUserCommand(command: string) {
         <div class="brand-mark">DG</div>
         <div>
           <div class="brand-title">DigiDocs</div>
-          <div class="brand-subtitle">课题组文档平台</div>
+          <div class="brand-subtitle">文档资产平台</div>
         </div>
       </div>
       <nav class="nav">
@@ -48,6 +108,7 @@ function handleUserCommand(command: string) {
           class="nav-item"
           :class="{ active: route.path === menu.path || route.path.startsWith(`${menu.path}/`) }"
         >
+          <ElIcon :size="17"><component :is="menu.icon" /></ElIcon>
           {{ menu.label }}
         </RouterLink>
       </nav>
@@ -65,23 +126,32 @@ function handleUserCommand(command: string) {
     </aside>
     <main class="content">
       <header class="topbar">
-        <div></div>
+        <div class="topbar-context">
+          <div class="topbar-title">{{ routeMeta.title }}</div>
+          <div class="topbar-caption">{{ routeMeta.caption }}</div>
+        </div>
+        <div class="topbar-tools">
+          <div class="system-badge">
+            <span class="system-dot"></span>
+            <span>主业务账本</span>
+          </div>
         <ElDropdown trigger="click" @command="handleUserCommand">
           <button class="user-menu" type="button">
             <span class="user-avatar">{{ auth.displayName.slice(0, 1) || "用" }}</span>
             <span class="user-meta">
               <span class="user-name">{{ auth.displayName || auth.username || "当前用户" }}</span>
-              <span class="user-role">{{ auth.role || "-" }}</span>
+              <span class="user-role">{{ roleLabel }}</span>
             </span>
             <ElIcon><ArrowDown /></ElIcon>
           </button>
           <template #dropdown>
             <ElDropdownMenu>
               <ElDropdownItem command="profile">个人信息</ElDropdownItem>
-              <ElDropdownItem divided command="logout">退出登录</ElDropdownItem>
-            </ElDropdownMenu>
+            <ElDropdownItem divided command="logout">退出登录</ElDropdownItem>
+          </ElDropdownMenu>
           </template>
         </ElDropdown>
+        </div>
       </header>
       <slot />
     </main>
@@ -91,62 +161,81 @@ function handleUserCommand(command: string) {
 <style scoped>
 .layout {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 248px minmax(0, 1fr);
   min-height: 100vh;
 }
 
 .sidebar {
+  position: sticky;
+  top: 0;
   display: flex;
   flex-direction: column;
-  padding: 28px 18px;
-  border-right: 1px solid rgba(16, 36, 62, 0.08);
-  background:
-    radial-gradient(circle at top, rgba(52, 120, 246, 0.16), transparent 45%),
-    #f7fafc;
+  height: 100vh;
+  padding: 24px 16px;
+  border-right: 1px solid var(--dd-line);
+  background: #f9fbfd;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 28px;
+  padding: 0 8px;
+  margin-bottom: 30px;
 }
 
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: #123e73;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, var(--dd-primary), var(--dd-primary-strong));
   color: #fff;
-  font-weight: 700;
+  font-weight: 760;
+  box-shadow: 0 10px 20px rgba(18, 75, 135, 0.18);
 }
 
 .brand-title {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 760;
+  letter-spacing: 0;
 }
 
 .brand-subtitle {
-  color: #61748d;
+  color: var(--dd-muted);
   font-size: 12px;
 }
 
 .nav {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .nav-item {
-  padding: 12px 14px;
-  border-radius: 12px;
-  color: #48607e;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--dd-ink-2);
+  font-weight: 650;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.nav-item:hover {
+  background: var(--dd-primary-soft);
+  color: var(--dd-primary-strong);
 }
 
 .nav-item.active {
-  background: #123e73;
+  background: var(--dd-primary);
   color: #fff;
+  box-shadow: 0 8px 18px rgba(18, 75, 135, 0.16);
 }
 
 .nav-admin {
@@ -165,14 +254,59 @@ function handleUserCommand(command: string) {
 }
 
 .content {
-  padding: 24px;
+  min-width: 0;
 }
 
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  gap: 16px;
+  min-height: 72px;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--dd-line);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(12px);
+}
+
+.topbar-title {
+  color: var(--dd-ink);
+  font-size: 16px;
+  font-weight: 760;
+}
+
+.topbar-caption {
+  margin-top: 2px;
+  color: var(--dd-muted);
+  font-size: 12px;
+}
+
+.topbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.system-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--dd-line);
+  border-radius: 8px;
+  background: var(--dd-surface-soft);
+  color: var(--dd-ink-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.system-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dd-success);
+  box-shadow: 0 0 0 4px var(--dd-success-soft);
 }
 
 .user-menu {
@@ -181,10 +315,10 @@ function handleUserCommand(command: string) {
   gap: 10px;
   min-height: 44px;
   padding: 6px 10px 6px 6px;
-  border: 1px solid rgba(16, 36, 62, 0.1);
-  border-radius: 12px;
+  border: 1px solid var(--dd-line);
+  border-radius: 8px;
   background: #fff;
-  color: #10243e;
+  color: var(--dd-ink);
   cursor: pointer;
 }
 
@@ -194,9 +328,9 @@ function handleUserCommand(command: string) {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #123e73;
+  background: var(--dd-primary);
   color: #fff;
-  font-weight: 700;
+  font-weight: 760;
 }
 
 .user-meta {
@@ -207,11 +341,11 @@ function handleUserCommand(command: string) {
 
 .user-name {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .user-role {
-  color: #61748d;
+  color: var(--dd-muted);
   font-size: 12px;
 }
 
@@ -221,8 +355,23 @@ function handleUserCommand(command: string) {
   }
 
   .sidebar {
+    position: static;
+    height: auto;
     border-right: 0;
-    border-bottom: 1px solid rgba(16, 36, 62, 0.08);
+    border-bottom: 1px solid var(--dd-line);
+  }
+
+  .nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .topbar {
+    padding: 14px 18px;
+  }
+
+  .system-badge,
+  .topbar-context {
+    display: none;
   }
 }
 </style>
