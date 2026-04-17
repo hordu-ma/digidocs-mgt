@@ -21,6 +21,7 @@ type AssistantConversationItem = {
   created_by?: string;
   created_at: string;
   last_message_at?: string;
+  archived_at?: string;
 };
 
 type AssistantConversationMessageItem = {
@@ -48,6 +49,7 @@ const loading = ref(false);
 const thinking = ref(false);
 const conversationsLoading = ref(false);
 const messagesLoading = ref(false);
+const showArchived = ref(false);
 
 // scope selectors (browsing / composing)
 const projects = ref<ProjectOption[]>([]);
@@ -63,6 +65,13 @@ const activeRequestID = ref("");
 let pollTimer: number | null = null;
 
 /* ---------- computed ---------- */
+
+const visibleConversations = computed(() => {
+  if (showArchived.value) {
+    return conversations.value.filter((c) => !!c.archived_at);
+  }
+  return conversations.value.filter((c) => !c.archived_at);
+});
 
 const composerScopeLabel = computed(() => {
   if (selectedDocumentID.value) {
@@ -248,6 +257,9 @@ async function fetchConversations() {
     } else if (selectedProjectID.value) {
       params.project_id = selectedProjectID.value;
     }
+    if (showArchived.value) {
+      params.include_archived = "true";
+    }
     const res = await api.get("/assistant/conversations", { params });
     conversations.value = (res.data?.data ?? []) as AssistantConversationItem[];
   } catch (err: any) {
@@ -375,6 +387,24 @@ function startNewConversation() {
   messages.value = [];
 }
 
+async function archiveConversation(conversationID: string, archive: boolean) {
+  try {
+    await api.patch(`/assistant/conversations/${conversationID}/archive`, { archive });
+    ElMessage.success(archive ? "会话已归档" : "会话已恢复");
+    if (conversationID === activeConversationID.value && archive) {
+      startNewConversation();
+    }
+    await fetchConversations();
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "操作失败");
+  }
+}
+
+function toggleShowArchived() {
+  showArchived.value = !showArchived.value;
+  void fetchConversations();
+}
+
 /* ---------- lifecycle ---------- */
 
 onMounted(async () => {
@@ -394,8 +424,13 @@ onBeforeUnmount(() => {
       <ElCard class="page-card conversation-panel">
         <template #header>
           <div class="panel-header">
-            <span>会话列表</span>
-            <ElButton link type="primary" @click="startNewConversation">新会话</ElButton>
+            <span>{{ showArchived ? '已归档会话' : '会话列表' }}</span>
+            <div class="panel-header-actions">
+              <ElButton link :type="showArchived ? 'warning' : 'default'" @click="toggleShowArchived">
+                {{ showArchived ? '返回列表' : '📦 归档' }}
+              </ElButton>
+              <ElButton v-if="!showArchived" link type="primary" @click="startNewConversation">新会话</ElButton>
+            </div>
           </div>
         </template>
 
@@ -429,30 +464,50 @@ onBeforeUnmount(() => {
           </ElSelect>
         </div>
 
-        <div v-if="!conversationsLoading && conversations.length === 0" class="empty-state">
+        <div v-if="!conversationsLoading && visibleConversations.length === 0" class="empty-state">
           <el-icon :size="32" color="var(--el-text-color-placeholder)"><ChatDotRound /></el-icon>
-          <p class="empty-title">暂无会话</p>
-          <p class="empty-hint">选择项目后开始您的第一次对话</p>
+          <p class="empty-title">{{ showArchived ? '暂无归档会话' : '暂无会话' }}</p>
+          <p class="empty-hint">{{ showArchived ? '归档的会话将显示在这里' : '选择项目后开始您的第一次对话' }}</p>
         </div>
         <div v-else v-loading="conversationsLoading" class="conversation-list">
-          <button
-            v-for="item in conversations"
+          <div
+            v-for="item in visibleConversations"
             :key="item.id"
             class="conversation-item"
             :class="{ active: item.id === activeConversationID }"
-            type="button"
-            @click="openConversation(item)"
           >
-            <div class="conversation-title">{{ item.title || "未命名会话" }}</div>
-            <div class="conversation-meta">
-              <ElTag size="small" :type="item.scope_type === 'document' ? 'warning' : 'info'" disable-transitions>
-                {{ formatScopeDisplay(item) }}
-              </ElTag>
-              <span class="conversation-time" :title="item.last_message_at || item.created_at">
-                {{ relativeTime(item.last_message_at || item.created_at) }}
-              </span>
+            <button
+              class="conversation-body"
+              type="button"
+              @click="openConversation(item)"
+            >
+              <div class="conversation-title">{{ item.title || "未命名会话" }}</div>
+              <div class="conversation-meta">
+                <ElTag size="small" :type="item.scope_type === 'document' ? 'warning' : 'info'" disable-transitions>
+                  {{ formatScopeDisplay(item) }}
+                </ElTag>
+                <span class="conversation-time" :title="item.last_message_at || item.created_at">
+                  {{ relativeTime(item.last_message_at || item.created_at) }}
+                </span>
+              </div>
+            </button>
+            <div class="conversation-actions">
+              <ElButton
+                v-if="!item.archived_at"
+                link
+                size="small"
+                title="归档此会话"
+                @click.stop="archiveConversation(item.id, true)"
+              >📥</ElButton>
+              <ElButton
+                v-else
+                link
+                size="small"
+                title="恢复此会话"
+                @click.stop="archiveConversation(item.id, false)"
+              >↩️</ElButton>
             </div>
-          </button>
+          </div>
         </div>
       </ElCard>
 
@@ -554,6 +609,12 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
+.panel-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .scope-filters {
   display: grid;
   gap: 12px;
@@ -568,10 +629,32 @@ onBeforeUnmount(() => {
 .conversation-item {
   border: 1px solid var(--el-border-color);
   border-radius: 12px;
-  padding: 12px;
+  padding: 0;
   background: #fff;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.conversation-body {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  background: transparent;
   text-align: left;
   cursor: pointer;
+}
+
+.conversation-actions {
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.conversation-item:hover .conversation-actions {
+  opacity: 1;
 }
 
 .conversation-item.active {

@@ -95,6 +95,7 @@ type AssistantRepository interface {
 	CreateConversation(ctx context.Context, scopeType string, scopeID string, sourceScope map[string]any, title string, actorID string) (*query.AssistantConversationItem, error)
 	GetConversation(ctx context.Context, conversationID string) (*query.AssistantConversationItem, error)
 	ListConversations(ctx context.Context, filter query.AssistantConversationFilter) ([]query.AssistantConversationItem, error)
+	ArchiveConversation(ctx context.Context, conversationID string, archive bool) error
 	ListConversationMessages(ctx context.Context, conversationID string) ([]query.AssistantConversationMessageItem, error)
 	CreateAssistantRequest(ctx context.Context, message task.Message, actorID string) error
 	CompleteAssistantRequest(ctx context.Context, result task.Result) error

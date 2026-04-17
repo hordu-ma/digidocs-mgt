@@ -144,6 +144,27 @@ func (r *AssistantRepository) ListConversations(
 	return items, nil
 }
 
+func (r *AssistantRepository) ArchiveConversation(
+	_ context.Context,
+	conversationID string,
+	archive bool,
+) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	record, ok := r.conversations[conversationID]
+	if !ok {
+		return service.ErrNotFound
+	}
+	if archive {
+		record.ArchivedAt = time.Now().UTC().Format(time.RFC3339)
+	} else {
+		record.ArchivedAt = ""
+	}
+	r.conversations[conversationID] = record
+	return nil
+}
+
 func (r *AssistantRepository) ListConversationMessages(
 	_ context.Context,
 	conversationID string,

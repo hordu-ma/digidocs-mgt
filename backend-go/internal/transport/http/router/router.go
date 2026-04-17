@@ -66,6 +66,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.Handle("GET "+cfg.APIV1Prefix+"/assistant/conversations", protect(assistantHandler.ListConversations))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/assistant/conversations/{conversationID}", protect(assistantHandler.GetConversation))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/assistant/conversations/{conversationID}/messages", protect(assistantHandler.ListConversationMessages))
+	mux.Handle("PATCH "+cfg.APIV1Prefix+"/assistant/conversations/{conversationID}/archive", protect(assistantHandler.ArchiveConversation))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/assistant/ask", protect(assistantHandler.Ask))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/assistant/requests", protect(assistantHandler.ListRequests))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/assistant/requests/{requestID}", protect(assistantHandler.GetRequest))

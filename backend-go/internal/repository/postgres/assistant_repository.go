@@ -172,6 +172,28 @@ func (r AssistantRepository) ListConversations(
 	return items, rows.Err()
 }
 
+func (r AssistantRepository) ArchiveConversation(
+	ctx context.Context,
+	conversationID string,
+	archive bool,
+) error {
+	var q string
+	if archive {
+		q = `UPDATE assistant_conversations SET archived_at = NOW() WHERE id::text = $1 AND archived_at IS NULL`
+	} else {
+		q = `UPDATE assistant_conversations SET archived_at = NULL WHERE id::text = $1 AND archived_at IS NOT NULL`
+	}
+	res, err := r.db.ExecContext(ctx, q, conversationID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return service.ErrNotFound
+	}
+	return nil
+}
+
 func (r AssistantRepository) ListConversationMessages(
 	ctx context.Context,
 	conversationID string,

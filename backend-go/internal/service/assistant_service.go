@@ -183,6 +183,14 @@ func (s AssistantService) ListConversations(
 	return s.repo.ListConversations(ctx, filter)
 }
 
+func (s AssistantService) ArchiveConversation(
+	ctx context.Context,
+	conversationID string,
+	archive bool,
+) error {
+	return s.repo.ArchiveConversation(ctx, conversationID, archive)
+}
+
 func (s AssistantService) GetConversation(
 	ctx context.Context,
 	conversationID string,

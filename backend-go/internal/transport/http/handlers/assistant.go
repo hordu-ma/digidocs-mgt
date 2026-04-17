@@ -93,10 +93,20 @@ func (h AssistantHandler) ListConversations(w http.ResponseWriter, r *http.Reque
 			scopeType = "project"
 		}
 	}
+
+	// 强制按认证用户过滤，admin 可通过 all_users=true 查看全部
+	createdBy := middleware.UserIDFromContext(r.Context())
+	if middleware.UserRoleFromContext(r.Context()) == "admin" && r.URL.Query().Get("all_users") == "true" {
+		createdBy = ""
+	}
+
+	includeArchived := r.URL.Query().Get("include_archived") == "true"
+
 	items, err := h.service.ListConversations(r.Context(), query.AssistantConversationFilter{
-		ScopeType: scopeType,
-		ScopeID:   firstNonEmpty(r.URL.Query().Get("document_id"), r.URL.Query().Get("project_id"), r.URL.Query().Get("scope_id")),
-		CreatedBy: r.URL.Query().Get("created_by"),
+		ScopeType:       scopeType,
+		ScopeID:         firstNonEmpty(r.URL.Query().Get("document_id"), r.URL.Query().Get("project_id"), r.URL.Query().Get("scope_id")),
+		CreatedBy:       createdBy,
+		IncludeArchived: includeArchived,
 	})
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list assistant conversations")
@@ -253,6 +263,36 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func (h AssistantHandler) ArchiveConversation(w http.ResponseWriter, r *http.Request) {
+	conversationID := r.PathValue("conversationID")
+	var payload map[string]any
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+	}
+	archive := true
+	if v, ok := payload["archive"].(bool); ok {
+		archive = v
+	}
+	err := h.service.ArchiveConversation(r.Context(), conversationID, archive)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.WriteError(w, http.StatusNotFound, "not_found", "conversation not found")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to archive conversation")
+		return
+	}
+	label := "已归档"
+	if !archive {
+		label = "已恢复"
+	}
+	response.WriteData(w, http.StatusOK, map[string]any{
+		"conversation_id": conversationID,
+		"archived":        archive,
+		"message":         label,
+	})
 }
 
 func (h AssistantHandler) ListSuggestions(w http.ResponseWriter, r *http.Request) {

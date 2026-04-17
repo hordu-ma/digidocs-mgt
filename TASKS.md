@@ -421,6 +421,15 @@
   - Worker Dockerfile 新增 `antiword` 系统依赖
   - 新增 7 个单元测试覆盖三种格式（含边界与缺失依赖场景）
   - 已为之前失败的 3 份文档重新抽取，全部 15/15 成功
+- 完成助手会话安全隔离与归档管理
+  - 修复 `ListConversations` 安全漏洞：handler 强制使用 `UserIDFromContext` 过滤，admin 可通过 `all_users=true` 查看全部
+  - 新增 `PATCH /assistant/conversations/{id}/archive` 归档/恢复端点（后端全链路：interface → postgres → memory → service → handler → router）
+  - 前端 AssistantView 支持归档/查看归档切换，每条会话 hover 显示归档按钮
+  - 前端默认只显示未归档会话，归档视图展示已归档列表并支持恢复
+- 完成文档摘要轮询显示
+  - `DocumentDetailView` 提交摘要后捕获 `request_id`，启动 2.5 秒间隔轮询
+  - 轮询期间显示动画提示（"AI 正在分析文档并生成摘要"），完成后自动刷新建议列表
+  - 页面卸载时清理轮询定时器
 
 ## 待办
 

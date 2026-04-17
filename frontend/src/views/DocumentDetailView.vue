@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
 import type { UploadRawFile } from "element-plus";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
@@ -23,6 +23,8 @@ const flows = ref<any[]>([]);
 const suggestions = ref<any[]>([]);
 const actionLoading = ref(false);
 const summaryLoading = ref(false);
+const summaryPolling = ref(false);
+let summaryPollTimer: number | null = null;
 const users = ref<UserOption[]>([]);
 
 const statusLabel: Record<string, string> = {
@@ -237,6 +239,37 @@ async function submitUpload() {
   }
 }
 
+function stopSummaryPolling() {
+  if (summaryPollTimer !== null) {
+    window.clearTimeout(summaryPollTimer);
+    summaryPollTimer = null;
+  }
+  summaryPolling.value = false;
+}
+
+async function pollSummaryRequest(requestID: string) {
+  try {
+    const res = await api.get(`/assistant/requests/${requestID}`);
+    const data = res.data?.data;
+    if (data?.status === "completed" || data?.status === "failed") {
+      stopSummaryPolling();
+      await loadData();
+      if (data.status === "failed") {
+        ElMessage.error(data.error_message ?? "摘要生成失败");
+      } else {
+        ElMessage.success("摘要已生成");
+      }
+      return;
+    }
+    summaryPollTimer = window.setTimeout(() => {
+      void pollSummaryRequest(requestID);
+    }, 2500);
+  } catch {
+    stopSummaryPolling();
+    ElMessage.error("查询摘要状态失败");
+  }
+}
+
 async function requestSummary() {
   const versionID = doc.value?.current_version_id;
   if (!versionID) {
@@ -246,11 +279,15 @@ async function requestSummary() {
 
   summaryLoading.value = true;
   try {
-    await api.post(`/assistant/documents/${documentID}/summarize`, {
+    const res = await api.post(`/assistant/documents/${documentID}/summarize`, {
       version_id: versionID,
     });
-    ElMessage.success("摘要任务已提交");
-    await loadData();
+    const requestID = res.data?.data?.request_id;
+    ElMessage.info("摘要任务已提交，AI 正在处理…");
+    if (requestID) {
+      summaryPolling.value = true;
+      void pollSummaryRequest(requestID);
+    }
   } catch (err: any) {
     ElMessage.error(err.response?.data?.message ?? "摘要提交失败");
   } finally {
@@ -279,6 +316,10 @@ onMounted(async () => {
   } catch (err: any) {
     ElMessage.error(err.response?.data?.message ?? "加载文档详情失败");
   }
+});
+
+onBeforeUnmount(() => {
+  stopSummaryPolling();
 });
 </script>
 
@@ -334,9 +375,17 @@ onMounted(async () => {
       <ElCard class="page-card">
         <template #header>AI 摘要与建议</template>
         <div class="assistant-toolbar">
-          <ElButton type="primary" :loading="summaryLoading" @click="requestSummary">
-            生成摘要
+          <ElButton type="primary" :loading="summaryLoading || summaryPolling" @click="requestSummary">
+            {{ summaryPolling ? 'AI 正在生成摘要…' : '生成摘要' }}
           </ElButton>
+        </div>
+        <div v-if="summaryPolling" class="summary-polling-hint">
+          <div class="thinking-dots">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+          <span>AI 正在分析文档并生成摘要，请稍候…</span>
         </div>
         <div v-if="suggestions.length === 0" class="summary-text">
           暂无 AI 摘要与建议
@@ -518,6 +567,41 @@ onMounted(async () => {
   display: flex;
   gap: 10px;
   margin-top: 16px;
+}
+
+.summary-polling-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #f0f6ff;
+  border-radius: 10px;
+  color: var(--el-color-primary);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.thinking-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.thinking-dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--el-color-primary);
+  opacity: 0.4;
+  animation: thinking-bounce 1.4s infinite ease-in-out both;
+}
+
+.thinking-dots .dot:nth-child(1) { animation-delay: 0s; }
+.thinking-dots .dot:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots .dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes thinking-bounce {
+  0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
 }
 
 .tag-row {
