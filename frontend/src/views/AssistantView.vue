@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import api from "@/api";
 import AppLayout from "@/components/AppLayout.vue";
+
+/* ---------- types ---------- */
+
+type ProjectOption = { id: string; name: string };
+type DocumentOption = { id: string; title: string };
 
 type AssistantConversationItem = {
   id: string;
   scope_type: string;
   scope_id: string;
   source_scope?: Record<string, unknown>;
+  scope_display_name?: string;
   title?: string;
   created_by?: string;
   created_at: string;
@@ -34,17 +40,41 @@ type AssistantRequestItem = {
   output?: Record<string, any>;
 };
 
-const question = ref("课题A 最近一个月有哪些文档在流转？");
-const projectID = ref("");
-const documentID = ref("");
+/* ---------- state ---------- */
+
+const question = ref("");
 const loading = ref(false);
 const conversationsLoading = ref(false);
 const messagesLoading = ref(false);
+
+// scope selectors (browsing / composing)
+const projects = ref<ProjectOption[]>([]);
+const documents = ref<DocumentOption[]>([]);
+const selectedProjectID = ref("");
+const selectedDocumentID = ref("");
+
+// conversations & messages
 const conversations = ref<AssistantConversationItem[]>([]);
 const messages = ref<AssistantConversationMessageItem[]>([]);
 const activeConversationID = ref("");
 const activeRequestID = ref("");
 let pollTimer: number | null = null;
+
+/* ---------- computed ---------- */
+
+const composerScopeLabel = computed(() => {
+  if (selectedDocumentID.value) {
+    const doc = documents.value.find((d) => d.id === selectedDocumentID.value);
+    return doc ? `📄 ${doc.title}` : "📄 文档";
+  }
+  if (selectedProjectID.value) {
+    const proj = projects.value.find((p) => p.id === selectedProjectID.value);
+    return proj ? `📁 ${proj.name}` : "📁 项目";
+  }
+  return "未选择范围";
+});
+
+/* ---------- helpers ---------- */
 
 function stopPolling() {
   if (pollTimer !== null) {
@@ -116,54 +146,105 @@ function renderMarkdown(value: string) {
   return html.join("");
 }
 
-function formatScope(scope?: Record<string, unknown>) {
-  if (!scope) {
-    return "未设置范围";
-  }
-  const parts: string[] = [];
-  if (typeof scope.project_id === "string" && scope.project_id) {
-    parts.push(`project_id=${scope.project_id}`);
-  }
-  if (typeof scope.document_id === "string" && scope.document_id) {
-    parts.push(`document_id=${scope.document_id}`);
-  }
-  return parts.length ? parts.join(" / ") : "未设置范围";
+function relativeTime(iso: string | undefined) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "刚刚";
+  if (diffMin < 60) return `${diffMin} 分钟前`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} 小时前`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay === 1) return "昨天";
+  if (diffDay < 30) return `${diffDay} 天前`;
+  return date.toLocaleDateString("zh-CN");
 }
 
-function formatMemorySources(metadata?: Record<string, any>) {
+function formatScopeDisplay(item: AssistantConversationItem) {
+  if (item.scope_display_name) {
+    const icon = item.scope_type === "document" ? "📄" : "📁";
+    return `${icon} ${item.scope_display_name}`;
+  }
+  // fallback: show scope type
+  return item.scope_type === "document" ? "📄 文档" : "📁 项目";
+}
+
+function formatMemorySourcesFriendly(metadata?: Record<string, any>) {
   const raw = metadata?.memory_sources;
   if (!Array.isArray(raw) || raw.length === 0) {
     return "未命中可复用记忆";
   }
+  const typeLabels: Record<string, string> = {
+    conversation_messages: "历史对话",
+    confirmed_suggestions: "已确认建议",
+    historical_answers: "历史问答",
+  };
   return raw
     .map((item: any) => {
       const type = typeof item?.type === "string" ? item.type : "memory";
+      const label = typeLabels[type] || type;
       const count = Number(item?.count ?? 0);
-      return count > 0 ? `${type}(${count})` : type;
+      return count > 0 ? `${count} 条${label}` : label;
     })
-    .join("，");
+    .join("、");
 }
 
-function applyConversationScope(item: AssistantConversationItem) {
-  activeConversationID.value = item.id;
-  projectID.value =
-    typeof item.source_scope?.project_id === "string"
-      ? item.source_scope.project_id
-      : "";
-  documentID.value =
-    typeof item.source_scope?.document_id === "string"
-      ? item.source_scope.document_id
-      : "";
+/* ---------- data loading ---------- */
+
+async function loadProjects() {
+  try {
+    const res = await api.get("/projects");
+    projects.value = (res.data?.data ?? []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+    }));
+  } catch {
+    projects.value = [];
+  }
 }
+
+async function loadDocuments(projectID: string) {
+  if (!projectID) {
+    documents.value = [];
+    return;
+  }
+  try {
+    const res = await api.get("/documents", {
+      params: { project_id: projectID, page_size: 200 },
+    });
+    documents.value = (res.data?.data ?? []).map((d: any) => ({
+      id: d.id,
+      title: d.title,
+    }));
+  } catch {
+    documents.value = [];
+  }
+}
+
+/* ---------- watchers ---------- */
+
+watch(selectedProjectID, (newVal) => {
+  selectedDocumentID.value = "";
+  void loadDocuments(newVal);
+  void fetchConversations();
+});
+
+watch(selectedDocumentID, () => {
+  void fetchConversations();
+});
+
+/* ---------- conversations & messages ---------- */
 
 async function fetchConversations() {
   conversationsLoading.value = true;
   try {
     const params: Record<string, string> = {};
-    if (documentID.value.trim()) {
-      params.document_id = documentID.value.trim();
-    } else if (projectID.value.trim()) {
-      params.project_id = projectID.value.trim();
+    if (selectedDocumentID.value) {
+      params.document_id = selectedDocumentID.value;
+    } else if (selectedProjectID.value) {
+      params.project_id = selectedProjectID.value;
     }
     const res = await api.get("/assistant/conversations", { params });
     conversations.value = (res.data?.data ?? []) as AssistantConversationItem[];
@@ -186,10 +267,33 @@ async function fetchMessages(conversationID: string) {
   }
 }
 
-async function openConversation(item: AssistantConversationItem) {
-  applyConversationScope(item);
-  await fetchMessages(item.id);
+function openConversation(item: AssistantConversationItem) {
+  activeConversationID.value = item.id;
+  // sync selectors from conversation scope
+  const projId =
+    typeof item.source_scope?.project_id === "string"
+      ? (item.source_scope.project_id as string)
+      : "";
+  const docId =
+    typeof item.source_scope?.document_id === "string"
+      ? (item.source_scope.document_id as string)
+      : "";
+  if (projId && projId !== selectedProjectID.value) {
+    selectedProjectID.value = projId;
+    // loadDocuments will fire via watcher, then set document
+    if (docId) {
+      const unwatch = watch(documents, () => {
+        selectedDocumentID.value = docId;
+        unwatch();
+      });
+    }
+  } else if (docId) {
+    selectedDocumentID.value = docId;
+  }
+  void fetchMessages(item.id);
 }
+
+/* ---------- polling ---------- */
 
 async function pollRequest(requestID: string) {
   try {
@@ -215,14 +319,16 @@ async function pollRequest(requestID: string) {
   }
 }
 
+/* ---------- submit ---------- */
+
 async function submitQuestion() {
   const questionText = question.value.trim();
   if (!questionText) {
     ElMessage.warning("请输入问题");
     return;
   }
-  if (!projectID.value.trim() && !documentID.value.trim()) {
-    ElMessage.warning("请至少填写 project_id 或 document_id");
+  if (!selectedProjectID.value && !selectedDocumentID.value) {
+    ElMessage.warning("请先选择一个项目或文档作为提问范围");
     return;
   }
 
@@ -233,8 +339,8 @@ async function submitQuestion() {
       question: questionText,
       conversation_id: activeConversationID.value || undefined,
       scope: {
-        project_id: projectID.value.trim() || null,
-        document_id: documentID.value.trim() || null,
+        project_id: selectedProjectID.value || null,
+        document_id: selectedDocumentID.value || null,
       },
     });
     const data = res.data?.data;
@@ -242,6 +348,7 @@ async function submitQuestion() {
     if (typeof data?.conversation_id === "string" && data.conversation_id) {
       activeConversationID.value = data.conversation_id;
     }
+    question.value = "";
     await fetchConversations();
     if (activeConversationID.value) {
       await fetchMessages(activeConversationID.value);
@@ -264,7 +371,10 @@ function startNewConversation() {
   messages.value = [];
 }
 
-onMounted(() => {
+/* ---------- lifecycle ---------- */
+
+onMounted(async () => {
+  await loadProjects();
   void fetchConversations();
 });
 
@@ -276,6 +386,7 @@ onBeforeUnmount(() => {
 <template>
   <AppLayout>
     <div class="page-shell assistant-layout">
+      <!-- Left: conversation panel -->
       <ElCard class="page-card conversation-panel">
         <template #header>
           <div class="panel-header">
@@ -283,14 +394,40 @@ onBeforeUnmount(() => {
             <ElButton link type="primary" @click="startNewConversation">新会话</ElButton>
           </div>
         </template>
+
         <div class="scope-filters">
-          <ElInput v-model="projectID" placeholder="project_id" clearable />
-          <ElInput v-model="documentID" placeholder="document_id" clearable />
-          <ElButton @click="fetchConversations">按范围筛选</ElButton>
+          <ElSelect
+            v-model="selectedProjectID"
+            placeholder="选择项目（可选）"
+            clearable
+            filterable
+          >
+            <ElOption
+              v-for="p in projects"
+              :key="p.id"
+              :label="p.name"
+              :value="p.id"
+            />
+          </ElSelect>
+          <ElSelect
+            v-model="selectedDocumentID"
+            placeholder="选择文档（可选）"
+            clearable
+            filterable
+            :disabled="!selectedProjectID"
+          >
+            <ElOption
+              v-for="d in documents"
+              :key="d.id"
+              :label="d.title"
+              :value="d.id"
+            />
+          </ElSelect>
         </div>
+
         <ElEmpty
           v-if="!conversationsLoading && conversations.length === 0"
-          description="当前范围暂无会话"
+          description="暂无会话"
         />
         <div v-else v-loading="conversationsLoading" class="conversation-list">
           <button
@@ -302,21 +439,34 @@ onBeforeUnmount(() => {
             @click="openConversation(item)"
           >
             <div class="conversation-title">{{ item.title || "未命名会话" }}</div>
-            <div class="conversation-scope">{{ formatScope(item.source_scope) }}</div>
-            <div class="conversation-time">{{ item.last_message_at || item.created_at }}</div>
+            <div class="conversation-meta">
+              <ElTag size="small" :type="item.scope_type === 'document' ? 'warning' : 'info'" disable-transitions>
+                {{ formatScopeDisplay(item) }}
+              </ElTag>
+              <span class="conversation-time" :title="item.last_message_at || item.created_at">
+                {{ relativeTime(item.last_message_at || item.created_at) }}
+              </span>
+            </div>
           </button>
         </div>
       </ElCard>
 
+      <!-- Right: main area -->
       <div class="assistant-main">
         <ElCard class="page-card">
           <template #header>会话与追问</template>
           <div class="assistant-form">
-            <ElInput v-model="question" :rows="4" type="textarea" />
+            <ElInput
+              v-model="question"
+              :rows="4"
+              type="textarea"
+              placeholder="请输入您想问的问题…"
+            />
             <div class="assistant-actions">
-              <div class="assistant-hint">
-                当前范围：{{ formatScope({ project_id: projectID || undefined, document_id: documentID || undefined }) }}
-              </div>
+              <ElTag v-if="selectedProjectID || selectedDocumentID" size="default" type="info" disable-transitions>
+                {{ composerScopeLabel }}
+              </ElTag>
+              <span v-else class="assistant-hint">请先在左侧选择项目或文档</span>
               <ElButton type="primary" :loading="loading" @click="submitQuestion">发送问题</ElButton>
             </div>
           </div>
@@ -339,15 +489,20 @@ onBeforeUnmount(() => {
                 <ElTag size="small" :type="item.role === 'assistant' ? 'success' : 'info'">
                   {{ item.role === "assistant" ? "AI" : "用户" }}
                 </ElTag>
-                <span>{{ item.created_at }}</span>
-                <span v-if="item.request_id">request_id={{ item.request_id }}</span>
+                <span :title="item.created_at">{{ relativeTime(item.created_at) }}</span>
               </div>
               <div class="assistant-markdown" v-html="renderMarkdown(item.content)"></div>
               <div v-if="item.role === 'assistant'" class="message-extra">
-                <div>模型：{{ item.metadata?.model || "-" }}</div>
-                <div>OpenClaw 响应 ID：{{ item.metadata?.upstream_request_id || "-" }}</div>
-                <div>记忆来源：{{ formatMemorySources(item.metadata) }}</div>
-                <div>来源范围：{{ formatScope(item.metadata?.source_scope) }}</div>
+                <span class="memory-label">{{ formatMemorySourcesFriendly(item.metadata) }}</span>
+                <details class="debug-details">
+                  <summary>调试详情</summary>
+                  <div class="debug-content">
+                    <div>模型：{{ item.metadata?.model || "-" }}</div>
+                    <div>处理耗时：{{ item.metadata?.processing_duration_ms ? `${item.metadata.processing_duration_ms}ms` : "-" }}</div>
+                    <div>Request ID：{{ item.request_id || "-" }}</div>
+                    <div>OpenClaw ID：{{ item.metadata?.upstream_request_id || "-" }}</div>
+                  </div>
+                </details>
               </div>
             </div>
           </div>
@@ -405,7 +560,12 @@ onBeforeUnmount(() => {
   margin-bottom: 6px;
 }
 
-.conversation-scope,
+.conversation-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .conversation-time,
 .assistant-hint,
 .message-meta,
@@ -452,6 +612,33 @@ onBeforeUnmount(() => {
 
 .message-extra {
   margin-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.memory-label {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.debug-details {
+  margin-top: 4px;
+}
+
+.debug-details summary {
+  cursor: pointer;
+  color: var(--el-text-color-placeholder);
+  font-size: 12px;
+  user-select: none;
+}
+
+.debug-content {
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
   display: grid;
   gap: 4px;
 }

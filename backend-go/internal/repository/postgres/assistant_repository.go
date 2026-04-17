@@ -89,17 +89,24 @@ func (r AssistantRepository) GetConversation(
 		ctx,
 		`
 		SELECT
-			id::text,
-			scope_type,
-			scope_id::text,
-			COALESCE(source_scope::text, '{}'),
-			COALESCE(title, ''),
-			COALESCE(created_by::text, ''),
-			TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
-			TO_CHAR(last_message_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
-			COALESCE(TO_CHAR(archived_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')
-		FROM assistant_conversations
-		WHERE id::text = $1
+			c.id::text,
+			c.scope_type,
+			c.scope_id::text,
+			COALESCE(c.source_scope::text, '{}'),
+			COALESCE(
+				CASE c.scope_type
+					WHEN 'document' THEN (SELECT d.title FROM documents d WHERE d.id = c.scope_id)
+					WHEN 'project'  THEN (SELECT p.name  FROM projects p  WHERE p.id = c.scope_id)
+				END,
+				''
+			),
+			COALESCE(c.title, ''),
+			COALESCE(c.created_by::text, ''),
+			TO_CHAR(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+			TO_CHAR(c.last_message_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+			COALESCE(TO_CHAR(c.archived_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')
+		FROM assistant_conversations c
+		WHERE c.id::text = $1
 		`,
 		conversationID,
 	)
@@ -121,21 +128,28 @@ func (r AssistantRepository) ListConversations(
 		ctx,
 		`
 		SELECT
-			id::text,
-			scope_type,
-			scope_id::text,
-			COALESCE(source_scope::text, '{}'),
-			COALESCE(title, ''),
-			COALESCE(created_by::text, ''),
-			TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
-			TO_CHAR(last_message_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
-			COALESCE(TO_CHAR(archived_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')
-		FROM assistant_conversations
-		WHERE ($1 = '' OR scope_type = $1)
-		  AND ($2 = '' OR scope_id::text = $2)
-		  AND ($3 = '' OR COALESCE(created_by::text, '') = $3)
-		  AND ($4 OR archived_at IS NULL)
-		ORDER BY last_message_at DESC, created_at DESC
+			c.id::text,
+			c.scope_type,
+			c.scope_id::text,
+			COALESCE(c.source_scope::text, '{}'),
+			COALESCE(
+				CASE c.scope_type
+					WHEN 'document' THEN (SELECT d.title FROM documents d WHERE d.id = c.scope_id)
+					WHEN 'project'  THEN (SELECT p.name  FROM projects p  WHERE p.id = c.scope_id)
+				END,
+				''
+			),
+			COALESCE(c.title, ''),
+			COALESCE(c.created_by::text, ''),
+			TO_CHAR(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+			TO_CHAR(c.last_message_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+			COALESCE(TO_CHAR(c.archived_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')
+		FROM assistant_conversations c
+		WHERE ($1 = '' OR c.scope_type = $1)
+		  AND ($2 = '' OR c.scope_id::text = $2)
+		  AND ($3 = '' OR COALESCE(c.created_by::text, '') = $3)
+		  AND ($4 OR c.archived_at IS NULL)
+		ORDER BY c.last_message_at DESC, c.created_at DESC
 		`,
 		filter.ScopeType,
 		filter.ScopeID,
@@ -1082,6 +1096,7 @@ func scanAssistantConversationItem(scanner assistantConversationScanner) (query.
 		&item.ScopeType,
 		&item.ScopeID,
 		&scopeText,
+		&item.ScopeDisplayName,
 		&item.Title,
 		&item.CreatedBy,
 		&item.CreatedAt,

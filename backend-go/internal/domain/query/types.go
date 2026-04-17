@@ -247,15 +247,16 @@ type AssistantConversationFilter struct {
 }
 
 type AssistantConversationItem struct {
-	ID            string         `json:"id"`
-	ScopeType     string         `json:"scope_type"`
-	ScopeID       string         `json:"scope_id"`
-	SourceScope   map[string]any `json:"source_scope,omitempty"`
-	Title         string         `json:"title,omitempty"`
-	CreatedBy     string         `json:"created_by,omitempty"`
-	CreatedAt     string         `json:"created_at"`
-	LastMessageAt string         `json:"last_message_at,omitempty"`
-	ArchivedAt    string         `json:"archived_at,omitempty"`
+	ID               string         `json:"id"`
+	ScopeType        string         `json:"scope_type"`
+	ScopeID          string         `json:"scope_id"`
+	SourceScope      map[string]any `json:"source_scope,omitempty"`
+	ScopeDisplayName string         `json:"scope_display_name,omitempty"`
+	Title            string         `json:"title,omitempty"`
+	CreatedBy        string         `json:"created_by,omitempty"`
+	CreatedAt        string         `json:"created_at"`
+	LastMessageAt    string         `json:"last_message_at,omitempty"`
+	ArchivedAt       string         `json:"archived_at,omitempty"`
 }
 
 type AssistantConversationMessageItem struct {

@@ -283,6 +283,7 @@ docker compose up -d postgres
 - 已完成宿主机持久化运维配置安装与验证：`install-persistent-routing.sh`、`digidocs-route-fix.sh` 与 `tailscaled` drop-in 已在当前机器落地，`systemctl restart tailscaled` 后 `table 52` 仍保持 `throw 172.17/172.18/192.168.1`
 - 已补充 RustDesk / 本机浏览器访问 `18080/18081` 超时的排查与临时修复说明，复用现有 `digidocs-route-fix.sh` 路由修正脚本
 - 已补充登录后个人信息维护能力：当前用户可自助更新显示姓名、手机号、微信号和邮箱，账号、角色、状态与权限保持只读
+- 已完成 Assistant 助手页面产品化改造：范围选择改为项目/文档下拉选择器，会话列表显示人类可读范围标签，消息流隐藏技术字段并折叠调试详情，记忆来源改为中文友好文案，时间戳改为相对时间
 - 当前下一步聚焦：把当前 Linux 单机运维方案复制到目标正式主机，并复验一次正式环境联调
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

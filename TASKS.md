@@ -348,6 +348,13 @@
   - `backend-py-worker` 已新增 `skill_registry` / `skill_adapter`，对白名单 skill 做任务绑定、scope 校验与输出归一化
   - `assistant_requests` / 会话消息查询已透出 `skill_name`、`skill_version` 等审计字段，无需新增数据库迁移
   - `.env.example`、`docs/API设计.md`、`docs/项目定义与技术架构.md`、`backend-py-worker/README.md` 已同步 skill 白名单与显式上下文约束
+- 完成 Assistant 助手页面产品化改造
+  - 左侧范围筛选从手工输入 UUID 改为项目/文档下拉选择器（联动加载、可筛选）
+  - 会话列表显示人类可读的范围标签（📁 项目名 / 📄 文档标题）替代裸 UUID
+  - 消息流隐藏技术字段（request_id、upstream_request_id、source_scope UUID），改由折叠面板承载
+  - 记忆来源描述由英文 key 改为中文友好文案（"2 条历史对话、1 条已确认建议"）
+  - 时间戳改为相对时间显示（鼠标悬停显示精确时间）
+  - 后端 `ListConversations` / `GetConversation` 新增 `scope_display_name` 字段（JOIN projects/documents 获取名称）
 
 ## 进行中
 
