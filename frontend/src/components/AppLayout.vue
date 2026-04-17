@@ -41,7 +41,7 @@ const routeMeta = computed(() => {
   }
   if (path.startsWith("/handovers")) {
     return {
-      title: "毕业交接",
+      title: "工作交接",
       caption: "确认资料范围与接收责任",
     };
   }
@@ -131,26 +131,22 @@ function handleUserCommand(command: string) {
           <div class="topbar-caption">{{ routeMeta.caption }}</div>
         </div>
         <div class="topbar-tools">
-          <div class="system-badge">
-            <span class="system-dot"></span>
-            <span>主业务账本</span>
-          </div>
-        <ElDropdown trigger="click" @command="handleUserCommand">
-          <button class="user-menu" type="button">
-            <span class="user-avatar">{{ auth.displayName.slice(0, 1) || "用" }}</span>
-            <span class="user-meta">
-              <span class="user-name">{{ auth.displayName || auth.username || "当前用户" }}</span>
-              <span class="user-role">{{ roleLabel }}</span>
-            </span>
-            <ElIcon><ArrowDown /></ElIcon>
-          </button>
-          <template #dropdown>
-            <ElDropdownMenu>
-              <ElDropdownItem command="profile">个人信息</ElDropdownItem>
-            <ElDropdownItem divided command="logout">退出登录</ElDropdownItem>
-          </ElDropdownMenu>
-          </template>
-        </ElDropdown>
+          <ElDropdown trigger="click" @command="handleUserCommand">
+            <button class="user-menu" type="button">
+              <span class="user-avatar">{{ auth.displayName.slice(0, 1) || "用" }}</span>
+              <span class="user-meta">
+                <span class="user-name">{{ auth.displayName || auth.username || "当前用户" }}</span>
+                <span class="user-role">{{ roleLabel }}</span>
+              </span>
+              <ElIcon><ArrowDown /></ElIcon>
+            </button>
+            <template #dropdown>
+              <ElDropdownMenu>
+                <ElDropdownItem command="profile">个人信息</ElDropdownItem>
+                <ElDropdownItem divided command="logout">退出登录</ElDropdownItem>
+              </ElDropdownMenu>
+            </template>
+          </ElDropdown>
         </div>
       </header>
       <slot />
@@ -287,28 +283,6 @@ function handleUserCommand(command: string) {
   gap: 12px;
 }
 
-.system-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 40px;
-  padding: 0 12px;
-  border: 1px solid var(--dd-line);
-  border-radius: 8px;
-  background: var(--dd-surface-soft);
-  color: var(--dd-ink-2);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.system-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--dd-success);
-  box-shadow: 0 0 0 4px var(--dd-success-soft);
-}
-
 .user-menu {
   display: inline-flex;
   align-items: center;
@@ -369,7 +343,6 @@ function handleUserCommand(command: string) {
     padding: 14px 18px;
   }
 
-  .system-badge,
   .topbar-context {
     display: none;
   }

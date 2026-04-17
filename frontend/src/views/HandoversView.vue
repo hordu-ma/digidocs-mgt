@@ -1,6 +1,15 @@
 <script setup lang="ts">
-import { ElMessage } from "element-plus";
-import { Document as DocumentIcon } from "@element-plus/icons-vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import {
+  ArrowRight,
+  CircleCheckFilled,
+  CircleCloseFilled,
+  Connection,
+  DocumentAdd,
+  DocumentChecked,
+  FolderOpened,
+  UserFilled,
+} from "@element-plus/icons-vue";
 import { computed, onMounted, reactive, ref } from "vue";
 
 import AppLayout from "@/components/AppLayout.vue";
@@ -71,10 +80,43 @@ const statusLabel: Record<string, string> = {
   cancelled: "已取消",
 };
 
+const statusClass: Record<string, string> = {
+  generated: "handover-generated",
+  pending_confirm: "handover-pending",
+  completed: "handover-completed",
+  cancelled: "handover-cancelled",
+};
+
+const documentStatusLabel: Record<string, string> = {
+  draft: "草稿",
+  in_progress: "处理中",
+  pending_handover: "待交接",
+  handed_over: "已交接",
+  finalized: "定稿",
+  archived: "已归档",
+};
+
+const documentStatusClass: Record<string, string> = {
+  draft: "status-draft",
+  in_progress: "status-in-progress",
+  pending_handover: "status-pending-handover",
+  handed_over: "status-handed-over",
+  finalized: "status-finalized",
+  archived: "status-archived",
+};
+
 const canEditItems = computed(() => activeHandover.value?.status === "generated");
 const selectedItemCount = computed(
   () => editableItems.value.filter((item) => item.selected).length,
 );
+const unselectedItemCount = computed(() => editableItems.value.length - selectedItemCount.value);
+
+const handoverMetrics = computed(() => ({
+  total: handovers.value.length,
+  pending: handovers.value.filter((item) => item.status === "pending_confirm").length,
+  generated: handovers.value.filter((item) => item.status === "generated").length,
+  completed: handovers.value.filter((item) => item.status === "completed").length,
+}));
 
 function userLabel(userID?: string) {
   const user = users.value.find((item) => item.id === userID);
@@ -84,6 +126,29 @@ function userLabel(userID?: string) {
 function documentTitle(documentID: string) {
   const document = projectDocuments.value.find((item) => item.id === documentID);
   return document ? document.title : documentID;
+}
+
+function projectLabel(projectID?: string) {
+  const project = projects.value.find((item) => item.id === projectID);
+  return project?.name ?? "全部课题";
+}
+
+function compactHandoverID(id: string) {
+  return id ? `#${id.slice(0, 8)}` : "-";
+}
+
+function userInitial(userID?: string) {
+  return userLabel(userID).slice(0, 1) || "人";
+}
+
+function statusStepState(status: string, step: "generated" | "pending_confirm" | "completed") {
+  const order = ["generated", "pending_confirm", "completed"];
+  if (status === "cancelled") return "cancelled";
+  const currentIndex = order.indexOf(status);
+  const stepIndex = order.indexOf(step);
+  if (currentIndex > stepIndex) return "done";
+  if (currentIndex === stepIndex) return "active";
+  return "todo";
 }
 
 async function fetchHandovers() {
@@ -229,6 +294,21 @@ async function applyAction(action: "confirm" | "complete" | "cancel") {
   if (!activeHandover.value) {
     return;
   }
+  if (action === "cancel") {
+    try {
+      await ElMessageBox.confirm(
+        "取消后该交接单将不再继续推进，确认取消吗？",
+        "取消交接",
+        {
+          confirmButtonText: "确认取消",
+          cancelButtonText: "返回",
+          type: "warning",
+        },
+      );
+    } catch {
+      return;
+    }
+  }
   actionLoading.value = true;
   try {
     await api.post(`/handovers/${activeHandover.value.id}/${action}`, {});
@@ -258,49 +338,80 @@ onMounted(async () => {
     <div class="page-shell">
       <div class="page-header">
         <div>
-          <h1>毕业交接</h1>
-          <p>管理课题组人员毕业交接流程，确保文档资产完整移交。</p>
+          <div class="page-eyebrow">交接工作台</div>
+          <h1>工作交接</h1>
+          <p>围绕成员离组、资料清单和接收确认推进交接闭环。</p>
         </div>
-        <ElButton type="primary" @click="openCreate">创建交接</ElButton>
+        <ElButton type="primary" @click="openCreate">
+          <ElIcon><DocumentAdd /></ElIcon>
+          创建交接
+        </ElButton>
       </div>
 
-      <ElCard class="page-card">
-        <template #header>交接记录</template>
-        <ElTable
-          v-if="handovers.length > 0"
-          :data="handovers"
-          v-loading="detailLoading"
-          style="width: 100%"
-        >
-          <ElTableColumn prop="id" label="交接单 ID" min-width="280" />
-          <ElTableColumn label="交接人" min-width="140">
-            <template #default="{ row }">
-              {{ userLabel(row.target_user_id) }}
-            </template>
-          </ElTableColumn>
-          <ElTableColumn label="接收人" min-width="140">
-            <template #default="{ row }">
-              {{ userLabel(row.receiver_user_id) }}
-            </template>
-          </ElTableColumn>
-          <ElTableColumn label="状态" width="120">
-            <template #default="{ row }">
-              <ElTag>{{ statusLabel[row.status] ?? row.status }}</ElTag>
-            </template>
-          </ElTableColumn>
-          <ElTableColumn prop="remark" label="备注" min-width="220" />
-          <ElTableColumn label="操作" width="100" fixed="right">
-            <template #default="{ row }">
-              <ElButton link type="primary" @click="openDetail(row.id)">管理</ElButton>
-            </template>
-          </ElTableColumn>
-        </ElTable>
-        <div v-else class="empty-state">
-          <el-icon :size="36" color="var(--el-text-color-placeholder)"><DocumentIcon /></el-icon>
-          <p class="empty-title">暂无交接记录</p>
-          <p class="empty-hint">点击上方「新建交接」创建第一条交接单</p>
+      <section class="handover-summary page-card">
+        <div class="handover-summary-copy">
+          <h2 class="section-title">交接任务概览</h2>
+          <p class="section-note">重点关注待确认和刚生成的交接单，避免资料交接断档。</p>
         </div>
-      </ElCard>
+        <div class="handover-metrics">
+          <div class="handover-metric">
+            <span>交接单</span>
+            <strong>{{ handoverMetrics.total }}</strong>
+          </div>
+          <div class="handover-metric warning">
+            <span>待确认</span>
+            <strong>{{ handoverMetrics.pending }}</strong>
+          </div>
+          <div class="handover-metric primary">
+            <span>已生成</span>
+            <strong>{{ handoverMetrics.generated }}</strong>
+          </div>
+          <div class="handover-metric success">
+            <span>已完成</span>
+            <strong>{{ handoverMetrics.completed }}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="handover-board" v-loading="detailLoading">
+        <div v-if="handovers.length === 0" class="page-card empty-state">
+          <ElIcon :size="36"><Connection /></ElIcon>
+          <p class="empty-title">暂无交接任务</p>
+          <p class="empty-hint">创建交接单后，可在这里确认资料范围并推进接收。</p>
+        </div>
+        <button
+          v-for="item in handovers"
+          v-else
+          :key="item.id"
+          class="handover-card page-card"
+          type="button"
+          @click="openDetail(item.id)"
+        >
+          <span class="handover-status" :class="statusClass[item.status]">
+            {{ statusLabel[item.status] ?? item.status }}
+          </span>
+          <div class="handover-people">
+            <span class="handover-person">
+              <span class="person-avatar">{{ userInitial(item.target_user_id) }}</span>
+              {{ userLabel(item.target_user_id) }}
+            </span>
+            <ElIcon class="handover-arrow"><ArrowRight /></ElIcon>
+            <span class="handover-person">
+              <span class="person-avatar">{{ userInitial(item.receiver_user_id) }}</span>
+              {{ userLabel(item.receiver_user_id) }}
+            </span>
+          </div>
+          <div class="handover-meta">
+            <span>
+              <ElIcon><FolderOpened /></ElIcon>
+              {{ projectLabel(item.project_id) }}
+            </span>
+            <span>{{ compactHandoverID(item.id) }}</span>
+          </div>
+          <p class="handover-remark">{{ item.remark || "暂无备注" }}</p>
+          <span class="handover-action">管理交接</span>
+        </button>
+      </section>
 
       <ElDialog v-model="showDialog" title="创建交接单" width="520px">
         <ElForm label-position="top" v-loading="referenceLoading">
@@ -361,32 +472,58 @@ onMounted(async () => {
 
       <ElDialog
         v-model="showDetailDialog"
-        title="交接单管理"
-        width="920px"
+        title="交接工作台"
+        width="1040px"
         destroy-on-close
       >
         <div v-if="activeHandover" class="handover-detail">
-          <div class="detail-header">
-            <div class="detail-item">
-              <span class="detail-label">交接人</span>
-              <strong>{{ userLabel(activeHandover.target_user_id) }}</strong>
+          <div class="detail-hero">
+            <div class="detail-people-flow">
+              <span class="detail-person">
+                <span class="person-avatar large">{{ userInitial(activeHandover.target_user_id) }}</span>
+                <span>
+                  <small>交接人</small>
+                  <strong>{{ userLabel(activeHandover.target_user_id) }}</strong>
+                </span>
+              </span>
+              <ElIcon class="detail-arrow"><ArrowRight /></ElIcon>
+              <span class="detail-person">
+                <span class="person-avatar large">{{ userInitial(activeHandover.receiver_user_id) }}</span>
+                <span>
+                  <small>接收人</small>
+                  <strong>{{ userLabel(activeHandover.receiver_user_id) }}</strong>
+                </span>
+              </span>
             </div>
-            <div class="detail-item">
-              <span class="detail-label">接收人</span>
-              <strong>{{ userLabel(activeHandover.receiver_user_id) }}</strong>
+            <span class="handover-status" :class="statusClass[activeHandover.status]">
+              {{ statusLabel[activeHandover.status] ?? activeHandover.status }}
+            </span>
+          </div>
+
+          <div class="handover-steps" :class="{ cancelled: activeHandover.status === 'cancelled' }">
+            <div class="handover-step" :class="statusStepState(activeHandover.status, 'generated')">
+              <ElIcon><DocumentChecked /></ElIcon>
+              <span>生成清单</span>
             </div>
-            <div class="detail-item">
-              <span class="detail-label">状态</span>
-              <ElTag>{{ statusLabel[activeHandover.status] ?? activeHandover.status }}</ElTag>
+            <div class="handover-step" :class="statusStepState(activeHandover.status, 'pending_confirm')">
+              <ElIcon><UserFilled /></ElIcon>
+              <span>接收确认</span>
             </div>
-            <div class="detail-item detail-remark">
-              <span class="detail-label">备注</span>
-              <strong>{{ activeHandover.remark || "-" }}</strong>
+            <div class="handover-step" :class="statusStepState(activeHandover.status, 'completed')">
+              <ElIcon><CircleCheckFilled /></ElIcon>
+              <span>完成交接</span>
+            </div>
+            <div v-if="activeHandover.status === 'cancelled'" class="handover-step cancelled active">
+              <ElIcon><CircleCloseFilled /></ElIcon>
+              <span>已取消</span>
             </div>
           </div>
 
           <div class="detail-toolbar">
-            <span>已选中文档 {{ selectedItemCount }} 项</span>
+            <div class="detail-counts">
+              <span>纳入交接 <strong>{{ selectedItemCount }}</strong> 项</span>
+              <span>暂不纳入 <strong>{{ unselectedItemCount }}</strong> 项</span>
+            </div>
             <div class="detail-actions">
               <ElButton
                 v-if="canEditItems"
@@ -423,32 +560,29 @@ onMounted(async () => {
             </div>
           </div>
 
-          <ElTable :data="editableItems" style="width: 100%">
-            <ElTableColumn label="纳入交接" width="100">
-              <template #default="{ row }">
+          <div class="handover-items">
+            <div
+              v-for="row in editableItems"
+              :key="row.document_id"
+              class="handover-item"
+              :class="{ selected: row.selected }"
+            >
+              <div class="item-main">
                 <ElSwitch v-model="row.selected" :disabled="!canEditItems" />
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="文档标题" min-width="260">
-              <template #default="{ row }">
-                {{ row.title || row.document_id }}
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="当前状态" width="140">
-              <template #default="{ row }">
-                {{ statusLabel[row.current_status] ?? (row.current_status || "-") }}
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="备注" min-width="220">
-              <template #default="{ row }">
-                <ElInput
-                  v-model="row.note"
-                  :disabled="!canEditItems"
-                  placeholder="补充交接说明"
-                />
-              </template>
-            </ElTableColumn>
-          </ElTable>
+                <div class="item-copy">
+                  <strong>{{ row.title || row.document_id }}</strong>
+                  <span class="status-pill" :class="documentStatusClass[row.current_status]">
+                    {{ documentStatusLabel[row.current_status] ?? (row.current_status || "未知状态") }}
+                  </span>
+                </div>
+              </div>
+              <ElInput
+                v-model="row.note"
+                :disabled="!canEditItems"
+                placeholder="补充交接说明"
+              />
+            </div>
+          </div>
         </div>
       </ElDialog>
     </div>
@@ -456,41 +590,243 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-h1 {
-  margin: 0;
-  font-size: 32px;
+.handover-summary {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(0, 1.6fr);
+  gap: 20px;
+  align-items: center;
+  padding: 20px;
+  margin-bottom: 18px;
 }
 
-p {
-  color: #61748d;
+.handover-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.handover-metric {
+  display: grid;
+  gap: 6px;
+  min-height: 82px;
+  padding: 14px;
+  border: 1px solid var(--dd-line-soft);
+  border-radius: 8px;
+  background: var(--dd-surface-soft);
+}
+
+.handover-metric span {
+  color: var(--dd-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.handover-metric strong {
+  color: var(--dd-ink);
+  font-size: 28px;
+}
+
+.handover-metric.primary {
+  border-color: #c8ddf2;
+  background: var(--dd-primary-soft);
+}
+
+.handover-metric.warning {
+  border-color: #f1d18b;
+  background: var(--dd-warning-soft);
+}
+
+.handover-metric.success {
+  border-color: #bae5d0;
+  background: var(--dd-success-soft);
+}
+
+.handover-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.handover-card {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  min-height: 214px;
+  padding: 18px;
+  border: 1px solid var(--dd-line);
+  color: var(--dd-ink-2);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.handover-card:hover {
+  border-color: #b8d1e8;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.handover-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.handover-generated {
+  border-color: #c8ddf2;
+  background: var(--dd-primary-soft);
+  color: var(--dd-primary-strong);
+}
+
+.handover-pending {
+  border-color: #f1d18b;
+  background: var(--dd-warning-soft);
+  color: var(--dd-warning);
+}
+
+.handover-completed {
+  border-color: #bae5d0;
+  background: var(--dd-success-soft);
+  color: var(--dd-success);
+}
+
+.handover-cancelled {
+  border-color: #d9e2ec;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.handover-people,
+.detail-people-flow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.handover-person,
+.detail-person {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  color: var(--dd-ink);
+  font-weight: 750;
+}
+
+.handover-arrow,
+.detail-arrow {
+  flex: 0 0 auto;
+  color: var(--dd-muted);
+}
+
+.handover-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--dd-muted);
+  font-size: 12px;
+}
+
+.handover-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.handover-remark {
+  min-height: 40px;
+  margin: 0;
+  color: var(--dd-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.handover-action {
+  color: var(--dd-primary);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.person-avatar.large {
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
 }
 
 .handover-detail {
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
-.detail-header {
+.detail-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--dd-line);
+  border-radius: 10px;
+  background: var(--dd-surface-soft);
+}
+
+.detail-person small {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--dd-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.handover-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
-.detail-item {
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: #f7f9fc;
+.handover-steps.cancelled {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.detail-remark {
-  grid-column: 1 / -1;
+.handover-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid var(--dd-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--dd-muted);
+  font-weight: 750;
 }
 
-.detail-label {
-  display: block;
-  margin-bottom: 8px;
-  color: #61748d;
-  font-size: 13px;
+.handover-step.done {
+  border-color: #bae5d0;
+  background: var(--dd-success-soft);
+  color: var(--dd-success);
+}
+
+.handover-step.active {
+  border-color: #c8ddf2;
+  background: var(--dd-primary-soft);
+  color: var(--dd-primary-strong);
+}
+
+.handover-step.cancelled.active {
+  border-color: #f3c3bd;
+  background: var(--dd-danger-soft);
+  color: var(--dd-danger);
 }
 
 .detail-toolbar {
@@ -500,42 +836,111 @@ p {
   gap: 12px;
 }
 
+.detail-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--dd-muted);
+  font-size: 13px;
+}
+
+.detail-counts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--dd-surface-soft);
+}
+
+.detail-counts strong {
+  color: var(--dd-ink);
+}
+
 .detail-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
+.handover-items {
+  display: grid;
+  gap: 10px;
+}
+
+.handover-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.65fr);
+  gap: 12px;
   align-items: center;
-  justify-content: center;
-  padding: 40px 16px;
-  text-align: center;
+  padding: 14px;
+  border: 1px solid var(--dd-line);
+  border-radius: 10px;
+  background: #fff;
 }
 
-.empty-title {
-  margin: 12px 0 4px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--el-text-color-regular);
+.handover-item.selected {
+  border-color: #c8ddf2;
+  background: #fbfdff;
 }
 
-.empty-hint {
-  margin: 0;
-  font-size: 13px;
-  color: var(--el-text-color-placeholder);
+.item-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.item-copy {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.item-copy strong {
+  overflow: hidden;
+  color: var(--dd-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {
-  .detail-header {
+  .handover-summary,
+  .detail-hero,
+  .handover-item {
     grid-template-columns: 1fr;
+  }
+
+  .handover-summary,
+  .detail-hero {
+    display: grid;
+  }
+
+  .handover-metrics,
+  .handover-steps,
+  .handover-steps.cancelled {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .detail-toolbar {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .handover-board,
+  .handover-metrics,
+  .handover-steps,
+  .handover-steps.cancelled {
+    grid-template-columns: 1fr;
+  }
+
+  .handover-people,
+  .detail-people-flow {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

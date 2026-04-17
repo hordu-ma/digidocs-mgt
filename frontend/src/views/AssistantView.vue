@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
-import { ChatDotRound } from "@element-plus/icons-vue";
+import {
+  Box,
+  ChatDotRound,
+  CircleCheck,
+  Document,
+  FolderOpened,
+  Message,
+  Position,
+  RefreshLeft,
+  TakeawayBox,
+} from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import api from "@/api";
@@ -76,14 +86,24 @@ const visibleConversations = computed(() => {
 const composerScopeLabel = computed(() => {
   if (selectedDocumentID.value) {
     const doc = documents.value.find((d) => d.id === selectedDocumentID.value);
-    return doc ? `📄 ${doc.title}` : "📄 文档";
+    return doc ? doc.title : "文档范围";
   }
   if (selectedProjectID.value) {
     const proj = projects.value.find((p) => p.id === selectedProjectID.value);
-    return proj ? `📁 ${proj.name}` : "📁 项目";
+    return proj ? proj.name : "项目范围";
   }
   return "未选择范围";
 });
+
+const composerScopeType = computed(() => {
+  if (selectedDocumentID.value) return "document";
+  if (selectedProjectID.value) return "project";
+  return "";
+});
+
+const activeConversation = computed(() =>
+  visibleConversations.value.find((item) => item.id === activeConversationID.value),
+);
 
 /* ---------- helpers ---------- */
 
@@ -175,11 +195,10 @@ function relativeTime(iso: string | undefined) {
 
 function formatScopeDisplay(item: AssistantConversationItem) {
   if (item.scope_display_name) {
-    const icon = item.scope_type === "document" ? "📄" : "📁";
-    return `${icon} ${item.scope_display_name}`;
+    return item.scope_display_name;
   }
   // fallback: show scope type
-  return item.scope_type === "document" ? "📄 文档" : "📁 项目";
+  return item.scope_type === "document" ? "文档范围" : "项目范围";
 }
 
 function formatMemorySourcesFriendly(metadata?: Record<string, any>) {
@@ -420,27 +439,28 @@ onBeforeUnmount(() => {
 <template>
   <AppLayout>
     <div class="page-shell assistant-layout">
-      <!-- Left: conversation panel -->
-      <ElCard class="page-card conversation-panel">
-        <template #header>
-          <div class="panel-header">
-            <span>{{ showArchived ? '已归档会话' : '会话列表' }}</span>
-            <div class="panel-header-actions">
-              <ElButton link :type="showArchived ? 'warning' : 'default'" @click="toggleShowArchived">
-                {{ showArchived ? '返回列表' : '📦 归档' }}
-              </ElButton>
-              <ElButton v-if="!showArchived" link type="primary" @click="startNewConversation">新会话</ElButton>
-            </div>
+      <aside class="assistant-sidebar page-card">
+        <div class="assistant-panel-head">
+          <div>
+            <h2 class="section-title">{{ showArchived ? "已归档会话" : "会话" }}</h2>
+            <p class="section-note">按项目或文档范围筛选问答上下文</p>
           </div>
-        </template>
+          <ElButton link :type="showArchived ? 'warning' : 'default'" @click="toggleShowArchived">
+            <ElIcon><component :is="showArchived ? RefreshLeft : Box" /></ElIcon>
+            {{ showArchived ? "返回" : "归档" }}
+          </ElButton>
+        </div>
 
         <div class="scope-filters">
           <ElSelect
             v-model="selectedProjectID"
-            placeholder="选择项目（可选）"
+            placeholder="选择项目范围"
             clearable
             filterable
           >
+            <template #prefix>
+              <ElIcon><FolderOpened /></ElIcon>
+            </template>
             <ElOption
               v-for="p in projects"
               :key="p.id"
@@ -450,11 +470,14 @@ onBeforeUnmount(() => {
           </ElSelect>
           <ElSelect
             v-model="selectedDocumentID"
-            placeholder="选择文档（可选）"
+            placeholder="选择文档范围"
             clearable
             filterable
             :disabled="!selectedProjectID"
           >
+            <template #prefix>
+              <ElIcon><Document /></ElIcon>
+            </template>
             <ElOption
               v-for="d in documents"
               :key="d.id"
@@ -464,10 +487,17 @@ onBeforeUnmount(() => {
           </ElSelect>
         </div>
 
-        <div v-if="!conversationsLoading && visibleConversations.length === 0" class="empty-state">
-          <el-icon :size="32" color="var(--el-text-color-placeholder)"><ChatDotRound /></el-icon>
-          <p class="empty-title">{{ showArchived ? '暂无归档会话' : '暂无会话' }}</p>
-          <p class="empty-hint">{{ showArchived ? '归档的会话将显示在这里' : '选择项目后开始您的第一次对话' }}</p>
+        <div class="conversation-toolbar">
+          <span>{{ visibleConversations.length }} 个会话</span>
+          <ElButton v-if="!showArchived" size="small" type="primary" plain @click="startNewConversation">
+            新会话
+          </ElButton>
+        </div>
+
+        <div v-if="!conversationsLoading && visibleConversations.length === 0" class="empty-state compact">
+          <ElIcon :size="32"><ChatDotRound /></ElIcon>
+          <p class="empty-title">{{ showArchived ? "暂无归档会话" : "暂无会话" }}</p>
+          <p class="empty-hint">{{ showArchived ? "归档后的会话会显示在这里" : "选择范围后发起第一条提问" }}</p>
         </div>
         <div v-else v-loading="conversationsLoading" class="conversation-list">
           <div
@@ -483,9 +513,12 @@ onBeforeUnmount(() => {
             >
               <div class="conversation-title">{{ item.title || "未命名会话" }}</div>
               <div class="conversation-meta">
-                <ElTag size="small" :type="item.scope_type === 'document' ? 'warning' : 'info'" disable-transitions>
+                <span class="scope-chip" :class="item.scope_type">
+                  <ElIcon>
+                    <component :is="item.scope_type === 'document' ? Document : FolderOpened" />
+                  </ElIcon>
                   {{ formatScopeDisplay(item) }}
-                </ElTag>
+                </span>
                 <span class="conversation-time" :title="item.last_message_at || item.created_at">
                   {{ relativeTime(item.last_message_at || item.created_at) }}
                 </span>
@@ -498,52 +531,44 @@ onBeforeUnmount(() => {
                 size="small"
                 title="归档此会话"
                 @click.stop="archiveConversation(item.id, true)"
-              >📥</ElButton>
+              >
+                <ElIcon><Box /></ElIcon>
+              </ElButton>
               <ElButton
                 v-else
                 link
                 size="small"
                 title="恢复此会话"
                 @click.stop="archiveConversation(item.id, false)"
-              >↩️</ElButton>
+              >
+                <ElIcon><RefreshLeft /></ElIcon>
+              </ElButton>
             </div>
           </div>
         </div>
-      </ElCard>
+      </aside>
 
-      <!-- Right: main area -->
-      <div class="assistant-main">
-        <ElCard class="page-card">
-          <template #header>会话与追问</template>
-          <div class="assistant-form">
-            <ElInput
-              v-model="question"
-              :rows="4"
-              type="textarea"
-              :disabled="thinking"
-              :placeholder="thinking ? 'AI 正在思考，请稍候…' : '请输入您想问的问题…'"
-            />
-            <div class="assistant-actions">
-              <ElTag v-if="selectedProjectID || selectedDocumentID" size="default" type="info" disable-transitions>
-                {{ composerScopeLabel }}
-              </ElTag>
-              <span v-else class="assistant-hint">请先在左侧选择项目或文档</span>
-              <ElButton
-                type="primary"
-                :loading="loading"
-                :disabled="thinking"
-                @click="submitQuestion"
-              >{{ thinking ? 'AI 思考中…' : '发送问题' }}</ElButton>
-            </div>
+      <main class="assistant-workspace page-card">
+        <header class="chat-header">
+          <div>
+            <h1>{{ activeConversation?.title || "OpenClaw 助手" }}</h1>
+            <p>
+              {{ selectedProjectID || selectedDocumentID ? "当前回答限定在已选择范围内" : "先选择项目或文档范围，再发起提问" }}
+            </p>
           </div>
-        </ElCard>
+          <span v-if="composerScopeType" class="scope-chip active">
+            <ElIcon>
+              <component :is="composerScopeType === 'document' ? Document : FolderOpened" />
+            </ElIcon>
+            {{ composerScopeLabel }}
+          </span>
+        </header>
 
-        <ElCard class="page-card">
-          <template #header>消息流</template>
+        <section class="message-panel">
           <div v-if="!messagesLoading && messages.length === 0 && !thinking" class="empty-state">
-            <el-icon :size="36" color="var(--el-text-color-placeholder)"><ChatDotRound /></el-icon>
+            <ElIcon :size="38"><Message /></ElIcon>
             <p class="empty-title">暂无消息</p>
-            <p class="empty-hint">选择左侧会话或发起新提问，消息将显示在这里</p>
+            <p class="empty-hint">选择左侧会话或在底部输入问题，回答会出现在这里。</p>
           </div>
           <div v-else v-loading="messagesLoading" class="message-list">
             <div
@@ -552,41 +577,85 @@ onBeforeUnmount(() => {
               class="message-item"
               :class="item.role"
             >
-              <div class="message-meta">
-                <ElTag size="small" :type="item.role === 'assistant' ? 'success' : 'info'">
-                  {{ item.role === "assistant" ? "AI" : "用户" }}
-                </ElTag>
-                <span :title="item.created_at">{{ relativeTime(item.created_at) }}</span>
+              <div class="message-avatar">
+                <ElIcon>
+                  <component :is="item.role === 'assistant' ? TakeawayBox : Position" />
+                </ElIcon>
               </div>
-              <div class="assistant-markdown" v-html="renderMarkdown(item.content)"></div>
-              <div v-if="item.role === 'assistant'" class="message-extra">
-                <span class="memory-label">{{ formatMemorySourcesFriendly(item.metadata) }}</span>
-                <details class="debug-details">
-                  <summary>调试详情</summary>
-                  <div class="debug-content">
-                    <div>模型：{{ item.metadata?.model || "-" }}</div>
-                    <div>处理耗时：{{ item.metadata?.processing_duration_ms ? `${item.metadata.processing_duration_ms}ms` : "-" }}</div>
-                    <div>Request ID：{{ item.request_id || "-" }}</div>
-                    <div>OpenClaw ID：{{ item.metadata?.upstream_request_id || "-" }}</div>
-                  </div>
-                </details>
+              <div class="message-bubble">
+                <div class="message-meta">
+                  <strong>{{ item.role === "assistant" ? "OpenClaw" : "用户" }}</strong>
+                  <span :title="item.created_at">{{ relativeTime(item.created_at) }}</span>
+                </div>
+                <div class="assistant-markdown" v-html="renderMarkdown(item.content)"></div>
+                <div v-if="item.role === 'assistant'" class="message-extra">
+                  <span class="memory-label">
+                    <ElIcon><CircleCheck /></ElIcon>
+                    {{ formatMemorySourcesFriendly(item.metadata) }}
+                  </span>
+                  <details class="debug-details">
+                    <summary>技术详情</summary>
+                    <div class="debug-content">
+                      <div>模型：{{ item.metadata?.model || "-" }}</div>
+                      <div>处理耗时：{{ item.metadata?.processing_duration_ms ? `${item.metadata.processing_duration_ms}ms` : "-" }}</div>
+                      <div>Request ID：{{ item.request_id || "-" }}</div>
+                      <div>OpenClaw ID：{{ item.metadata?.upstream_request_id || "-" }}</div>
+                    </div>
+                  </details>
+                </div>
               </div>
             </div>
-            <!-- AI 思考中占位气泡 -->
-            <div v-if="thinking" class="message-item assistant thinking-bubble">
-              <div class="message-meta">
-                <ElTag size="small" type="success">AI</ElTag>
-                <span>正在思考…</span>
+            <div v-if="thinking" class="message-item assistant">
+              <div class="message-avatar">
+                <ElIcon><TakeawayBox /></ElIcon>
               </div>
-              <div class="thinking-dots">
-                <span class="dot"></span>
-                <span class="dot"></span>
-                <span class="dot"></span>
+              <div class="message-bubble thinking-bubble">
+                <div class="message-meta">
+                  <strong>OpenClaw</strong>
+                  <span>正在思考</span>
+                </div>
+                <div class="thinking-dots" aria-label="AI 正在思考">
+                  <span class="dot"></span>
+                  <span class="dot"></span>
+                  <span class="dot"></span>
+                </div>
               </div>
             </div>
           </div>
-        </ElCard>
-      </div>
+        </section>
+
+        <footer class="composer">
+          <div class="composer-scope">
+            <span v-if="composerScopeType" class="scope-chip active">
+              <ElIcon>
+                <component :is="composerScopeType === 'document' ? Document : FolderOpened" />
+              </ElIcon>
+              {{ composerScopeLabel }}
+            </span>
+            <span v-else class="assistant-hint">请先选择项目或文档范围</span>
+          </div>
+          <div class="composer-input">
+            <ElInput
+              v-model="question"
+              :rows="3"
+              type="textarea"
+              :disabled="thinking"
+              resize="none"
+              :placeholder="thinking ? 'OpenClaw 正在处理上一条问题…' : '输入需要整理、核对或追问的问题'"
+              @keyup.ctrl.enter="submitQuestion"
+            />
+            <ElButton
+              type="primary"
+              :loading="loading"
+              :disabled="thinking"
+              @click="submitQuestion"
+            >
+              <ElIcon><Position /></ElIcon>
+              {{ thinking ? "处理中" : "发送" }}
+            </ElButton>
+          </div>
+        </footer>
+      </main>
     </div>
   </AppLayout>
 </template>
@@ -594,41 +663,78 @@ onBeforeUnmount(() => {
 <style scoped>
 .assistant-layout {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: 340px minmax(0, 1fr);
   gap: 20px;
+  min-height: calc(100vh - 128px);
 }
 
-.assistant-main {
+.assistant-sidebar,
+.assistant-workspace {
   display: grid;
-  gap: 20px;
+  align-content: start;
+  padding: 18px;
 }
 
-.panel-header {
+.assistant-sidebar {
+  position: sticky;
+  top: 92px;
+  max-height: calc(100vh - 120px);
+  overflow: hidden;
+}
+
+.assistant-panel-head,
+.chat-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 14px;
 }
 
-.panel-header-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.chat-header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--dd-line-soft);
+}
+
+.chat-header h1 {
+  margin: 0;
+  color: var(--dd-ink);
+  font-size: 22px;
+  font-weight: 780;
+}
+
+.chat-header p {
+  margin: 6px 0 0;
+  color: var(--dd-muted);
+  font-size: 13px;
 }
 
 .scope-filters {
   display: grid;
   gap: 12px;
-  margin-bottom: 16px;
+  margin: 18px 0 14px;
+}
+
+.conversation-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--dd-muted);
+  font-size: 13px;
 }
 
 .conversation-list {
   display: grid;
   gap: 10px;
+  max-height: calc(100vh - 332px);
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .conversation-item {
-  border: 1px solid var(--el-border-color);
-  border-radius: 12px;
+  border: 1px solid var(--dd-line);
+  border-radius: 10px;
   padding: 0;
   background: #fff;
   display: flex;
@@ -638,7 +744,8 @@ onBeforeUnmount(() => {
 
 .conversation-body {
   flex: 1;
-  padding: 12px;
+  min-width: 0;
+  padding: 13px;
   border: none;
   background: transparent;
   text-align: left;
@@ -650,7 +757,7 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 0 6px;
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.16s ease;
 }
 
 .conversation-item:hover .conversation-actions {
@@ -658,55 +765,113 @@ onBeforeUnmount(() => {
 }
 
 .conversation-item.active {
-  border-color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
+  border-color: #c8ddf2;
+  background: var(--dd-primary-soft);
 }
 
 .conversation-title {
-  font-weight: 600;
+  overflow: hidden;
+  color: var(--dd-ink);
+  font-weight: 750;
   margin-bottom: 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .conversation-meta {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.scope-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid #dbe3ed;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: var(--dd-ink-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scope-chip.document {
+  border-color: #f1d18b;
+  background: var(--dd-warning-soft);
+  color: var(--dd-warning);
+}
+
+.scope-chip.active,
+.scope-chip.project {
+  border-color: #c8ddf2;
+  background: var(--dd-primary-soft);
+  color: var(--dd-primary-strong);
 }
 
 .conversation-time,
 .assistant-hint,
 .message-meta,
 .message-extra {
-  color: var(--el-text-color-secondary);
+  color: var(--dd-muted);
   font-size: 13px;
 }
 
-.assistant-form {
-  display: grid;
-  gap: 16px;
+.assistant-workspace {
+  grid-template-rows: auto minmax(420px, 1fr) auto;
+  min-height: calc(100vh - 156px);
+  padding: 0;
+  overflow: hidden;
 }
 
-.assistant-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
+.message-panel {
+  min-height: 0;
+  overflow: auto;
+  padding: 20px;
 }
 
 .message-list {
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
 .message-item {
-  border-radius: 14px;
-  padding: 16px;
-  border: 1px solid var(--el-border-color-light);
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.message-avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--dd-primary-soft);
+  color: var(--dd-primary);
+}
+
+.message-item.user .message-avatar {
+  background: #f1f5f9;
+  color: var(--dd-ink-2);
+}
+
+.message-bubble {
+  min-width: 0;
+  padding: 15px 16px;
+  border: 1px solid var(--dd-line-soft);
+  border-radius: 10px;
   background: #fff;
 }
 
-.message-item.assistant {
-  background: #f8fbff;
+.message-item.assistant .message-bubble {
+  border-color: #c5e6eb;
+  background: #f5fbfc;
 }
 
 .message-meta {
@@ -717,6 +882,10 @@ onBeforeUnmount(() => {
   margin-bottom: 10px;
 }
 
+.message-meta strong {
+  color: var(--dd-ink);
+}
+
 .message-extra {
   margin-top: 12px;
   display: grid;
@@ -724,7 +893,10 @@ onBeforeUnmount(() => {
 }
 
 .memory-label {
-  color: var(--el-text-color-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dd-muted);
   font-size: 13px;
 }
 
@@ -734,7 +906,7 @@ onBeforeUnmount(() => {
 
 .debug-details summary {
   cursor: pointer;
-  color: var(--el-text-color-placeholder);
+  color: var(--dd-subtle);
   font-size: 12px;
   user-select: none;
 }
@@ -742,10 +914,10 @@ onBeforeUnmount(() => {
 .debug-content {
   margin-top: 6px;
   padding: 8px 12px;
-  background: var(--el-fill-color-lighter);
+  background: var(--dd-surface-soft);
   border-radius: 8px;
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: var(--dd-muted);
   display: grid;
   gap: 4px;
 }
@@ -766,38 +938,56 @@ onBeforeUnmount(() => {
   background: #f2f4f7;
 }
 
-@media (max-width: 960px) {
+.composer {
+  display: grid;
+  gap: 10px;
+  padding: 16px 20px 20px;
+  border-top: 1px solid var(--dd-line-soft);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.composer-scope {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+}
+
+.composer-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 12px;
+  align-items: end;
+}
+
+.compact {
+  padding: 34px 12px;
+}
+
+@media (max-width: 1080px) {
   .assistant-layout {
     grid-template-columns: 1fr;
+    min-height: auto;
   }
 
-  .assistant-actions {
-    flex-direction: column;
-    align-items: stretch;
+  .assistant-sidebar {
+    position: static;
+    max-height: none;
+  }
+
+  .conversation-list {
+    max-height: 320px;
   }
 }
 
-/* empty state */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 16px;
-  text-align: center;
-}
+@media (max-width: 720px) {
+  .chat-header,
+  .assistant-panel-head {
+    display: grid;
+  }
 
-.empty-title {
-  margin: 12px 0 4px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--el-text-color-regular);
-}
-
-.empty-hint {
-  margin: 0;
-  font-size: 13px;
-  color: var(--el-text-color-placeholder);
+  .composer-input {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* thinking bubble animation */
@@ -815,7 +1005,7 @@ onBeforeUnmount(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--el-color-primary);
+  background: var(--dd-ai);
   opacity: 0.4;
   animation: thinking-bounce 1.4s infinite ease-in-out both;
 }

@@ -1,13 +1,13 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-import AssistantView from "@/views/AssistantView.vue";
-import AdminView from "@/views/AdminView.vue";
-import DashboardView from "@/views/DashboardView.vue";
-import DocumentDetailView from "@/views/DocumentDetailView.vue";
-import DocumentsView from "@/views/DocumentsView.vue";
-import HandoversView from "@/views/HandoversView.vue";
-import LoginView from "@/views/LoginView.vue";
-import ProfileView from "@/views/ProfileView.vue";
+const AssistantView = () => import("@/views/AssistantView.vue");
+const AdminView = () => import("@/views/AdminView.vue");
+const DashboardView = () => import("@/views/DashboardView.vue");
+const DocumentDetailView = () => import("@/views/DocumentDetailView.vue");
+const DocumentsView = () => import("@/views/DocumentsView.vue");
+const HandoversView = () => import("@/views/HandoversView.vue");
+const LoginView = () => import("@/views/LoginView.vue");
+const ProfileView = () => import("@/views/ProfileView.vue");
 
 const router = createRouter({
   history: createWebHistory(),

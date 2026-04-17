@@ -320,7 +320,7 @@ onMounted(async () => {
         <aside class="project-rail page-card">
           <div class="rail-title">
             <ElIcon><FolderOpened /></ElIcon>
-            课题
+            文档
           </div>
           <button
             class="project-filter"
@@ -328,7 +328,7 @@ onMounted(async () => {
             type="button"
             @click="selectedProjectName = ''"
           >
-            <span>全部课题</span>
+            <span>全部文档</span>
             <strong>{{ total }}</strong>
           </button>
           <button

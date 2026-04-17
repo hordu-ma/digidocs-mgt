@@ -259,6 +259,7 @@ docker compose up -d postgres
 - 已补 `.github/INDEX.md` 与 GitHub 协作资产入口校验
 - 已新增 `docs/backend-go核心源码学习导读.md`，面向 Go 初学者解释 backend-go 核心文件中的典型函数与关键代码块
 - 已完成前端 P0/P1 产品化体验改版首轮：统一视觉 token、应用外壳、状态/文件徽标，并重构负责人总览、文档资产库和文档档案页
+- 已完成前端 P2/P3 产品化体验改版首轮：毕业交接改为任务卡与流程工作台，OpenClaw 助手改为成熟对话工作区，并通过路由懒加载消除前端构建 chunk 过大提示
 - 已完成 p14s/Linux compose 首轮部署适配（Worker 宿主机 OpenClaw 访问改用 `host-gateway`）
 - 已修复 `backend-go` 运行镜像未携带 `migrations/` 导致容器内自动迁移失效的问题
 - 已完成 Assistant 问答历史列表 / 筛选与 Markdown 结果展示首轮接线
@@ -284,7 +285,7 @@ docker compose up -d postgres
 - 已完成宿主机持久化运维配置安装与验证：`install-persistent-routing.sh`、`digidocs-route-fix.sh` 与 `tailscaled` drop-in 已在当前机器落地，`systemctl restart tailscaled` 后 `table 52` 仍保持 `throw 172.17/172.18/192.168.1`
 - 已补充 RustDesk / 本机浏览器访问 `18080/18081` 超时的排查与临时修复说明，复用现有 `digidocs-route-fix.sh` 路由修正脚本
 - 已补充登录后个人信息维护能力：当前用户可自助更新显示姓名、手机号、微信号和邮箱，账号、角色、状态与权限保持只读
-- 已完成 Assistant 助手页面产品化改造：范围选择改为项目/文档下拉选择器，会话列表显示人类可读范围标签，消息流隐藏技术字段并折叠调试详情，记忆来源改为中文友好文案，时间戳改为相对时间
+- 已完成 Assistant 助手页面产品化改造：范围选择改为项目/文档下拉选择器，会话列表显示人类可读范围标签，消息流隐藏技术字段并折叠技术详情，记忆来源改为中文友好文案，时间戳改为相对时间
 - 已完成 AI 思考中交互优化（三点呼吸动画占位气泡 + 按钮状态）与全局空状态轻量化替换（AssistantView、HandoversView）
 - 已完成总览页近期流转操作中文化、文档页按课题分组显示、数据库测试数据清理
 - 已完成管理员功能模块：后端 9 个 admin API 端点（团队空间/项目/用户/成员 CRUD），RequireAdmin 中间件，前端四标签页管理界面与侧边栏角色感知入口
