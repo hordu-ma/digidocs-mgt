@@ -362,6 +362,14 @@
 - 完成全局空状态组件化替换
   - 替换所有 ElEmpty 为轻量级引导空状态（小图标 + 引导文案）
   - 覆盖 AssistantView（会话列表、消息流）和 HandoversView（交接记录）
+- 完成总览页近期流转操作中文化
+  - 前端 action 映射表：transfer→移交、accept_transfer→接收移交、finalize→定稿、archive→归档、unarchive→取消归档、mark_in_progress→标记处理中
+- 完成文档页按课题分组显示
+  - 利用后端已返回的 project_name 做客户端分组
+  - 每个课题一个可折叠卡片，内嵌文档表格
+  - 搜索关键字可跨组过滤
+- 清理数据库中全部测试数据
+  - 删除 documents、document_versions、flow_records、audit_events、folders、assistant 全系列表的历史测试记录
 
 ## 进行中
 

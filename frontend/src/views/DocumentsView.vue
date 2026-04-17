@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
 import type { UploadRawFile } from "element-plus";
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
@@ -40,14 +40,13 @@ const router = useRouter();
 const auth = useAuthStore();
 const rows = ref<any[]>([]);
 const total = ref(0);
-const page = ref(1);
-const pageSize = ref(20);
 const keyword = ref("");
 const teamSpaces = ref<TeamSpaceOption[]>([]);
 const users = ref<UserOption[]>([]);
 const projects = ref<ProjectOption[]>([]);
 const folderOptions = ref<FolderOption[]>([]);
 const referenceLoading = ref(false);
+const collapsedGroups = ref<Set<string>>(new Set());
 
 const statusLabel: Record<string, string> = {
   draft: "草稿",
@@ -61,8 +60,8 @@ const statusLabel: Record<string, string> = {
 async function fetchDocuments() {
   const res = await api.get("/documents", {
     params: {
-      page: page.value,
-      page_size: pageSize.value,
+      page: 1,
+      page_size: 500,
       keyword: keyword.value,
     },
   });
@@ -70,13 +69,32 @@ async function fetchDocuments() {
   total.value = res.data?.meta?.total ?? 0;
 }
 
-function handleSearch() {
-  page.value = 1;
-  fetchDocuments();
+type DocumentGroup = {
+  projectName: string;
+  documents: any[];
+};
+
+const groupedDocuments = computed<DocumentGroup[]>(() => {
+  const groups = new Map<string, any[]>();
+  for (const doc of rows.value) {
+    const key = doc.project_name || "未分类";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(doc);
+  }
+  return Array.from(groups.entries())
+    .sort((a, b) => a[0].localeCompare(b[0], "zh-Hans"))
+    .map(([name, docs]) => ({ projectName: name, documents: docs }));
+});
+
+function toggleGroup(name: string) {
+  if (collapsedGroups.value.has(name)) {
+    collapsedGroups.value.delete(name);
+  } else {
+    collapsedGroups.value.add(name);
+  }
 }
 
-function handlePageChange(p: number) {
-  page.value = p;
+function handleSearch() {
   fetchDocuments();
 }
 
@@ -245,39 +263,60 @@ onMounted(async () => {
           <ElInput
             v-model="keyword"
             placeholder="搜索文档标题"
+            clearable
             @keyup.enter="handleSearch"
+            @clear="handleSearch"
           />
+          <span class="doc-count">共 {{ total }} 篇文档，{{ groupedDocuments.length }} 个课题</span>
         </div>
-        <ElTable :data="rows" style="width: 100%" @row-click="goDetail">
-          <ElTableColumn prop="title" label="文档标题" />
-          <ElTableColumn label="当前责任人">
-            <template #default="{ row }">{{
-              row.current_owner?.display_name ?? "-"
-            }}</template>
-          </ElTableColumn>
-          <ElTableColumn label="当前版本">
-            <template #default="{ row }">{{
-              row.current_version_no ?? "-"
-            }}</template>
-          </ElTableColumn>
-          <ElTableColumn label="状态">
-            <template #default="{ row }">
-              <ElTag>{{
-                statusLabel[row.current_status] ?? row.current_status
-              }}</ElTag>
-            </template>
-          </ElTableColumn>
-          <ElTableColumn prop="updated_at" label="更新时间" />
-        </ElTable>
-        <ElPagination
-          v-if="total > pageSize"
-          :current-page="page"
-          :page-size="pageSize"
-          :total="total"
-          layout="prev, pager, next"
-          style="margin-top: 16px; justify-content: flex-end"
-          @current-change="handlePageChange"
-        />
+
+        <div v-if="groupedDocuments.length === 0" class="empty-state">
+          <p class="empty-title">暂无文档</p>
+          <p class="empty-hint">点击右上角「新建文档」创建第一篇文档</p>
+        </div>
+
+        <div v-else class="project-groups">
+          <div
+            v-for="group in groupedDocuments"
+            :key="group.projectName"
+            class="project-group"
+          >
+            <div
+              class="group-header"
+              @click="toggleGroup(group.projectName)"
+            >
+              <span class="group-toggle">{{ collapsedGroups.has(group.projectName) ? '▶' : '▼' }}</span>
+              <span class="group-name">{{ group.projectName }}</span>
+              <ElTag size="small" type="info" disable-transitions>{{ group.documents.length }} 篇</ElTag>
+            </div>
+            <ElTable
+              v-show="!collapsedGroups.has(group.projectName)"
+              :data="group.documents"
+              style="width: 100%"
+              @row-click="goDetail"
+            >
+              <ElTableColumn prop="title" label="文档标题" min-width="200" />
+              <ElTableColumn label="当前责任人" width="140">
+                <template #default="{ row }">{{
+                  row.current_owner?.display_name ?? "-"
+                }}</template>
+              </ElTableColumn>
+              <ElTableColumn label="当前版本" width="100">
+                <template #default="{ row }">{{
+                  row.current_version_no ?? "-"
+                }}</template>
+              </ElTableColumn>
+              <ElTableColumn label="状态" width="120">
+                <template #default="{ row }">
+                  <ElTag>{{
+                    statusLabel[row.current_status] ?? row.current_status
+                  }}</ElTag>
+                </template>
+              </ElTableColumn>
+              <ElTableColumn prop="updated_at" label="更新时间" width="180" />
+            </ElTable>
+          </div>
+        </div>
       </ElCard>
 
       <ElDialog v-model="showCreateDialog" title="新建文档" width="520px">
@@ -394,6 +433,69 @@ p {
 }
 
 .toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   margin-bottom: 16px;
+}
+
+.doc-count {
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+.project-groups {
+  display: grid;
+  gap: 20px;
+}
+
+.project-group {
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--el-fill-color-light);
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+}
+
+.group-toggle {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  width: 16px;
+}
+
+.group-name {
+  flex: 1;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  text-align: center;
+}
+
+.empty-title {
+  margin: 12px 0 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-regular);
+}
+
+.empty-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--el-text-color-placeholder);
 }
 </style>

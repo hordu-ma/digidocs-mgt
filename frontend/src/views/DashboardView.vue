@@ -22,6 +22,16 @@ const statusLabel: Record<string, string> = {
   archived: "已归档",
 };
 
+const actionLabel: Record<string, string> = {
+  transfer: "移交",
+  accept_transfer: "接收移交",
+  finalize: "定稿",
+  archive: "归档",
+  unarchive: "取消归档",
+  mark_in_progress: "标记处理中",
+  create: "创建",
+};
+
 onMounted(async () => {
   const [overviewRes, flowsRes, riskRes] = await Promise.all([
     api.get("/dashboard/overview"),
@@ -70,7 +80,11 @@ onMounted(async () => {
           <template #header>近期流转</template>
           <ElTable :data="recentFlows" style="width: 100%">
             <ElTableColumn prop="title" label="文档" />
-            <ElTableColumn prop="action" label="操作" />
+            <ElTableColumn label="操作">
+              <template #default="{ row }">
+                {{ actionLabel[row.action] ?? row.action }}
+              </template>
+            </ElTableColumn>
             <ElTableColumn label="状态变更">
               <template #default="{ row }">
                 <ElTag
