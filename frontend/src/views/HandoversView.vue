@@ -228,7 +228,7 @@ async function loadProjectDataAssets(projectID?: string) {
   const res = await api.get("/data-assets", {
     params: { project_id: projectID, page: 1, page_size: 200 },
   });
-  projectDataAssets.value = res.data?.data ?? [];
+  projectDataAssets.value = res.data?.data?.items ?? [];
 }
 
 async function fetchHandoverDataItems(handoverID: string): Promise<HandoverDataLine[]> {

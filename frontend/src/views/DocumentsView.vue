@@ -46,6 +46,7 @@ const auth = useAuthStore();
 const rows = ref<any[]>([]);
 const total = ref(0);
 const keyword = ref("");
+const showArchived = ref(false);
 const teamSpaces = ref<TeamSpaceOption[]>([]);
 const users = ref<UserOption[]>([]);
 const projects = ref<ProjectOption[]>([]);
@@ -79,6 +80,7 @@ async function fetchDocuments() {
       page: 1,
       page_size: 500,
       keyword: keyword.value,
+      include_archived: showArchived.value || undefined,
     },
   });
   rows.value = res.data?.data ?? [];
@@ -357,6 +359,14 @@ onMounted(async () => {
                 <ElIcon><Search /></ElIcon>
               </template>
             </ElInput>
+            <label class="archived-toggle">
+              <ElSwitch
+                v-model="showArchived"
+                size="small"
+                @change="fetchDocuments"
+              />
+              <span>显示已归档</span>
+            </label>
             <span class="doc-count">
               当前显示 {{ visibleDocumentTotal }} 篇文档，共 {{ groupedDocuments.length }} 个课题
             </span>
@@ -396,6 +406,7 @@ onMounted(async () => {
                   v-for="row in group.documents"
                   :key="row.id"
                   class="document-row"
+                  :class="{ 'is-archived': row.is_archived }"
                   type="button"
                   @click="goDetail(row)"
                 >
@@ -597,6 +608,18 @@ onMounted(async () => {
   max-width: 420px;
 }
 
+.archived-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--dd-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
 .doc-count {
   white-space: nowrap;
   font-size: 13px;
@@ -672,6 +695,15 @@ onMounted(async () => {
 
 .document-row:hover {
   background: #f8fbff;
+}
+
+.document-row.is-archived {
+  opacity: 0.6;
+}
+
+.document-row.is-archived .document-main strong {
+  text-decoration: line-through;
+  color: var(--dd-muted);
 }
 
 .document-main {

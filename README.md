@@ -311,5 +311,9 @@ docker compose up -d postgres
   - 文件夹导航移入左侧 Rail（分隔线 + 缩进树形 + hover 删除按钮），取消原横向 chip strip
   - 上传对话框文件选择器改为自定义拖拽上传区（拖放/点击二合一，选中后显示文件信息）
   - 修复切换团队空间残留、clearUploadFile 名称残留、dragleave 闪烁等细节 bug
+- 已完成**文档页面交互细节修复**：
+  - DocumentDetailView 按钮顺序调整：流转 → 档案编辑 → 下载当前版本 → 上传新版本；"编辑信息"更名为"档案编辑"
+  - 修复归档后文档消失问题：DocumentsView 新增"显示已归档"开关，关闭时隐藏归档文档，开启后归档文档以灰色半透明 + 删除线标注
+  - 修复管理交接弹窗加载失败：`HandoversView.loadProjectDataAssets` 响应解析从 `res.data?.data` 修正为 `res.data?.data?.items`，消除 `TypeError: assets.map is not a function`
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

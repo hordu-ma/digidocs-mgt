@@ -486,6 +486,19 @@
   - 使用 dragCounter 计数法（dragenter/dragleave 对应计数）防止 dragleave 因子元素触发导致的高亮闪烁
   - 已通过 `cd frontend && npm run build` 验证，容器已重建，18080 前端服务正常
 
+- 完成文档详情页按钮调整
+  - DocumentDetailView hero-actions 按钮顺序调整为：流转→档案编辑→下载当前版本→上传新版本
+  - "编辑信息"更名为"档案编辑"，排在定稿之后，无竖线分隔
+
+- 修复归档后文档消失
+  - DocumentsView 新增"显示已归档"开关（默认关闭），切换后传 `include_archived=true` 给后端
+  - 已归档文档显示为灰色半透明，标题带删除线，视觉区分活跃与归档态
+  - 后端 `include_archived` 参数已验证（`document_repository.go` 第 60 行）
+
+- 修复管理交接弹窗加载失败
+  - 根因：`HandoversView.loadProjectDataAssets` 解析响应用 `res.data?.data`，但 `/data-assets` 返回格式为 `{ data: { items, total } }`，导致 `buildEditableDataItems` 对非数组调 `.map()` 抛 TypeError
+  - 修复：改为 `res.data?.data?.items ?? []`，对齐实际响应结构
+
 ## 待办
 
 - ~~跑通 Alembic 初始迁移~~ ✅ 已完成
