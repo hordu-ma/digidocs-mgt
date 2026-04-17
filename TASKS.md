@@ -477,6 +477,15 @@
   - DocumentDetailView 补充下载按钮：hero-actions 区新增"下载当前版本"按钮，版本历史每行右侧新增下载图标，使用 `api.get(..., { responseType: 'blob' })` 触发文件下载，复用已有 `GET /api/v1/versions/{versionID}/download` 端点
   - 已通过 `cd frontend && npm run build` 验证，容器已重建，18080 前端服务正常
 
+- 完成数据页面二次优化
+  - 文件夹导航从横向 chip strip 迁移至左侧课题 Rail 下方：分隔线隔开、缩进树形展示父子层级、每行 hover 时右侧出现删除图标
+  - 上传对话框文件选择器替换为自定义拖拽上传区：支持鼠标点击和文件拖放，选中后展示文件名和大小，可一键"重新选择"
+  - Rail 加 `overflow-y: auto; max-height` 防止文件夹过多时溢出，移动端重置
+  - 修复：切换团队空间时清空课题/文件夹/下拉选项残留
+  - 修复：clearUploadFile 未清除 display_name 导致重新选择后名称残留的 bug
+  - 使用 dragCounter 计数法（dragenter/dragleave 对应计数）防止 dragleave 因子元素触发导致的高亮闪烁
+  - 已通过 `cd frontend && npm run build` 验证，容器已重建，18080 前端服务正常
+
 ## 待办
 
 - ~~跑通 Alembic 初始迁移~~ ✅ 已完成

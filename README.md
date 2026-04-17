@@ -307,5 +307,9 @@ docker compose up -d postgres
   - T7：`docs/数据库设计.md` 与 `docs/API设计.md` 补充数据资产模块全量内容
   - DataView 页面 UI 全面产品化：改用 `page-shell / page-header / page-card / asset-workspace` 布局，左侧课题 Rail、文件类型徽标色系、`--dd-*` 设计变量、自定义行布局替代 el-table，消除"样品感"
   - DocumentDetailView 补充下载按钮：hero-actions 新增"下载当前版本"，版本历史每行新增下载图标按钮，使用 blob 流方式下载，复用已有 `GET /api/v1/versions/{versionID}/download` 端点
+- 已完成**数据页面二次 UI 优化**：
+  - 文件夹导航移入左侧 Rail（分隔线 + 缩进树形 + hover 删除按钮），取消原横向 chip strip
+  - 上传对话框文件选择器改为自定义拖拽上传区（拖放/点击二合一，选中后显示文件信息）
+  - 修复切换团队空间残留、clearUploadFile 名称残留、dragleave 闪烁等细节 bug
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

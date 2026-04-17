@@ -145,6 +145,9 @@ async function loadProjects(teamSpaceID: string) {
   if (!teamSpaceID) return;
   const res = await api.get("/projects", { params: { team_space_id: teamSpaceID } });
   projects.value = res.data?.data ?? [];
+  uploadForm.project_id = "";
+  uploadForm.folder_id = "";
+  uploadFolderOptions.value = [];
 }
 
 async function loadAllProjects() {
@@ -170,6 +173,9 @@ const uploadForm = reactive({
 });
 const uploadFile = ref<File | null>(null);
 const uploadFolderOptions = ref<FolderItem[]>([]);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const isDragging = ref(false);
+const dragCounter = ref(0);
 
 // Name hint pattern: suggest alphanumeric + hyphen + Chinese
 const FILE_NAME_HINT = "建议使用：字母、数字、中文、下划线、连字符，避免空格和特殊字符";
@@ -182,6 +188,40 @@ function onFileChange(e: Event) {
       uploadForm.display_name = input.files[0].name;
     }
   }
+}
+
+function onDropZoneClick() {
+  fileInputRef.value?.click();
+}
+
+function onDragEnter(e: DragEvent) {
+  e.preventDefault();
+  dragCounter.value++;
+  isDragging.value = true;
+}
+
+function onDragLeave() {
+  dragCounter.value--;
+  if (dragCounter.value <= 0) {
+    dragCounter.value = 0;
+    isDragging.value = false;
+  }
+}
+
+function onDrop(e: DragEvent) {
+  dragCounter.value = 0;
+  isDragging.value = false;
+  const file = e.dataTransfer?.files?.[0];
+  if (file) {
+    uploadFile.value = file;
+    if (!uploadForm.display_name) uploadForm.display_name = file.name;
+  }
+}
+
+function clearUploadFile() {
+  uploadFile.value = null;
+  uploadForm.display_name = "";
+  if (fileInputRef.value) fileInputRef.value.value = "";
 }
 
 async function openUpload() {
@@ -197,6 +237,9 @@ async function openUpload() {
   });
   uploadFile.value = null;
   uploadProgress.value = 0;
+  isDragging.value = false;
+  dragCounter.value = 0;
+  if (fileInputRef.value) fileInputRef.value.value = "";
   if (uploadForm.team_space_id) {
     await loadProjects(uploadForm.team_space_id);
   }
@@ -456,43 +499,70 @@ onMounted(async () => {
           >
             <span>{{ p.name }}</span>
           </button>
+
+          <!-- folder tree (shown when a project is selected and has folders) -->
+          <template v-if="filterProjectID && folderTree.length">
+            <div class="rail-divider" />
+            <div class="rail-title rail-subtitle">
+              <ElIcon><FolderOpened /></ElIcon>
+              文件夹
+            </div>
+            <div class="folder-filter-row">
+              <button
+                class="folder-filter"
+                :class="{ active: selectedFolderID === '' }"
+                type="button"
+                @click="clearFolderSelect"
+              >
+                <span>全部文件</span>
+              </button>
+            </div>
+            <template v-for="node in folderTree" :key="node.id">
+              <div class="folder-filter-row">
+                <button
+                  class="folder-filter"
+                  :class="{ active: selectedFolderID === node.id }"
+                  type="button"
+                  @click="onFolderSelect(node.id)"
+                >
+                  <ElIcon><FolderOpened /></ElIcon>
+                  <span>{{ node.name }}</span>
+                </button>
+                <button
+                  class="folder-del-btn"
+                  type="button"
+                  title="删除文件夹"
+                  @click.stop="deleteFolder(node)"
+                >
+                  <ElIcon><Delete /></ElIcon>
+                </button>
+              </div>
+              <template v-for="child in node.children" :key="child.id">
+                <div class="folder-filter-row sub">
+                  <button
+                    class="folder-filter"
+                    :class="{ active: selectedFolderID === child.id }"
+                    type="button"
+                    @click="onFolderSelect(child.id)"
+                  >
+                    <ElIcon><FolderOpened /></ElIcon>
+                    <span>{{ child.name }}</span>
+                  </button>
+                  <button
+                    class="folder-del-btn"
+                    type="button"
+                    title="删除文件夹"
+                    @click.stop="deleteFolder(child)"
+                  >
+                    <ElIcon><Delete /></ElIcon>
+                  </button>
+                </div>
+              </template>
+            </template>
+          </template>
         </aside>
 
         <div class="asset-column">
-          <!-- folder strip (only when project selected and has folders) -->
-          <div v-if="filterProjectID && folderTree.length" class="folder-strip page-card">
-            <button
-              class="folder-chip"
-              :class="{ active: selectedFolderID === '' }"
-              type="button"
-              @click="clearFolderSelect"
-            >全部</button>
-            <template v-for="node in folderTree" :key="node.id">
-              <button
-                class="folder-chip"
-                :class="{ active: selectedFolderID === node.id }"
-                type="button"
-                @click="onFolderSelect(node.id)"
-              >
-                <ElIcon><FolderOpened /></ElIcon>
-                {{ node.name }}
-                <span class="chip-del" @click.stop="deleteFolder(node)">✕</span>
-              </button>
-              <template v-for="child in node.children" :key="child.id">
-                <button
-                  class="folder-chip sub"
-                  :class="{ active: selectedFolderID === child.id }"
-                  type="button"
-                  @click="onFolderSelect(child.id)"
-                >
-                  <ElIcon><FolderOpened /></ElIcon>
-                  {{ child.name }}
-                  <span class="chip-del" @click.stop="deleteFolder(child)">✕</span>
-                </button>
-              </template>
-            </template>
-          </div>
-
           <!-- asset panel -->
           <section class="page-card asset-panel">
             <div class="toolbar">
@@ -574,8 +644,31 @@ onMounted(async () => {
             <ElInput v-model="uploadForm.description" type="textarea" :rows="2" placeholder="可选" />
           </ElFormItem>
           <ElFormItem label="选择文件" required>
-            <input type="file" @change="onFileChange" style="width:100%" />
-            <p v-if="uploadFile" class="field-hint">{{ uploadFile.name }} ({{ formatSize(uploadFile.size) }})</p>
+            <input ref="fileInputRef" type="file" style="display:none" @change="onFileChange" />
+            <div
+              class="drop-zone"
+              :class="{ dragging: isDragging, 'has-file': !!uploadFile }"
+              @click="onDropZoneClick"
+              @dragenter="onDragEnter"
+              @dragover.prevent
+              @dragleave="onDragLeave"
+              @drop.prevent="onDrop"
+            >
+              <template v-if="uploadFile">
+                <div class="dz-file-info">
+                  <span class="dz-name">{{ uploadFile.name }}</span>
+                  <span class="dz-size">{{ formatSize(uploadFile.size) }}</span>
+                </div>
+                <button class="dz-clear" type="button" @click.stop="clearUploadFile">✕ 重新选择</button>
+              </template>
+              <template v-else>
+                <div class="dz-body">
+                  <div class="dz-icon-wrap"><ElIcon size="28"><Upload /></ElIcon></div>
+                  <p class="dz-hint">将文件拖拽到此处，或 <span class="dz-link">点击选择文件</span></p>
+                  <p class="dz-sub">支持所有格式，单文件最大 10 GB</p>
+                </div>
+              </template>
+            </div>
           </ElFormItem>
           <ElFormItem v-if="uploadLoading" label="上传进度">
             <ElProgress :percentage="uploadProgress" style="width:100%" />
@@ -628,6 +721,8 @@ onMounted(async () => {
   display: grid;
   gap: 8px;
   padding: 16px;
+  overflow-y: auto;
+  max-height: calc(100vh - 140px);
 }
 
 .rail-title {
@@ -680,51 +775,82 @@ onMounted(async () => {
   min-width: 0;
 }
 
-/* Folder strip */
-.folder-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px 16px;
-  align-items: center;
+/* Folder tree in Rail */
+.rail-divider {
+  height: 1px;
+  background: var(--dd-line);
+  margin: 6px 0;
 }
 
-.folder-chip {
-  display: inline-flex;
+.rail-subtitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dd-muted);
+}
+
+.folder-filter-row {
+  display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 12px;
-  border: 1px solid var(--dd-line);
-  border-radius: 999px;
+  gap: 2px;
+}
+
+.folder-filter-row.sub {
+  padding-left: 20px;
+}
+
+.folder-filter {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   background: transparent;
   color: var(--dd-ink-2);
   font-size: 13px;
+  text-align: left;
   cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s;
+  overflow: hidden;
+  min-width: 0;
 }
 
-.folder-chip:hover,
-.folder-chip.active {
+.folder-filter span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-filter:hover,
+.folder-filter.active {
   border-color: #c8ddf2;
   background: var(--dd-primary-soft);
   color: var(--dd-primary-strong);
 }
 
-.folder-chip.sub {
-  font-size: 12px;
-  opacity: 0.85;
-  padding-left: 18px;
+.folder-del-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dd-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 
-.chip-del {
-  margin-left: 2px;
-  font-size: 10px;
-  opacity: 0.35;
-}
-
-.chip-del:hover {
+.folder-filter-row:hover .folder-del-btn {
   opacity: 1;
+}
+
+.folder-del-btn:hover {
+  background: var(--el-fill-color-light);
   color: var(--el-color-danger);
 }
 
@@ -820,6 +946,114 @@ onMounted(async () => {
   line-height: 1.4;
 }
 
+/* Drop zone */
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 120px;
+  border: 2px dashed var(--dd-line);
+  border-radius: 12px;
+  background: var(--dd-surface-soft);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  padding: 20px 16px;
+  box-sizing: border-box;
+  text-align: center;
+  user-select: none;
+}
+
+.drop-zone:hover,
+.drop-zone.dragging {
+  border-color: var(--dd-primary-strong);
+  background: var(--dd-primary-soft);
+}
+
+.drop-zone.has-file {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 64px;
+  padding: 12px 16px;
+  border-style: solid;
+  border-color: #c8ddf2;
+  background: var(--dd-primary-soft);
+  gap: 12px;
+}
+
+.dz-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.dz-icon-wrap {
+  color: var(--dd-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dz-hint {
+  font-size: 14px;
+  color: var(--dd-ink-2);
+  margin: 0;
+}
+
+.dz-link {
+  color: var(--dd-primary-strong);
+  font-weight: 500;
+}
+
+.dz-sub {
+  font-size: 12px;
+  color: var(--dd-muted);
+  margin: 0;
+}
+
+.dz-file-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.dz-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dd-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dz-size {
+  font-size: 12px;
+  color: var(--dd-muted);
+}
+
+.dz-clear {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--dd-muted);
+  background: transparent;
+  border: 1px solid var(--dd-line);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.dz-clear:hover {
+  color: var(--el-color-danger);
+  border-color: var(--el-color-danger);
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -843,6 +1077,8 @@ onMounted(async () => {
 
   .project-rail {
     position: static;
+    max-height: none;
+    overflow-y: visible;
   }
 
   .asset-row {
