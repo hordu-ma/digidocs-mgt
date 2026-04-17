@@ -24,6 +24,17 @@ type UserOption = {
   role: string;
 };
 
+type FolderNode = {
+  id: string;
+  path: string;
+  children?: FolderNode[];
+};
+
+type FolderOption = {
+  id: string;
+  path: string;
+};
+
 const route = useRoute();
 const router = useRouter();
 const documentID = route.params.id as string;
@@ -37,6 +48,7 @@ const summaryLoading = ref(false);
 const summaryPolling = ref(false);
 let summaryPollTimer: number | null = null;
 const users = ref<UserOption[]>([]);
+const folderOptions = ref<FolderOption[]>([]);
 
 const statusLabel: Record<string, string> = {
   draft: "草稿",
@@ -113,6 +125,11 @@ const currentVersionNo = computed(
   () => doc.value?.current_version_no ?? versions.value[0]?.version_no ?? "-",
 );
 
+const latestSummaryText = computed(() => {
+  const candidate = versions.value.find((item) => typeof item.summary_text === "string" && item.summary_text.trim());
+  return candidate?.summary_text ?? "";
+});
+
 function ownerInitial() {
   return (doc.value?.current_owner?.display_name || "责").slice(0, 1);
 }
@@ -170,11 +187,29 @@ async function loadData() {
   versions.value = versionsRes.data?.data ?? [];
   flows.value = flowsRes.data?.data ?? [];
   suggestions.value = suggestionsRes.data?.data ?? [];
+  await loadFolders();
 }
 
 async function loadUsers() {
   const res = await api.get("/users");
   users.value = res.data?.data ?? [];
+}
+
+function flattenFolders(nodes: FolderNode[]): FolderOption[] {
+  return nodes.flatMap((node) => [
+    { id: node.id, path: node.path },
+    ...(node.children?.length ? flattenFolders(node.children) : []),
+  ]);
+}
+
+async function loadFolders() {
+  const projectID = doc.value?.project_id;
+  if (!projectID) {
+    folderOptions.value = [];
+    return;
+  }
+  const res = await api.get(`/projects/${projectID}/folders/tree`);
+  folderOptions.value = flattenFolders(res.data?.data ?? []);
 }
 
 const showTransferDialog = ref(false);
@@ -236,7 +271,7 @@ const editForm = reactive({ title: "", description: "", folder_id: "" });
 function openEdit() {
   editForm.title = doc.value?.title ?? "";
   editForm.description = doc.value?.description ?? "";
-  editForm.folder_id = "";
+  editForm.folder_id = doc.value?.folder_id ?? "";
   showEditDialog.value = true;
 }
 
@@ -391,6 +426,10 @@ async function updateSuggestionStatus(id: string, action: "confirm" | "dismiss")
   }
 }
 
+function goToHandovers() {
+  void router.push("/handovers");
+}
+
 onMounted(async () => {
   try {
     await Promise.all([loadData(), loadUsers()]);
@@ -458,6 +497,7 @@ onBeforeUnmount(() => {
             <ElIcon><Upload /></ElIcon>
             上传新版本
           </ElButton>
+          <ElButton plain @click="goToHandovers">查看交接工作台</ElButton>
         </div>
       </section>
 
@@ -488,6 +528,22 @@ onBeforeUnmount(() => {
                 <span>当前版本</span>
                 <strong>v{{ currentVersionNo }}</strong>
               </div>
+              <div class="fact-item">
+                <span>更新时间</span>
+                <strong>{{ formatTime(doc.updated_at) }}</strong>
+              </div>
+              <div class="fact-item">
+                <span>所属目录</span>
+                <strong>{{ doc.folder_path || doc.folder_name || "未挂接目录" }}</strong>
+              </div>
+              <div class="fact-item">
+                <span>归档状态</span>
+                <strong>{{ doc.is_archived ? "已归档" : "活跃中" }}</strong>
+              </div>
+            </div>
+            <div v-if="latestSummaryText" class="summary-preview">
+              <div class="section-title">当前版本摘要</div>
+              <p>{{ latestSummaryText }}</p>
             </div>
           </section>
 
@@ -584,8 +640,11 @@ onBeforeUnmount(() => {
             <div v-else class="suggestion-list">
               <div v-for="item in suggestions" :key="item.id" class="suggestion-item">
                 <div class="suggestion-head">
-                  <div class="suggestion-title">
-                    {{ item.title || item.suggestion_type }}
+                  <div>
+                    <div class="suggestion-type">{{ item.suggestion_type }}</div>
+                    <div class="suggestion-title">
+                      {{ item.title || "AI 建议" }}
+                    </div>
                   </div>
                   <span class="status-pill" :class="item.status === 'pending' ? 'status-pending-handover' : 'status-finalized'">
                     {{ suggestionStatusLabel[item.status] ?? item.status }}
@@ -626,11 +685,20 @@ onBeforeUnmount(() => {
         <ElFormItem label="描述">
           <ElInput v-model="editForm.description" type="textarea" :rows="3" />
         </ElFormItem>
-        <ElFormItem label="目录 ID">
-          <ElInput
+        <ElFormItem label="归档目录">
+          <ElSelect
             v-model="editForm.folder_id"
-            placeholder="移动到新目录（可选）"
-          />
+            clearable
+            filterable
+            placeholder="选择新目录（可选）"
+          >
+            <ElOption
+              v-for="item in folderOptions"
+              :key="item.id"
+              :label="item.path"
+              :value="item.id"
+            />
+          </ElSelect>
         </ElFormItem>
       </ElForm>
       <template #footer>
@@ -759,6 +827,20 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 14px;
+}
+
+.summary-preview {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid #c5e6eb;
+  border-radius: 12px;
+  background: #f5fbfc;
+}
+
+.summary-preview p {
+  margin: 8px 0 0;
+  color: var(--dd-ink-2);
+  line-height: 1.7;
 }
 
 .version-chip {
@@ -951,6 +1033,15 @@ onBeforeUnmount(() => {
 .suggestion-title {
   color: var(--dd-ink);
   font-weight: 750;
+}
+
+.suggestion-type {
+  margin-bottom: 4px;
+  color: var(--dd-ai);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .suggestion-actions {

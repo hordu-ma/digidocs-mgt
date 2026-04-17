@@ -258,6 +258,15 @@
   - `DocumentsView`：新建文档 Dialog（multipart 上传），接入 `POST /documents`
   - `DocumentDetailView`：编辑信息 Dialog（PATCH）、删除/恢复按钮、上传新版本 Dialog
 - 完成前端 P0/P1 产品化体验改版首轮
+- 完成前端商业化产品体验升级（二期）
+  - 统一 `styles.css` 设计 token、Element Plus 对话框/表单/输入/按钮皮肤和 AppLayout 壳层
+  - 新增 `GlobalCommandDialog` 全局命令面板，支持快捷导航与文档直达搜索
+  - `DashboardView` 增加任务导向焦点卡片，强化负责人首屏操作入口
+  - `DocumentsView` 增加预设筛选、排序和行级快捷操作，提升文档工作台效率
+  - `DocumentDetailView` 增加目录选择、摘要预览与交接跳转，强化档案中心语义
+  - `HandoversView` 增加筛选排序、卡片进度表达与流程概览补强
+  - `AssistantView` 增加推荐提示词、新会话入口与更清晰的工作区编排
+  - `DataView` / `AdminView` / `ProfileView` 完成一致性体验收口
   - P0：统一全局视觉 token、页面底色、卡片层级、状态色、文件类型徽标、空状态和应用外壳导航
   - P1：重构负责人总览、文档资产库、文档档案页，强化工作台、资产库、版本/流转时间线和 AI 建议隔离
   - 已完成 `cd frontend && npm run build` 验证

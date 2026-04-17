@@ -105,6 +105,13 @@ const activeConversation = computed(() =>
   visibleConversations.value.find((item) => item.id === activeConversationID.value),
 );
 
+const recommendedPrompts = [
+  "帮我总结当前范围内最需要优先处理的资料风险",
+  "请按责任人梳理最近的文档流转变化",
+  "给出适合交接的资料清单建议",
+  "总结当前文档的核心内容与后续动作建议",
+];
+
 /* ---------- helpers ---------- */
 
 function stopPolling() {
@@ -406,6 +413,10 @@ function startNewConversation() {
   messages.value = [];
 }
 
+function applyPrompt(prompt: string) {
+  question.value = prompt;
+}
+
 async function archiveConversation(conversationID: string, archive: boolean) {
   try {
     await api.patch(`/assistant/conversations/${conversationID}/archive`, { archive });
@@ -556,12 +567,15 @@ onBeforeUnmount(() => {
               {{ selectedProjectID || selectedDocumentID ? "当前回答限定在已选择范围内" : "先选择项目或文档范围，再发起提问" }}
             </p>
           </div>
-          <span v-if="composerScopeType" class="scope-chip active">
-            <ElIcon>
-              <component :is="composerScopeType === 'document' ? Document : FolderOpened" />
-            </ElIcon>
-            {{ composerScopeLabel }}
-          </span>
+          <div class="chat-header-actions">
+            <span v-if="composerScopeType" class="scope-chip active">
+              <ElIcon>
+                <component :is="composerScopeType === 'document' ? Document : FolderOpened" />
+              </ElIcon>
+              {{ composerScopeLabel }}
+            </span>
+            <ElButton plain @click="startNewConversation">新会话</ElButton>
+          </div>
         </header>
 
         <section class="message-panel">
@@ -625,6 +639,17 @@ onBeforeUnmount(() => {
         </section>
 
         <footer class="composer">
+          <div class="prompt-suggestions">
+            <button
+              v-for="item in recommendedPrompts"
+              :key="item"
+              class="prompt-chip"
+              type="button"
+              @click="applyPrompt(item)"
+            >
+              {{ item }}
+            </button>
+          </div>
           <div class="composer-scope">
             <span v-if="composerScopeType" class="scope-chip active">
               <ElIcon>
@@ -688,6 +713,12 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: flex-start;
   gap: 14px;
+}
+
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .chat-header {
@@ -946,6 +977,32 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.94);
 }
 
+.prompt-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prompt-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--dd-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--dd-ink-2);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.prompt-chip:hover {
+  border-color: #bfd5ed;
+  background: var(--dd-primary-soft);
+  color: var(--dd-primary-strong);
+}
+
 .composer-scope {
   display: flex;
   align-items: center;
@@ -983,6 +1040,10 @@ onBeforeUnmount(() => {
   .chat-header,
   .assistant-panel-head {
     display: grid;
+  }
+
+  .chat-header-actions {
+    justify-content: space-between;
   }
 
   .composer-input {

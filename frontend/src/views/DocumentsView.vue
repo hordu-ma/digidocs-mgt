@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import {
+  CopyDocument,
   DocumentAdd,
   FolderOpened,
+  MoreFilled,
+  RefreshLeft,
   Search,
 } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
@@ -47,6 +50,8 @@ const rows = ref<any[]>([]);
 const total = ref(0);
 const keyword = ref("");
 const showArchived = ref(false);
+const quickFilter = ref("all");
+const sortBy = ref("updated_desc");
 const teamSpaces = ref<TeamSpaceOption[]>([]);
 const users = ref<UserOption[]>([]);
 const projects = ref<ProjectOption[]>([]);
@@ -87,10 +92,71 @@ async function fetchDocuments() {
   total.value = res.data?.meta?.total ?? 0;
 }
 
+function parseDateValue(value?: string) {
+  return value ? new Date(value).getTime() : 0;
+}
+
+function formatShortTime(value?: string) {
+  if (!value) return "暂无更新时间";
+  return new Date(value).toLocaleDateString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
+function isRecent(row: any) {
+  const updatedAt = parseDateValue(row.updated_at);
+  return updatedAt > 0 && Date.now() - updatedAt <= 7 * 24 * 60 * 60 * 1000;
+}
+
+const quickFilters = [
+  { key: "all", label: "全部文档" },
+  { key: "mine", label: "我负责的" },
+  { key: "pending_handover", label: "待交接" },
+  { key: "in_progress", label: "处理中" },
+  { key: "recent", label: "最近更新" },
+];
+
 type DocumentGroup = {
   projectName: string;
   documents: any[];
 };
+
+const processedRows = computed(() => {
+  let list = [...rows.value];
+  switch (quickFilter.value) {
+    case "mine":
+      list = list.filter((doc) => doc.current_owner?.id === auth.userId);
+      break;
+    case "pending_handover":
+      list = list.filter((doc) => doc.current_status === "pending_handover");
+      break;
+    case "in_progress":
+      list = list.filter((doc) => doc.current_status === "in_progress");
+      break;
+    case "recent":
+      list = list.filter((doc) => isRecent(doc));
+      break;
+  }
+
+  list.sort((a, b) => {
+    switch (sortBy.value) {
+      case "updated_asc":
+        return parseDateValue(a.updated_at) - parseDateValue(b.updated_at);
+      case "title_asc":
+        return `${a.title || ""}`.localeCompare(`${b.title || ""}`, "zh-Hans");
+      case "owner_asc":
+        return `${a.current_owner?.display_name || ""}`.localeCompare(
+          `${b.current_owner?.display_name || ""}`,
+          "zh-Hans",
+        );
+      default:
+        return parseDateValue(b.updated_at) - parseDateValue(a.updated_at);
+    }
+  });
+
+  return list;
+});
 
 const groupedDocuments = computed<DocumentGroup[]>(() => {
   const groups = new Map<string, any[]>();
@@ -98,7 +164,7 @@ const groupedDocuments = computed<DocumentGroup[]>(() => {
   for (const p of allProjects.value) {
     if (!groups.has(p.name)) groups.set(p.name, []);
   }
-  for (const doc of rows.value) {
+  for (const doc of processedRows.value) {
     const key = doc.project_name || "未分类";
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(doc);
@@ -139,6 +205,30 @@ function goDetail(row: any) {
 
 function ownerInitial(row: any) {
   return (row.current_owner?.display_name || "责").slice(0, 1);
+}
+
+async function toggleArchiveState(row: any) {
+  try {
+    if (row.is_archived) {
+      await api.post(`/documents/${row.id}/restore`);
+      ElMessage.success("文档已恢复");
+    } else {
+      await api.post(`/documents/${row.id}/delete`, { reason: "前端工作台快捷移出" });
+      ElMessage.success("文档已移出当前工作台");
+    }
+    await fetchDocuments();
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "操作失败");
+  }
+}
+
+async function copyTitle(row: any) {
+  try {
+    await navigator.clipboard.writeText(row.title || "");
+    ElMessage.success("标题已复制");
+  } catch {
+    ElMessage.error("复制失败");
+  }
 }
 
 function inferFileType(row: any) {
@@ -347,6 +437,26 @@ onMounted(async () => {
         </aside>
 
         <section class="page-card asset-panel">
+          <div class="control-bar asset-control-bar">
+            <div class="segmented-filters">
+              <button
+                v-for="item in quickFilters"
+                :key="item.key"
+                class="segment-chip"
+                :class="{ active: quickFilter === item.key }"
+                type="button"
+                @click="quickFilter = item.key"
+              >
+                {{ item.label }}
+              </button>
+            </div>
+            <ElSelect v-model="sortBy" class="sort-select">
+              <ElOption label="按最近更新" value="updated_desc" />
+              <ElOption label="按最早更新" value="updated_asc" />
+              <ElOption label="按标题排序" value="title_asc" />
+              <ElOption label="按责任人排序" value="owner_asc" />
+            </ElSelect>
+          </div>
           <div class="toolbar">
             <ElInput
               v-model="keyword"
@@ -402,30 +512,61 @@ onMounted(async () => {
                 v-show="!collapsedGroups.has(group.projectName) && group.documents.length > 0"
                 class="document-list"
               >
-                <button
+                <div class="document-list-head">
+                  <span>类型</span>
+                  <span>文档信息</span>
+                  <span>责任人</span>
+                  <span>版本</span>
+                  <span>状态</span>
+                  <span>操作</span>
+                </div>
+                <div
                   v-for="row in group.documents"
                   :key="row.id"
                   class="document-row"
                   :class="{ 'is-archived': row.is_archived }"
-                  type="button"
-                  @click="goDetail(row)"
                 >
-                  <span class="file-badge" :class="inferFileType(row)">
-                    {{ inferFileType(row).toUpperCase() }}
-                  </span>
-                  <span class="document-main">
-                    <strong>{{ row.title }}</strong>
-                    <span>{{ row.project_name || group.projectName }} · {{ row.updated_at || "暂无更新时间" }}</span>
-                  </span>
-                  <span class="person-chip">
-                    <span class="person-avatar">{{ ownerInitial(row) }}</span>
-                    {{ row.current_owner?.display_name ?? "-" }}
-                  </span>
-                  <span class="version-chip">v{{ row.current_version_no ?? "-" }}</span>
-                  <span class="status-pill" :class="statusClass[row.current_status]">
-                    {{ statusLabel[row.current_status] ?? row.current_status }}
-                  </span>
-                </button>
+                  <button class="document-row-main" type="button" @click="goDetail(row)">
+                    <span class="file-badge" :class="inferFileType(row)">
+                      {{ inferFileType(row).toUpperCase() }}
+                    </span>
+                    <span class="document-main">
+                      <strong>{{ row.title }}</strong>
+                      <span>
+                        {{ row.project_name || group.projectName }} · {{ formatShortTime(row.updated_at) }}
+                        <template v-if="isRecent(row)"> · 最近 7 天更新</template>
+                      </span>
+                    </span>
+                    <span class="person-chip">
+                      <span class="person-avatar">{{ ownerInitial(row) }}</span>
+                      {{ row.current_owner?.display_name ?? "-" }}
+                    </span>
+                    <span class="version-chip">v{{ row.current_version_no ?? "-" }}</span>
+                    <span class="status-pill" :class="statusClass[row.current_status]">
+                      {{ statusLabel[row.current_status] ?? row.current_status }}
+                    </span>
+                  </button>
+                  <div class="document-row-actions">
+                    <ElDropdown trigger="click">
+                      <button class="row-action-trigger" type="button" @click.stop>
+                        <ElIcon><MoreFilled /></ElIcon>
+                      </button>
+                      <template #dropdown>
+                        <ElDropdownMenu>
+                          <ElDropdownItem @click="goDetail(row)">查看档案</ElDropdownItem>
+                          <ElDropdownItem @click="copyTitle(row)">
+                            <ElIcon><CopyDocument /></ElIcon>
+                            复制标题
+                          </ElDropdownItem>
+                          <ElDropdownItem @click="toggleArchiveState(row)">
+                            <ElIcon><RefreshLeft /></ElIcon>
+                            {{ row.is_archived ? "恢复文档" : "移出工作台" }}
+                          </ElDropdownItem>
+                        </ElDropdownMenu>
+                      </template>
+                    </ElDropdown>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -597,6 +738,15 @@ onMounted(async () => {
   padding: 20px;
 }
 
+.asset-control-bar {
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.sort-select {
+  width: 180px;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -674,27 +824,70 @@ onMounted(async () => {
   display: grid;
 }
 
+.document-list-head {
+  display: grid;
+  grid-template-columns: 64px minmax(220px, 1fr) minmax(120px, auto) 72px minmax(86px, auto) 56px;
+  gap: 14px;
+  padding: 10px 16px;
+  background: var(--dd-surface-soft);
+  color: var(--dd-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .document-row {
   display: grid;
-  grid-template-columns: 64px minmax(220px, 1fr) minmax(120px, auto) 72px minmax(86px, auto);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 56px;
   align-items: center;
   width: 100%;
-  min-height: 74px;
-  padding: 12px 16px;
-  border: 0;
+  min-height: 78px;
   border-top: 1px solid var(--dd-line-soft);
   background: #fff;
   color: var(--dd-ink-2);
   text-align: left;
-  cursor: pointer;
-  transition:
-    background 0.16s ease,
-    transform 0.16s ease;
 }
 
-.document-row:hover {
+.document-row-main {
+  display: grid;
+  grid-template-columns: 64px minmax(220px, 1fr) minmax(120px, auto) 72px minmax(86px, auto);
+  gap: 14px;
+  align-items: center;
+  min-height: 78px;
+  padding: 12px 16px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.document-row:hover,
+.document-row-main:hover {
   background: #f8fbff;
+}
+
+.document-row-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.row-action-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dd-muted);
+  cursor: pointer;
+}
+
+.row-action-trigger:hover {
+  border-color: var(--dd-line);
+  background: var(--dd-surface-soft);
+  color: var(--dd-ink);
 }
 
 .document-row.is-archived {
@@ -755,19 +948,41 @@ onMounted(async () => {
     position: static;
   }
 
+  .document-list-head {
+    display: none;
+  }
+
   .document-row {
+    grid-template-columns: 1fr;
+  }
+
+  .document-row-main {
     grid-template-columns: 56px minmax(0, 1fr);
   }
 
   .person-chip,
   .version-chip,
-  .document-row > .status-pill {
+  .document-row-main > .status-pill {
     justify-self: start;
     grid-column: 2;
+  }
+
+  .document-row-actions {
+    justify-content: flex-start;
+    padding: 0 16px 14px 72px;
   }
 }
 
 @media (max-width: 720px) {
+  .asset-control-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sort-select {
+    width: 100%;
+  }
+
   .toolbar {
     align-items: flex-start;
     flex-direction: column;

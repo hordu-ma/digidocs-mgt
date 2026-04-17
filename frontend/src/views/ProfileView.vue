@@ -85,6 +85,7 @@ onMounted(loadProfile);
     <div class="page-shell">
       <div class="page-header">
         <div>
+          <div class="page-eyebrow">账号中心</div>
           <h1>个人信息</h1>
           <p class="page-desc">维护显示姓名和联系方式，账号角色与权限保持只读。</p>
         </div>

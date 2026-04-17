@@ -239,12 +239,16 @@ onMounted(() => {
 
 <template>
   <AppLayout>
-  <div class="admin-view">
-    <h2 class="page-title">
-      <ElIcon :size="22"><Setting /></ElIcon>
-      系统管理
-    </h2>
+  <div class="page-shell">
+    <div class="page-header">
+      <div>
+        <div class="page-eyebrow">平台治理</div>
+        <h1>系统管理</h1>
+        <p>统一维护团队空间、项目、用户和项目成员关系。</p>
+      </div>
+    </div>
 
+    <div class="admin-view page-card">
     <ElTabs v-model="activeTab" class="admin-tabs">
       <!-- ===== 团队空间 ===== -->
       <ElTabPane label="团队空间" name="team-spaces">
@@ -431,13 +435,14 @@ onMounted(() => {
         </ElDialog>
       </ElTabPane>
     </ElTabs>
+    </div>
   </div>
   </AppLayout>
 </template>
 
 <style scoped>
 .admin-view {
-  max-width: 960px;
+  padding: 20px;
 }
 
 .page-title {
@@ -458,6 +463,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+  gap: 12px;
 }
 
 .tab-desc {
@@ -472,5 +478,12 @@ onMounted(() => {
   gap: 8px;
   padding: 48px 0;
   color: #909399;
+}
+
+@media (max-width: 720px) {
+  .tab-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

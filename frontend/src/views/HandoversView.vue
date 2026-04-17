@@ -14,6 +14,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+import { useAuthStore } from "@/stores/auth";
 
 type UserOption = {
   id: string;
@@ -45,6 +46,7 @@ type HandoverDetail = {
   project_id?: string;
   status: string;
   remark?: string;
+  created_at?: string;
   items?: HandoverLine[];
 };
 
@@ -75,6 +77,7 @@ type DataAssetItem = {
 };
 
 const handovers = ref<HandoverDetail[]>([]);
+const auth = useAuthStore();
 const users = ref<UserOption[]>([]);
 const projects = ref<ProjectOption[]>([]);
 const projectDocuments = ref<DocumentOption[]>([]);
@@ -89,6 +92,8 @@ const activeHandover = ref<HandoverDetail | null>(null);
 const editableItems = ref<EditableHandoverLine[]>([]);
 const editableDataItems = ref<EditableDataLine[]>([]);
 const activeTab = ref<"documents" | "data-assets">("documents");
+const quickFilter = ref("all");
+const sortBy = ref("newest");
 
 const form = reactive({
   target_user_id: "",
@@ -148,6 +153,41 @@ const handoverMetrics = computed(() => ({
   completed: handovers.value.filter((item) => item.status === "completed").length,
 }));
 
+const filteredHandovers = computed(() => {
+  let list = [...handovers.value];
+  switch (quickFilter.value) {
+    case "mine":
+      list = list.filter(
+        (item) =>
+          item.target_user_id === auth.userId || item.receiver_user_id === auth.userId,
+      );
+      break;
+    case "pending":
+      list = list.filter((item) => item.status === "pending_confirm");
+      break;
+    case "generated":
+      list = list.filter((item) => item.status === "generated");
+      break;
+    case "completed":
+      list = list.filter((item) => item.status === "completed");
+      break;
+  }
+
+  list.sort((a, b) => {
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+    if (sortBy.value === "oldest") {
+      return aTime - bTime;
+    }
+    if (sortBy.value === "status") {
+      return `${a.status}`.localeCompare(`${b.status}`, "zh-Hans");
+    }
+    return bTime - aTime;
+  });
+
+  return list;
+});
+
 function userLabel(userID?: string) {
   const user = users.value.find((item) => item.id === userID);
   return user ? user.display_name : userID || "-";
@@ -165,6 +205,14 @@ function projectLabel(projectID?: string) {
 
 function compactHandoverID(id: string) {
   return id ? `#${id.slice(0, 8)}` : "-";
+}
+
+function formatDate(value?: string) {
+  if (!value) return "时间待同步";
+  return new Date(value).toLocaleDateString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+  });
 }
 
 function userInitial(userID?: string) {
@@ -483,14 +531,29 @@ onMounted(async () => {
         </div>
       </section>
 
+      <div class="control-bar handover-toolbar">
+        <div class="segmented-filters">
+          <button class="segment-chip" :class="{ active: quickFilter === 'all' }" type="button" @click="quickFilter = 'all'">全部交接</button>
+          <button class="segment-chip" :class="{ active: quickFilter === 'mine' }" type="button" @click="quickFilter = 'mine'">与我相关</button>
+          <button class="segment-chip" :class="{ active: quickFilter === 'pending' }" type="button" @click="quickFilter = 'pending'">待确认</button>
+          <button class="segment-chip" :class="{ active: quickFilter === 'generated' }" type="button" @click="quickFilter = 'generated'">新生成</button>
+          <button class="segment-chip" :class="{ active: quickFilter === 'completed' }" type="button" @click="quickFilter = 'completed'">已完成</button>
+        </div>
+        <ElSelect v-model="sortBy" class="handover-sort">
+          <ElOption label="最新创建" value="newest" />
+          <ElOption label="最早创建" value="oldest" />
+          <ElOption label="按状态排序" value="status" />
+        </ElSelect>
+      </div>
+
       <section class="handover-board" v-loading="detailLoading">
-        <div v-if="handovers.length === 0" class="page-card empty-state">
+        <div v-if="filteredHandovers.length === 0" class="page-card empty-state">
           <ElIcon :size="36"><Connection /></ElIcon>
           <p class="empty-title">暂无交接任务</p>
           <p class="empty-hint">创建交接单后，可在这里确认资料范围并推进接收。</p>
         </div>
         <button
-          v-for="item in handovers"
+          v-for="item in filteredHandovers"
           v-else
           :key="item.id"
           class="handover-card page-card"
@@ -516,7 +579,13 @@ onMounted(async () => {
               <ElIcon><FolderOpened /></ElIcon>
               {{ projectLabel(item.project_id) }}
             </span>
+            <span>{{ formatDate(item.created_at) }}</span>
             <span>{{ compactHandoverID(item.id) }}</span>
+          </div>
+          <div class="handover-mini-steps" :class="{ cancelled: item.status === 'cancelled' }">
+            <span class="mini-step" :class="statusStepState(item.status, 'generated')">生成</span>
+            <span class="mini-step" :class="statusStepState(item.status, 'pending_confirm')">确认</span>
+            <span class="mini-step" :class="statusStepState(item.status, 'completed')">完成</span>
           </div>
           <p class="handover-remark">{{ item.remark || "暂无备注" }}</p>
           <span class="handover-action">管理交接</span>
@@ -817,6 +886,15 @@ onMounted(async () => {
   gap: 16px;
 }
 
+.handover-toolbar {
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.handover-sort {
+  width: 180px;
+}
+
 .handover-card {
   position: relative;
   display: grid;
@@ -920,6 +998,40 @@ onMounted(async () => {
   color: var(--dd-muted);
   font-size: 13px;
   line-height: 1.6;
+}
+
+.handover-mini-steps {
+  display: flex;
+  gap: 8px;
+}
+
+.mini-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: var(--dd-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mini-step.done {
+  background: var(--dd-success-soft);
+  color: var(--dd-success);
+}
+
+.mini-step.active {
+  background: var(--dd-primary-soft);
+  color: var(--dd-primary-strong);
+}
+
+.mini-step.cancelled {
+  background: var(--dd-danger-soft);
+  color: var(--dd-danger);
 }
 
 .handover-action {
@@ -1105,6 +1217,15 @@ onMounted(async () => {
   .handover-steps,
   .handover-steps.cancelled {
     grid-template-columns: 1fr;
+  }
+
+  .handover-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .handover-sort {
+    width: 100%;
   }
 
   .handover-people,

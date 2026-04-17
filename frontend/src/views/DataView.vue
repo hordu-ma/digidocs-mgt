@@ -56,11 +56,18 @@ const total = ref(0);
 const keyword = ref("");
 const filterProjectID = ref("");
 const filterFolderID = ref("");
+const assetTypeFilter = ref("all");
 
 // folder sidebar
 const folders = ref<FolderItem[]>([]);
 const folderTree = computed<FolderItem[]>(() => buildTree(folders.value));
 const selectedFolderID = ref("");
+const filteredAssets = computed(() => {
+  if (assetTypeFilter.value === "all") {
+    return assets.value;
+  }
+  return assets.value.filter((item) => inferAssetFileType(item.file_name) === assetTypeFilter.value);
+});
 
 // ─────────────────────────── fetch list ──────────────────────────
 
@@ -443,6 +450,17 @@ function getFileExt(fileName: string): string {
   return ext.length > 5 ? ext.slice(0, 4) + "…" : ext;
 }
 
+const assetTypeOptions = [
+  { key: "all", label: "全部文件" },
+  { key: "img", label: "图片" },
+  { key: "vid", label: "视频" },
+  { key: "zip", label: "压缩包" },
+  { key: "mdl", label: "模型" },
+  { key: "dat", label: "数据集" },
+  { key: "code", label: "代码" },
+  { key: "doc", label: "文档" },
+];
+
 // ─────────────────────────── lifecycle ───────────────────────────
 
 onMounted(async () => {
@@ -565,6 +583,20 @@ onMounted(async () => {
         <div class="asset-column">
           <!-- asset panel -->
           <section class="page-card asset-panel">
+            <div class="control-bar asset-control-bar">
+              <div class="segmented-filters">
+                <button
+                  v-for="item in assetTypeOptions"
+                  :key="item.key"
+                  class="segment-chip"
+                  :class="{ active: assetTypeFilter === item.key }"
+                  type="button"
+                  @click="assetTypeFilter = item.key"
+                >
+                  {{ item.label }}
+                </button>
+              </div>
+            </div>
             <div class="toolbar">
               <ElInput
                 v-model="keyword"
@@ -575,16 +607,16 @@ onMounted(async () => {
               >
                 <template #prefix><ElIcon><Search /></ElIcon></template>
               </ElInput>
-              <span class="file-count">共 {{ total }} 个文件</span>
+              <span class="file-count">当前显示 {{ filteredAssets.length }} / {{ total }} 个文件</span>
             </div>
 
-            <div v-if="assets.length === 0" class="empty-state">
+            <div v-if="filteredAssets.length === 0" class="empty-state">
               <p class="empty-title">暂无数据文件</p>
               <p class="empty-hint">上传后，文件会按课题自动归入数据资产库</p>
             </div>
 
             <div v-else class="asset-list">
-              <div v-for="row in assets" :key="row.id" class="asset-row">
+              <div v-for="row in filteredAssets" :key="row.id" class="asset-row">
                 <span class="file-badge" :class="inferAssetFileType(row.file_name)">
                   {{ getFileExt(row.file_name) }}
                 </span>
@@ -857,6 +889,10 @@ onMounted(async () => {
 /* Asset panel */
 .asset-panel {
   padding: 20px;
+}
+
+.asset-control-bar {
+  margin-bottom: 14px;
 }
 
 .toolbar {

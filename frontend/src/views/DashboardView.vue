@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  ArrowRight,
   Connection,
   DocumentChecked,
   Finished,
@@ -7,9 +8,12 @@ import {
   WarningFilled,
 } from "@element-plus/icons-vue";
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+
+const router = useRouter();
 
 const overview = ref({
   document_total: 0,
@@ -95,6 +99,30 @@ const activeDocumentCount = computed(
     (overview.value.status_counts?.pending_handover ?? 0),
 );
 
+const focusCards = computed(() => [
+  {
+    title: "待负责人推进",
+    count: overview.value.handover_pending_count,
+    caption: "需要继续确认接收与交接闭环",
+    actionLabel: "打开交接工作台",
+    action: () => router.push("/handovers"),
+  },
+  {
+    title: "风险文档",
+    count: overview.value.risk_document_count,
+    caption: "优先处理长期未更新或交接异常文档",
+    actionLabel: "查看文档资产库",
+    action: () => router.push("/documents"),
+  },
+  {
+    title: "处理中资产",
+    count: activeDocumentCount.value,
+    caption: "仍处于草稿、处理中和待交接状态",
+    actionLabel: "进入文档工作台",
+    action: () => router.push("/documents"),
+  },
+]);
+
 function formatTime(value?: string) {
   if (!value) return "-";
   return new Date(value).toLocaleString("zh-CN", {
@@ -127,6 +155,28 @@ onMounted(async () => {
           <p>优先呈现需要负责人关注的文档状态、近期流转和交接风险。</p>
         </div>
       </div>
+
+      <section class="action-card-grid focus-grid">
+        <button
+          v-for="item in focusCards"
+          :key="item.title"
+          class="action-card focus-card"
+          type="button"
+          @click="item.action()"
+        >
+          <div class="action-card-head">
+            <div>
+              <div class="focus-label">{{ item.title }}</div>
+              <div class="focus-value">{{ item.count }}</div>
+            </div>
+            <span class="action-card-icon">
+              <ElIcon :size="18"><ArrowRight /></ElIcon>
+            </span>
+          </div>
+          <p class="focus-note">{{ item.caption }}</p>
+          <span class="focus-action">{{ item.actionLabel }}</span>
+        </button>
+      </section>
 
       <section class="command-strip page-card">
         <div class="command-copy">
@@ -238,6 +288,51 @@ onMounted(async () => {
   align-items: center;
   padding: 20px;
   margin-bottom: 16px;
+}
+
+.focus-grid {
+  margin-bottom: 18px;
+}
+
+.focus-card {
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.focus-card:hover {
+  border-color: #bfd5ed;
+  transform: translateY(-1px);
+  box-shadow: var(--dd-shadow-sm);
+}
+
+.focus-label {
+  color: var(--dd-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.focus-value {
+  margin-top: 6px;
+  color: var(--dd-ink);
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.focus-note {
+  margin: 0;
+  color: var(--dd-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.focus-action {
+  color: var(--dd-primary);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .status-distribution {
