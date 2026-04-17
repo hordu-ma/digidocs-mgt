@@ -32,8 +32,8 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	teamSpaceHandler := handlers.NewTeamSpaceHandler(container.QueryService)
 	userHandler := handlers.NewUserHandler(container.QueryService)
 	projectHandler := handlers.NewProjectHandler(container.QueryService)
-	documentHandler := handlers.NewDocumentHandler(container.DocumentService)
-	versionHandler := handlers.NewVersionHandler(container.VersionService)
+	documentHandler := handlers.NewDocumentHandler(container.DocumentService, container.AssistantService)
+	versionHandler := handlers.NewVersionHandler(container.VersionService, container.AssistantService)
 	adminHandler := handlers.NewAdminHandler(container.AdminService)
 
 	authMw := middleware.Auth(container.TokenService)

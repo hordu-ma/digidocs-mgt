@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"digidocs-mgt/backend-go/internal/domain/task"
 	"digidocs-mgt/backend-go/internal/service"
 	"digidocs-mgt/backend-go/internal/shared"
 	"digidocs-mgt/backend-go/internal/transport/http/middleware"
@@ -12,11 +13,16 @@ import (
 )
 
 type VersionHandler struct {
-	service service.VersionService
+	service   service.VersionService
+	assistant service.AssistantService
 }
 
-func NewVersionHandler(svc service.VersionService) VersionHandler {
-	return VersionHandler{service: svc}
+func NewVersionHandler(svc service.VersionService, assistant ...service.AssistantService) VersionHandler {
+	h := VersionHandler{service: svc}
+	if len(assistant) > 0 {
+		h.assistant = assistant[0]
+	}
+	return h
 }
 
 func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {
@@ -62,4 +68,34 @@ func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.WriteData(w, http.StatusOK, data)
+
+	// P1: auto-trigger text extraction in background
+	h.queueExtraction(r, r.PathValue("documentID"), data)
+}
+
+func (h VersionHandler) queueExtraction(r *http.Request, documentID string, versionData map[string]any) {
+	if (h.assistant == service.AssistantService{}) {
+		return
+	}
+	versionID, _ := versionData["id"].(string)
+	fileName, _ := versionData["file_name"].(string)
+	if versionID == "" {
+		return
+	}
+	actorID := middleware.UserIDFromContext(r.Context())
+	_, err := h.assistant.QueueTask(
+		r.Context(),
+		task.TaskTypeDocumentExtractText,
+		"document", documentID,
+		map[string]any{
+			"version_id": versionID,
+			"file_name":  fileName,
+		},
+		actorID,
+	)
+	if err != nil {
+		log.Printf("[versions] auto-extract queue failed document=%s version=%s err=%v", documentID, versionID, err)
+	} else {
+		log.Printf("[versions] auto-extract queued document=%s version=%s", documentID, versionID)
+	}
 }

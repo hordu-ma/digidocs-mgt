@@ -3,11 +3,13 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
+	"digidocs-mgt/backend-go/internal/domain/task"
 	"digidocs-mgt/backend-go/internal/service"
 	"digidocs-mgt/backend-go/internal/shared"
 	"digidocs-mgt/backend-go/internal/transport/http/middleware"
@@ -15,11 +17,16 @@ import (
 )
 
 type DocumentHandler struct {
-	service service.DocumentService
+	service   service.DocumentService
+	assistant service.AssistantService
 }
 
-func NewDocumentHandler(svc service.DocumentService) DocumentHandler {
-	return DocumentHandler{service: svc}
+func NewDocumentHandler(svc service.DocumentService, assistant ...service.AssistantService) DocumentHandler {
+	h := DocumentHandler{service: svc}
+	if len(assistant) > 0 {
+		h.assistant = assistant[0]
+	}
+	return h
 }
 
 func (h DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +85,39 @@ func (h DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.WriteData(w, http.StatusCreated, data)
+
+	// P1: auto-trigger text extraction for new document
+	h.queueExtraction(r, data, header.Filename)
+}
+
+func (h DocumentHandler) queueExtraction(r *http.Request, data map[string]any, fileName string) {
+	if (h.assistant == service.AssistantService{}) {
+		return
+	}
+	documentID, _ := data["id"].(string)
+	var versionID string
+	if cv, ok := data["current_version"].(map[string]any); ok {
+		versionID, _ = cv["id"].(string)
+	}
+	if documentID == "" || versionID == "" {
+		return
+	}
+	actorID := middleware.UserIDFromContext(r.Context())
+	_, err := h.assistant.QueueTask(
+		r.Context(),
+		task.TaskTypeDocumentExtractText,
+		"document", documentID,
+		map[string]any{
+			"version_id": versionID,
+			"file_name":  fileName,
+		},
+		actorID,
+	)
+	if err != nil {
+		log.Printf("[documents] auto-extract queue failed document=%s version=%s err=%v", documentID, versionID, err)
+	} else {
+		log.Printf("[documents] auto-extract queued document=%s version=%s", documentID, versionID)
+	}
 }
 
 func (h DocumentHandler) List(w http.ResponseWriter, r *http.Request) {

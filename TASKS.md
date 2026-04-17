@@ -409,6 +409,11 @@
   - 已补充 RustDesk / 本机浏览器访问 `18080/18081` 超时的排查、临时修复与复发处理说明
   - 已补充同一局域网用户访问方式：联调阶段使用宿主机局域网 IP 加 `18080` 访问前端
   - 已补充登录后个人信息维护能力：`GET/PATCH /api/v1/auth/me` 支持当前用户读取和更新显示姓名、手机号、微信号和邮箱
+- 完成 AI 助手文档内容读取能力修复
+  - P0：Python Worker `assistant.ask` 处理时，若文档 `extracted_text` 为空，自动内联抽取文档正文后再调用大模型
+  - P1：文档上传（`DocumentHandler.Create`、`VersionHandler.Upload`）成功后自动队列 `document.extract_text` 任务，新文档无需手动触发即可被助手读取
+  - Worker Dockerfile 增加 `poppler-utils`，支持 PDF 正文抽取（`pdftotext`）
+  - 已为现有 15 份文档批量补发抽取任务，12 份成功（3 份为 .pptx/.xlsx/.doc 暂不支持）
 
 ## 待办
 

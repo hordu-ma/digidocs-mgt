@@ -53,6 +53,10 @@ class WorkerDispatcher:
                 "document_id": scope.get("document_id") or task.payload.get("document_id"),
             }
             context = self._build_context(task, normalized_scope)
+            # Inline document text extraction when scoped to a document
+            doc_id = _string_value(normalized_scope.get("document_id"))
+            if doc_id:
+                self._ensure_document_text(task, context)
             try:
                 answer = self.skill_adapter.run(task, context, normalized_scope)
             except (OpenClawClientError, SkillAdapterError) as exc:
@@ -192,6 +196,22 @@ class WorkerDispatcher:
 
         return context
 
+    def _ensure_document_text(self, task: WorkerTask, context: ObjectDict) -> None:
+        """If document is in scope but extracted_text is empty, try inline extraction."""
+        doc_ctx = _as_object_dict(context.get("document_context"))
+        if doc_ctx is None:
+            return
+        existing = _string_value(doc_ctx.get("extracted_text"))
+        if existing:
+            return
+        try:
+            text = self._resolve_document_text(task, context)
+            doc_ctx["extracted_text"] = text
+            context["document_text"] = text
+            logger.info("inline extraction ok request_id=%s chars=%d", task.request_id, len(text))
+        except DocumentTextExtractionError as exc:
+            logger.warning("inline extraction skipped request_id=%s reason=%s", task.request_id, exc)
+
     def _resolve_document_text(
         self,
         task: WorkerTask,
@@ -204,6 +224,8 @@ class WorkerDispatcher:
                 return existing_text
 
         version_id = _string_value(task.payload.get("version_id"))
+        if version_id == "":
+            version_id = _latest_version_id(document_context)
         if version_id == "":
             raise DocumentTextExtractionError("缺少 version_id，无法抽取正文")
 
@@ -224,6 +246,23 @@ def _string_value(value: object) -> str:
 
 def _as_object_dict(value: object) -> ObjectDict | None:
     return cast(ObjectDict, value) if isinstance(value, dict) else None
+
+
+def _latest_version_id(document_context: ObjectDict | None) -> str:
+    """Extract the latest version ID from document_context.versions list."""
+    if document_context is None:
+        return ""
+    versions = document_context.get("versions")
+    if not isinstance(versions, list) or not versions:
+        return ""
+    # versions are ordered by version_no; pick the last (latest)
+    for candidate in reversed(cast(list[object], versions)):
+        d = _as_object_dict(candidate)
+        if d is not None:
+            vid = _string_value(d.get("id"))
+            if vid:
+                return vid
+    return ""
 
 
 def _extract_filename(content_disposition: str, fallback: str) -> str:
