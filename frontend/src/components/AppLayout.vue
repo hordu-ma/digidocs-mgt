@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ArrowDown } from "@element-plus/icons-vue";
+import { ArrowDown, Setting } from "@element-plus/icons-vue";
+import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { useAuthStore } from "@/stores/auth";
@@ -7,6 +8,8 @@ import { useAuthStore } from "@/stores/auth";
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+
+const isAdmin = computed(() => auth.role === "admin");
 
 const menus = [
   { label: "总览", path: "/dashboard" },
@@ -48,6 +51,17 @@ function handleUserCommand(command: string) {
           {{ menu.label }}
         </RouterLink>
       </nav>
+      <div v-if="isAdmin" class="nav-admin">
+        <div class="nav-divider"></div>
+        <RouterLink
+          to="/admin"
+          class="nav-item nav-item-admin"
+          :class="{ active: route.path === '/admin' }"
+        >
+          <ElIcon :size="16"><Setting /></ElIcon>
+          系统管理
+        </RouterLink>
+      </div>
     </aside>
     <main class="content">
       <header class="topbar">
@@ -82,6 +96,8 @@ function handleUserCommand(command: string) {
 }
 
 .sidebar {
+  display: flex;
+  flex-direction: column;
   padding: 28px 18px;
   border-right: 1px solid rgba(16, 36, 62, 0.08);
   background:
@@ -131,6 +147,21 @@ function handleUserCommand(command: string) {
 .nav-item.active {
   background: #123e73;
   color: #fff;
+}
+
+.nav-admin {
+  margin-top: auto;
+}
+
+.nav-divider {
+  margin: 16px 0 8px;
+  border-top: 1px solid rgba(16, 36, 62, 0.1);
+}
+
+.nav-item-admin {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .content {

@@ -370,6 +370,14 @@
   - 搜索关键字可跨组过滤
 - 清理数据库中全部测试数据
   - 删除 documents、document_versions、flow_records、audit_events、folders、assistant 全系列表的历史测试记录
+- 完成管理员功能模块
+  - 后端：AdminRepository（9 个方法）、AdminService（验证+bcrypt）、AdminHandler（9 个端点）
+  - RequireAdmin 中间件：Auth + 角色检查二合一
+  - 9 条 admin 路由：团队空间 CRUD、项目 CRUD、用户 CRUD、成员分配 CRUD
+  - 前端：AdminView 四标签页（团队空间、项目管理、用户管理、成员分配）
+  - 侧边栏管理入口（仅 admin 角色可见）、路由守卫
+  - 修复 UUID 列未指定 `gen_random_uuid()` / `::uuid` 类型转换导致的 500 错误
+  - API 冒烟测试通过：创建团队空间、创建项目、创建用户、列表查询均正常
 
 ## 进行中
 

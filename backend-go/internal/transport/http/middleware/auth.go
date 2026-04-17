@@ -61,3 +61,17 @@ func UserRoleFromContext(ctx context.Context) string {
 	}
 	return claims.Role
 }
+
+// RequireAdmin returns a middleware that rejects non-admin users with 403.
+func RequireAdmin(tokenService service.TokenService) Middleware {
+	authMw := Auth(tokenService)
+	return func(next http.Handler) http.Handler {
+		return authMw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if UserRoleFromContext(r.Context()) != "admin" {
+				response.WriteError(w, http.StatusForbidden, "forbidden", "admin access required")
+				return
+			}
+			next.ServeHTTP(w, r)
+		}))
+	}
+}

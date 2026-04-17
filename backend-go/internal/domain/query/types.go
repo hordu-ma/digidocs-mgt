@@ -185,6 +185,14 @@ type AuditEventFilter struct {
 	PageSize   int
 }
 
+type ProjectMemberItem struct {
+	ID          string `json:"id"`
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
+	Username    string `json:"username"`
+	ProjectRole string `json:"project_role"`
+}
+
 type AssistantSuggestionItem struct {
 	ID             string   `json:"id"`
 	RelatedType    string   `json:"related_type"`

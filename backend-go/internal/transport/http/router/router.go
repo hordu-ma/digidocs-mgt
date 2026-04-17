@@ -34,10 +34,15 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	projectHandler := handlers.NewProjectHandler(container.QueryService)
 	documentHandler := handlers.NewDocumentHandler(container.DocumentService)
 	versionHandler := handlers.NewVersionHandler(container.VersionService)
+	adminHandler := handlers.NewAdminHandler(container.AdminService)
 
 	authMw := middleware.Auth(container.TokenService)
 	protect := func(h http.HandlerFunc) http.Handler {
 		return authMw(h)
+	}
+	adminMw := middleware.RequireAdmin(container.TokenService)
+	protectAdmin := func(h http.HandlerFunc) http.Handler {
+		return adminMw(h)
 	}
 
 	// --- Public routes (no JWT required) ---
@@ -102,6 +107,17 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.Handle("GET "+cfg.APIV1Prefix+"/dashboard/overview", protect(dashboardHandler.Overview))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/dashboard/recent-flows", protect(dashboardHandler.RecentFlows))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/dashboard/risk-documents", protect(dashboardHandler.RiskDocuments))
+
+	// --- Admin routes (admin role required) ---
+	mux.Handle("POST "+cfg.APIV1Prefix+"/admin/team-spaces", protectAdmin(adminHandler.CreateTeamSpace))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/admin/projects", protectAdmin(adminHandler.CreateProject))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/admin/users", protectAdmin(adminHandler.ListAllUsers))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/admin/users", protectAdmin(adminHandler.CreateUser))
+	mux.Handle("PATCH "+cfg.APIV1Prefix+"/admin/users/{userID}", protectAdmin(adminHandler.UpdateUser))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/admin/projects/{projectID}/members", protectAdmin(adminHandler.ListProjectMembers))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/admin/projects/{projectID}/members", protectAdmin(adminHandler.AddProjectMember))
+	mux.Handle("PATCH "+cfg.APIV1Prefix+"/admin/projects/{projectID}/members/{memberID}", protectAdmin(adminHandler.UpdateProjectMember))
+	mux.Handle("DELETE "+cfg.APIV1Prefix+"/admin/projects/{projectID}/members/{memberID}", protectAdmin(adminHandler.RemoveProjectMember))
 
 	return middleware.Chain(
 		mux,

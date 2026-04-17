@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 
 import AssistantView from "@/views/AssistantView.vue";
+import AdminView from "@/views/AdminView.vue";
 import DashboardView from "@/views/DashboardView.vue";
 import DocumentDetailView from "@/views/DocumentDetailView.vue";
 import DocumentsView from "@/views/DocumentsView.vue";
@@ -18,6 +19,7 @@ const router = createRouter({
     { path: "/documents/:id", name: "document-detail", component: DocumentDetailView, meta: { requiresAuth: true } },
     { path: "/handovers", name: "handovers", component: HandoversView, meta: { requiresAuth: true } },
     { path: "/assistant", name: "assistant", component: AssistantView, meta: { requiresAuth: true } },
+    { path: "/admin", name: "admin", component: AdminView, meta: { requiresAuth: true, requiresAdmin: true } },
     { path: "/profile", name: "profile", component: ProfileView, meta: { requiresAuth: true } },
   ],
 });
@@ -26,6 +28,9 @@ router.beforeEach((to) => {
   const token = localStorage.getItem("access_token");
   if (to.meta.requiresAuth && !token) {
     return { name: "login" };
+  }
+  if (to.meta.requiresAdmin && localStorage.getItem("role") !== "admin") {
+    return { name: "dashboard" };
   }
 });
 

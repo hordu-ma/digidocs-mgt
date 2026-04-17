@@ -24,6 +24,7 @@ type Container struct {
 	DB                    *sql.DB
 	QueueConsumer         queue.Consumer
 	QueryService          service.QueryService
+	AdminService          service.AdminService
 	AssistantService      service.AssistantService
 	DocumentService       service.DocumentService
 	AuditQueryService     service.AuditQueryService
@@ -71,6 +72,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				pgrepo.NewUserQueryRepository(postgresDB),
 				pgrepo.NewProjectRepository(postgresDB),
 			),
+			AdminService:          service.NewAdminService(pgrepo.NewAdminRepository(postgresDB)),
 			AssistantService:      service.NewAssistantService(noopqueue.NewPublisher(), pgrepo.NewAssistantRepository(postgresDB), docRepo),
 			DocumentService:       service.NewDocumentService(docRepo, docRepo, storageProvider, versionWorkflow, permissionService),
 			AuditQueryService:     service.NewAuditQueryService(pgrepo.NewAuditRepository(postgresDB)),

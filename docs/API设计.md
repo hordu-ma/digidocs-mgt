@@ -1358,3 +1358,15 @@
 - 审计事件明细列表
 - 建议确认与忽略
 - 交接项编辑
+
+### 12.3 第三批实现（管理员模块）
+
+- 创建团队空间 `POST /api/v1/admin/team-spaces`
+- 创建项目 `POST /api/v1/admin/projects`
+- 创建用户 `POST /api/v1/admin/users`
+- 更新用户 `PUT /api/v1/admin/users/{id}`
+- 列出全部用户 `GET /api/v1/admin/users`
+- 列出项目成员 `GET /api/v1/admin/projects/{id}/members`
+- 添加项目成员 `POST /api/v1/admin/projects/{id}/members`
+- 更新项目成员角色 `PUT /api/v1/admin/projects/{id}/members/{userId}`
+- 移除项目成员 `DELETE /api/v1/admin/projects/{id}/members/{userId}`
