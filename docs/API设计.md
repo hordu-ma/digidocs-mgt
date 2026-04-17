@@ -1370,3 +1370,111 @@
 - 添加项目成员 `POST /api/v1/admin/projects/{id}/members`
 - 更新项目成员角色 `PUT /api/v1/admin/projects/{id}/members/{userId}`
 - 移除项目成员 `DELETE /api/v1/admin/projects/{id}/members/{userId}`
+
+---
+
+## 13. 数据资产模块（第四批，已实现）
+
+### 13.1 概述
+
+数据资产模块用于存储图片、视频、压缩包、模型文件等非 Office/PDF 数据文件。以课题为核心，支持 1-10GB 大文件，简单文件夹结构（最多 2 层），无工作流与版本管理。
+
+**权限规则：**
+- 上传：项目成员即可（`CanUploadDataAsset`）
+- 删除/管理：资产创建者、项目 owner、项目 manager（`CanManageDataAsset`）
+
+### 13.2 数据资产端点
+
+#### 列出数据资产
+`GET /api/v1/data-assets`
+
+Query: `project_id`, `folder_id`, `keyword`, `page`, `page_size`
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "project_id": "uuid",
+      "project_name": "五好爱学 AI 平台",
+      "folder_id": "uuid",
+      "folder_name": "原始数据",
+      "display_name": "训练集 v3",
+      "file_name": "train_v3.zip",
+      "mime_type": "application/zip",
+      "file_size": 1073741824,
+      "created_by_name": "张三",
+      "created_at": "2026-04-17T12:00:00Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+#### 上传数据资产
+`POST /api/v1/data-assets`（multipart/form-data）
+
+字段：`file`（二进制）、`project_id`（必填）、`display_name`（可选）、`folder_id`（可选）、`description`（可选）
+
+文件名命名约束由前端执行（仅允许字母、数字、中文、下划线、连字符、点）。
+
+#### 获取数据资产详情
+`GET /api/v1/data-assets/{id}`
+
+#### 更新数据资产
+`PUT /api/v1/data-assets/{id}`
+
+Body: `{ "display_name": "...", "description": "...", "folder_id": "..." }`
+
+#### 删除数据资产（软删除）
+`DELETE /api/v1/data-assets/{id}`
+
+#### 下载数据资产
+`GET /api/v1/data-assets/{id}/download`
+
+流式返回文件内容，`Content-Disposition: attachment`，`Content-Length` 按文件实际大小设置。
+
+### 13.3 文件夹端点
+
+#### 列出课题文件夹
+`GET /api/v1/projects/{id}/data-folders`
+
+返回扁平列表，前端根据 `parent_id` 和 `depth` 自行构建树。
+
+#### 创建文件夹
+`POST /api/v1/data-folders`
+
+Body: `{ "project_id": "uuid", "parent_id": "uuid（可选）", "name": "原始数据" }`
+
+深度超过 2 返回 400 `validation_error`，同目录同名返回 409 `conflict`。
+
+#### 删除文件夹
+`DELETE /api/v1/data-folders/{id}`
+
+### 13.4 交接单数据资产清单端点
+
+#### 查看交接单数据资产清单
+`GET /api/v1/handovers/{id}/data-items`
+
+```json
+{
+  "data": [
+    {
+      "data_asset_id": "uuid",
+      "display_name": "训练集 v3",
+      "file_name": "train_v3.zip",
+      "selected": true,
+      "note": "最终版训练数据"
+    }
+  ]
+}
+```
+
+#### 更新交接单数据资产清单
+`PUT /api/v1/handovers/{id}/data-items`
+
+Body: `{ "items": [{ "data_asset_id": "uuid", "selected": true, "note": "..." }] }`
+
+注：使用 PUT（全量覆盖），而非 PATCH。只有 `generated` 状态的交接单可编辑。

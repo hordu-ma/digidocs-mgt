@@ -35,6 +35,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	documentHandler := handlers.NewDocumentHandler(container.DocumentService, container.AssistantService)
 	versionHandler := handlers.NewVersionHandler(container.VersionService, container.AssistantService)
 	adminHandler := handlers.NewAdminHandler(container.AdminService)
+	dataAssetHandler := handlers.NewDataAssetHandler(container.DataAssetService)
 
 	authMw := middleware.Auth(container.TokenService)
 	protect := func(h http.HandlerFunc) http.Handler {
@@ -106,6 +107,20 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.Handle("POST "+cfg.APIV1Prefix+"/handovers/{handoverID}/complete", protect(handoverHandler.Complete))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/handovers/{handoverID}/cancel", protect(handoverHandler.Cancel))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/dashboard/overview", protect(dashboardHandler.Overview))
+
+	// --- Data Asset routes ---
+	mux.Handle("GET "+cfg.APIV1Prefix+"/data-assets", protect(dataAssetHandler.List))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/data-assets", protect(dataAssetHandler.Upload))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/data-assets/{id}", protect(dataAssetHandler.Get))
+	mux.Handle("PUT "+cfg.APIV1Prefix+"/data-assets/{id}", protect(dataAssetHandler.Update))
+	mux.Handle("DELETE "+cfg.APIV1Prefix+"/data-assets/{id}", protect(dataAssetHandler.Delete))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/data-assets/{id}/download", protect(dataAssetHandler.Download))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/projects/{id}/data-folders", protect(dataAssetHandler.ListFolders))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/data-folders", protect(dataAssetHandler.CreateFolder))
+	mux.Handle("DELETE "+cfg.APIV1Prefix+"/data-folders/{id}", protect(dataAssetHandler.DeleteFolder))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/handovers/{id}/data-items", protect(dataAssetHandler.ListHandoverDataItems))
+	mux.Handle("PUT "+cfg.APIV1Prefix+"/handovers/{id}/data-items", protect(dataAssetHandler.UpdateHandoverDataItems))
+
 	mux.Handle("GET "+cfg.APIV1Prefix+"/dashboard/recent-flows", protect(dashboardHandler.RecentFlows))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/dashboard/risk-documents", protect(dashboardHandler.RiskDocuments))
 

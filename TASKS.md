@@ -455,6 +455,20 @@
   - 文档流转验证通过：`finalize / archive / unarchive / transfer / accept-transfer`
   - 交接流程验证通过：`POST /handovers`、`PATCH /handovers/{id}/items`、`POST /handovers/{id}/confirm`、`POST /handovers/{id}/complete`
   - 同时确认流转字段名与交接字段名差异：流转使用 `to_user_id`，交接使用 `target_user_id / receiver_user_id`
+- 完成**数据资产模块**首期实现（T1–T5）
+  - 数据库迁移：`006_data_assets.sql`（`data_folders` + `data_assets` 表）、`007_handover_data_items.sql`（`graduation_handover_data_items` 表）
+  - 后端存储层：`shared/upload.go` 新增 `MaxDataAssetMemoryBuffer = 64MB` 与 `ValidateDataAssetFileName()`
+  - 后端 domain 层：`domain/command/types.go` 和 `domain/query/types.go` 新增全部数据资产命令与查询类型
+  - 后端权限层：`PermissionReader` 接口新增 `CanUploadDataAsset` / `CanManageDataAsset`；postgres / memory 双实现；`PermissionService` 新增 `EnsureUploadDataAsset` / `EnsureManageDataAsset`
+  - 后端 repository 层：`repository/contracts.go` 新增 `DataAssetReader` / `DataAssetWriter` 接口；新增 `postgres/data_asset_repository.go` 和 `memory/data_asset_repository.go` 全功能实现
+  - 后端服务层：新增 `service/data_asset_service.go`（上传流式代理、CRUD、下载、文件夹管理、交接数据清单）
+  - 后端 handler 层：新增 `handlers/data_assets.go`（11 个端点），XHR 大文件流式上传，下载使用 `io.Copy`
+  - 后端路由：`router/router.go` 新增 11 条数据资产路由
+  - 后端容器：`bootstrap/container.go` 新增 `DataAssetService` 字段，postgres / memory 均已接入
+  - 前端页面：新增 `views/DataView.vue`（文件列表、课题过滤、文件夹侧边栏、上传 Dialog 含 XHR 进度条、新建文件夹 Dialog）
+  - 前端导航：`AppLayout.vue` 菜单数组新增"数据"入口（位于文档与交接之间），`routeMeta` 补充 `/data` 路径标题
+  - 前端路由：`router/index.ts` 新增 `/data` 路由
+  - 已通过 `cd backend-go && go build ./...` + `go test ./...` + `cd frontend && npm run build` 全量验证
 
 ## 待办
 

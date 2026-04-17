@@ -184,3 +184,31 @@ func (r PermissionRepository) exists(ctx context.Context, query string, args ...
 func isAdmin(role string) bool {
 	return role == "admin"
 }
+
+func (r PermissionRepository) CanUploadDataAsset(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error) {
+	if isAdmin(actorRole) {
+		return true, nil
+	}
+	return r.isProjectContributor(ctx, actorID, projectID)
+}
+
+func (r PermissionRepository) CanManageDataAsset(ctx context.Context, actorID string, actorRole string, dataAssetID string) (bool, error) {
+	if isAdmin(actorRole) {
+		return true, nil
+	}
+	// Creator OR project manager for the project the asset belongs to.
+	return r.exists(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM data_assets da
+			JOIN projects p ON p.id = da.project_id
+			LEFT JOIN project_members pm
+			  ON pm.project_id = p.id
+			 AND pm.user_id::text = $2
+			 AND pm.project_role IN ('owner', 'manager')
+			WHERE da.id::text = $1
+			  AND da.is_deleted = false
+			  AND (da.created_by::text = $2 OR p.owner_id::text = $2 OR pm.id IS NOT NULL)
+		)
+	`, dataAssetID, actorID)
+}

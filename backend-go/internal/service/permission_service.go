@@ -79,6 +79,22 @@ func (s PermissionService) EnsureApplyHandover(ctx context.Context, actorID stri
 	return permissionResult(ok, err, "apply handover")
 }
 
+func (s PermissionService) EnsureUploadDataAsset(ctx context.Context, actorID string, actorRole string, projectID string) error {
+	if s.reader == nil {
+		return nil
+	}
+	ok, err := s.reader.CanUploadDataAsset(ctx, actorID, actorRole, projectID)
+	return permissionResult(ok, err, "upload data asset")
+}
+
+func (s PermissionService) EnsureManageDataAsset(ctx context.Context, actorID string, actorRole string, dataAssetID string) error {
+	if s.reader == nil {
+		return nil
+	}
+	ok, err := s.reader.CanManageDataAsset(ctx, actorID, actorRole, dataAssetID)
+	return permissionResult(ok, err, "manage data asset")
+}
+
 func permissionResult(ok bool, err error, action string) error {
 	if err != nil {
 		return err

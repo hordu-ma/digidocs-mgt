@@ -53,10 +53,32 @@ type EditableHandoverLine = HandoverLine & {
   current_status: string;
 };
 
+type HandoverDataLine = {
+  data_asset_id: string;
+  display_name: string;
+  file_name: string;
+  selected: boolean;
+  note: string;
+};
+
+type EditableDataLine = HandoverDataLine & {
+  mime_type?: string;
+  file_size?: number;
+};
+
+type DataAssetItem = {
+  id: string;
+  display_name: string;
+  file_name: string;
+  mime_type?: string;
+  file_size?: number;
+};
+
 const handovers = ref<HandoverDetail[]>([]);
 const users = ref<UserOption[]>([]);
 const projects = ref<ProjectOption[]>([]);
 const projectDocuments = ref<DocumentOption[]>([]);
+const projectDataAssets = ref<DataAssetItem[]>([]);
 const showDialog = ref(false);
 const formLoading = ref(false);
 const referenceLoading = ref(false);
@@ -65,6 +87,8 @@ const actionLoading = ref(false);
 const showDetailDialog = ref(false);
 const activeHandover = ref<HandoverDetail | null>(null);
 const editableItems = ref<EditableHandoverLine[]>([]);
+const editableDataItems = ref<EditableDataLine[]>([]);
+const activeTab = ref<"documents" | "data-assets">("documents");
 
 const form = reactive({
   target_user_id: "",
@@ -110,6 +134,12 @@ const selectedItemCount = computed(
   () => editableItems.value.filter((item) => item.selected).length,
 );
 const unselectedItemCount = computed(() => editableItems.value.length - selectedItemCount.value);
+const selectedDataItemCount = computed(
+  () => editableDataItems.value.filter((item) => item.selected).length,
+);
+const unselectedDataItemCount = computed(
+  () => editableDataItems.value.length - selectedDataItemCount.value,
+);
 
 const handoverMetrics = computed(() => ({
   total: handovers.value.length,
@@ -190,6 +220,59 @@ async function loadProjectDocuments(projectID?: string) {
   projectDocuments.value = res.data?.data ?? [];
 }
 
+async function loadProjectDataAssets(projectID?: string) {
+  if (!projectID) {
+    projectDataAssets.value = [];
+    return;
+  }
+  const res = await api.get("/data-assets", {
+    params: { project_id: projectID, page: 1, page_size: 200 },
+  });
+  projectDataAssets.value = res.data?.data ?? [];
+}
+
+async function fetchHandoverDataItems(handoverID: string): Promise<HandoverDataLine[]> {
+  try {
+    const res = await api.get(`/handovers/${handoverID}/data-items`);
+    return res.data?.data ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function buildEditableDataItems(dataItems: HandoverDataLine[], assets: DataAssetItem[]) {
+  const itemMap = new Map(dataItems.map((i) => [i.data_asset_id, i]));
+  const result: EditableDataLine[] = assets.map((a) => ({
+    data_asset_id: a.id,
+    display_name: a.display_name,
+    file_name: a.file_name,
+    mime_type: a.mime_type,
+    file_size: a.file_size,
+    selected: itemMap.get(a.id)?.selected ?? false,
+    note: itemMap.get(a.id)?.note ?? "",
+  }));
+  for (const item of dataItems) {
+    if (!result.some((r) => r.data_asset_id === item.data_asset_id)) {
+      result.push({
+        data_asset_id: item.data_asset_id,
+        display_name: item.display_name,
+        file_name: item.file_name,
+        selected: item.selected,
+        note: item.note,
+      });
+    }
+  }
+  editableDataItems.value = result;
+}
+
+function formatFileSize(bytes?: number): string {
+  if (!bytes) return "-";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
 function buildEditableItems(detail: HandoverDetail, documents: DocumentOption[]) {
   const itemMap = new Map(detail.items?.map((item) => [item.document_id, item]) ?? []);
   const baseDocuments = documents.map((item) => ({
@@ -249,6 +332,7 @@ async function submitCreate() {
 
 async function openDetail(handoverID: string) {
   detailLoading.value = true;
+  activeTab.value = "documents";
   try {
     const res = await api.get(`/handovers/${handoverID}`);
     const detail = (res.data?.data ?? null) as HandoverDetail | null;
@@ -257,8 +341,13 @@ async function openDetail(handoverID: string) {
       return;
     }
     activeHandover.value = detail;
-    await loadProjectDocuments(detail.project_id);
+    const [, dataItems] = await Promise.all([
+      loadProjectDocuments(detail.project_id),
+      fetchHandoverDataItems(handoverID),
+      loadProjectDataAssets(detail.project_id),
+    ]);
     buildEditableItems(detail, projectDocuments.value);
+    buildEditableDataItems(dataItems, projectDataAssets.value);
     showDetailDialog.value = true;
   } catch (err: any) {
     ElMessage.error(err.response?.data?.message ?? "加载交接单详情失败");
@@ -285,6 +374,27 @@ async function saveItems() {
     await fetchHandovers();
   } catch (err: any) {
     ElMessage.error(err.response?.data?.message ?? "更新交接清单失败");
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+async function saveDataItems() {
+  if (!activeHandover.value) {
+    return;
+  }
+  actionLoading.value = true;
+  try {
+    await api.put(`/handovers/${activeHandover.value.id}/data-items`, {
+      items: editableDataItems.value.map((item) => ({
+        data_asset_id: item.data_asset_id,
+        selected: item.selected,
+        note: item.note,
+      })),
+    });
+    ElMessage.success("数据资产清单已更新");
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.message ?? "更新数据资产清单失败");
   } finally {
     actionLoading.value = false;
   }
@@ -521,17 +631,27 @@ onMounted(async () => {
 
           <div class="detail-toolbar">
             <div class="detail-counts">
-              <span>纳入交接 <strong>{{ selectedItemCount }}</strong> 项</span>
-              <span>暂不纳入 <strong>{{ unselectedItemCount }}</strong> 项</span>
+              <span v-if="activeTab === 'documents'">文档纳入 <strong>{{ selectedItemCount }}</strong> 项</span>
+              <span v-if="activeTab === 'documents'">暂不纳入 <strong>{{ unselectedItemCount }}</strong> 项</span>
+              <span v-if="activeTab === 'data-assets'">资产纳入 <strong>{{ selectedDataItemCount }}</strong> 项</span>
+              <span v-if="activeTab === 'data-assets'">暂不纳入 <strong>{{ unselectedDataItemCount }}</strong> 项</span>
             </div>
             <div class="detail-actions">
               <ElButton
-                v-if="canEditItems"
+                v-if="canEditItems && activeTab === 'documents'"
                 type="primary"
                 :loading="actionLoading"
                 @click="saveItems"
               >
-                保存清单
+                保存文档清单
+              </ElButton>
+              <ElButton
+                v-if="canEditItems && activeTab === 'data-assets'"
+                type="primary"
+                :loading="actionLoading"
+                @click="saveDataItems"
+              >
+                保存数据资产
               </ElButton>
               <ElButton
                 v-if="activeHandover.status === 'generated'"
@@ -560,7 +680,29 @@ onMounted(async () => {
             </div>
           </div>
 
-          <div class="handover-items">
+          <div class="detail-tabs">
+            <button
+              class="detail-tab"
+              :class="{ active: activeTab === 'documents' }"
+              @click="activeTab = 'documents'"
+            >
+              文档清单
+              <span class="tab-count">{{ selectedItemCount }}/{{ editableItems.length }}</span>
+            </button>
+            <button
+              class="detail-tab"
+              :class="{ active: activeTab === 'data-assets' }"
+              @click="activeTab = 'data-assets'"
+            >
+              数据资产
+              <span class="tab-count">{{ selectedDataItemCount }}/{{ editableDataItems.length }}</span>
+            </button>
+          </div>
+
+          <div v-show="activeTab === 'documents'" class="handover-items">
+            <div v-if="editableItems.length === 0" class="items-empty">
+              <p>该课题下暂无文档，创建文档后可添加到交接清单。</p>
+            </div>
             <div
               v-for="row in editableItems"
               :key="row.document_id"
@@ -573,6 +715,34 @@ onMounted(async () => {
                   <strong>{{ row.title || row.document_id }}</strong>
                   <span class="status-pill" :class="documentStatusClass[row.current_status]">
                     {{ documentStatusLabel[row.current_status] ?? (row.current_status || "未知状态") }}
+                  </span>
+                </div>
+              </div>
+              <ElInput
+                v-model="row.note"
+                :disabled="!canEditItems"
+                placeholder="补充交接说明"
+              />
+            </div>
+          </div>
+
+          <div v-show="activeTab === 'data-assets'" class="handover-items">
+            <div v-if="editableDataItems.length === 0" class="items-empty">
+              <p>该课题下暂无数据资产，上传数据文件后可添加到交接清单。</p>
+            </div>
+            <div
+              v-for="row in editableDataItems"
+              :key="row.data_asset_id"
+              class="handover-item"
+              :class="{ selected: row.selected }"
+            >
+              <div class="item-main">
+                <ElSwitch v-model="row.selected" :disabled="!canEditItems" />
+                <div class="item-copy">
+                  <strong>{{ row.display_name || row.file_name }}</strong>
+                  <span class="item-meta-row">
+                    <span class="item-file-name">{{ row.file_name }}</span>
+                    <span class="item-size">{{ formatFileSize(row.file_size) }}</span>
                   </span>
                 </div>
               </div>
@@ -943,4 +1113,79 @@ onMounted(async () => {
     flex-direction: column;
   }
 }
-</style>
+
+.detail-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid var(--dd-line);
+}
+
+.detail-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--dd-muted);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: -2px;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.detail-tab:hover {
+  color: var(--dd-ink);
+}
+
+.detail-tab.active {
+  border-bottom-color: var(--dd-primary);
+  color: var(--dd-primary-strong);
+}
+
+.tab-count {
+  display: inline-flex;
+  align-items: center;
+  min-width: 32px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--dd-surface-soft);
+  color: var(--dd-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.detail-tab.active .tab-count {
+  background: var(--dd-primary-soft);
+  color: var(--dd-primary-strong);
+}
+
+.items-empty {
+  padding: 24px 16px;
+  color: var(--dd-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.item-meta-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.item-file-name {
+  overflow: hidden;
+  color: var(--dd-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-size {
+  flex-shrink: 0;
+  color: var(--dd-muted);
+  font-size: 11px;
+}</style>

@@ -300,6 +300,7 @@ docker compose up -d postgres
 - 已完成全局表格空状态中文化：文档详情（版本/流转）、管理页面（空间/项目/用户/成员）的空表格提示从 "No Data" 改为中文友好文案
 - 已修复流转状态机细节缺陷：`unarchive` 现从 `archived` 正确恢复到 `finalized`，不再错误回退到 `in_progress`
 - 已完成文档流转与毕业交接接口实测：验证 `finalize / archive / unarchive / transfer / accept-transfer` 与 `handover create / items / confirm / complete` 全链路通过
+- 已完成**数据资产模块**首期实现（T1–T5）：新增 `data_folders` / `data_assets` / `graduation_handover_data_items` 数据库表，后端存储层、权限层、domain、repository、service、handler、路由全栈落地；前端新增"数据"页面（位于文档与交接之间），含文件列表、课题/文件夹过滤、XHR 大文件上传进度条、文件夹管理；已通过 `go test ./...` + 前端构建验证
 - 当前下一步聚焦：把当前 Linux 单机运维方案复制到目标正式主机，并复验一次正式环境联调
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

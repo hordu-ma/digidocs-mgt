@@ -5,6 +5,7 @@ import {
   Connection,
   DataBoard,
   Document,
+  Folder,
   Setting,
 } from "@element-plus/icons-vue";
 import { computed } from "vue";
@@ -21,6 +22,7 @@ const isAdmin = computed(() => auth.role === "admin");
 const menus = [
   { label: "总览", path: "/dashboard", icon: DataBoard },
   { label: "文档", path: "/documents", icon: Document },
+  { label: "数据", path: "/data", icon: Folder },
   { label: "交接", path: "/handovers", icon: Connection },
   { label: "助手", path: "/assistant", icon: ChatDotRound },
 ];
@@ -37,6 +39,12 @@ const routeMeta = computed(() => {
     return {
       title: "文档资产库",
       caption: "按课题沉淀团队文档",
+    };
+  }
+  if (path.startsWith("/data")) {
+    return {
+      title: "数据资产库",
+      caption: "以项目为核心的轻量文件仓库",
     };
   }
   if (path.startsWith("/handovers")) {

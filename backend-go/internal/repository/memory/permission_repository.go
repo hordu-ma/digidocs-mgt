@@ -39,3 +39,11 @@ func (r PermissionRepository) CanUpdateHandoverItems(context.Context, string, st
 func (r PermissionRepository) CanApplyHandover(context.Context, string, string, string, string) (bool, error) {
 	return true, nil
 }
+
+func (r PermissionRepository) CanUploadDataAsset(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+
+func (r PermissionRepository) CanManageDataAsset(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}

@@ -277,3 +277,63 @@ type AssistantConversationMessageItem struct {
 	CreatedBy      string         `json:"created_by,omitempty"`
 	CreatedAt      string         `json:"created_at"`
 }
+
+// ========== Data Asset ==========
+
+type DataFolderItem struct {
+	ID        string `json:"id"`
+	ProjectID string `json:"project_id"`
+	ParentID  string `json:"parent_id,omitempty"`
+	Depth     int    `json:"depth"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at"`
+}
+
+type DataAssetListItem struct {
+	ID            string `json:"id"`
+	ProjectID     string `json:"project_id"`
+	ProjectName   string `json:"project_name,omitempty"`
+	FolderID      string `json:"folder_id,omitempty"`
+	FolderName    string `json:"folder_name,omitempty"`
+	DisplayName   string `json:"display_name"`
+	FileName      string `json:"file_name"`
+	MimeType      string `json:"mime_type,omitempty"`
+	FileSize      int64  `json:"file_size"`
+	CreatedByName string `json:"created_by_name,omitempty"`
+	CreatedAt     string `json:"created_at"`
+}
+
+type DataAssetDetail struct {
+	ID                   string `json:"id"`
+	TeamSpaceID          string `json:"team_space_id"`
+	ProjectID            string `json:"project_id"`
+	ProjectName          string `json:"project_name,omitempty"`
+	FolderID             string `json:"folder_id,omitempty"`
+	FolderName           string `json:"folder_name,omitempty"`
+	DisplayName          string `json:"display_name"`
+	FileName             string `json:"file_name"`
+	Description          string `json:"description,omitempty"`
+	MimeType             string `json:"mime_type,omitempty"`
+	FileSize             int64  `json:"file_size"`
+	StorageProvider      string `json:"storage_provider"`
+	StorageObjectKey     string `json:"storage_object_key,omitempty"`
+	CreatedByName        string `json:"created_by_name,omitempty"`
+	CreatedAt            string `json:"created_at"`
+	UpdatedAt            string `json:"updated_at"`
+}
+
+type DataAssetListFilter struct {
+	ProjectID string
+	FolderID  string
+	Keyword   string
+	Page      int
+	PageSize  int
+}
+
+type HandoverDataLine struct {
+	DataAssetID string `json:"data_asset_id"`
+	DisplayName string `json:"display_name,omitempty"`
+	FileName    string `json:"file_name,omitempty"`
+	Selected    bool   `json:"selected"`
+	Note        string `json:"note,omitempty"`
+}

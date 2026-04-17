@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from "vue-router";
 const AssistantView = () => import("@/views/AssistantView.vue");
 const AdminView = () => import("@/views/AdminView.vue");
 const DashboardView = () => import("@/views/DashboardView.vue");
+const DataView = () => import("@/views/DataView.vue");
 const DocumentDetailView = () => import("@/views/DocumentDetailView.vue");
 const DocumentsView = () => import("@/views/DocumentsView.vue");
 const HandoversView = () => import("@/views/HandoversView.vue");
@@ -17,6 +18,7 @@ const router = createRouter({
     { path: "/dashboard", name: "dashboard", component: DashboardView, meta: { requiresAuth: true } },
     { path: "/documents", name: "documents", component: DocumentsView, meta: { requiresAuth: true } },
     { path: "/documents/:id", name: "document-detail", component: DocumentDetailView, meta: { requiresAuth: true } },
+    { path: "/data", name: "data", component: DataView, meta: { requiresAuth: true } },
     { path: "/handovers", name: "handovers", component: HandoversView, meta: { requiresAuth: true } },
     { path: "/assistant", name: "assistant", component: AssistantView, meta: { requiresAuth: true } },
     { path: "/admin", name: "admin", component: AdminView, meta: { requiresAuth: true, requiresAdmin: true } },

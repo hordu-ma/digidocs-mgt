@@ -71,6 +71,8 @@ type PermissionReader interface {
 	CanCreateHandover(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
 	CanUpdateHandoverItems(ctx context.Context, actorID string, actorRole string, handoverID string) (bool, error)
 	CanApplyHandover(ctx context.Context, actorID string, actorRole string, handoverID string, action string) (bool, error)
+	CanUploadDataAsset(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
+	CanManageDataAsset(ctx context.Context, actorID string, actorRole string, dataAssetID string) (bool, error)
 }
 
 type DocumentReader interface {
@@ -89,6 +91,24 @@ type UserAuthReader interface {
 	FindUserByUsername(ctx context.Context, username string) (*auth.UserRecord, error)
 	GetUserProfile(ctx context.Context, userID string) (*auth.UserProfile, error)
 	UpdateUserProfile(ctx context.Context, userID string, input auth.ProfileUpdateInput) (*auth.UserProfile, error)
+}
+
+// ========== Data Asset ==========
+
+type DataAssetReader interface {
+	ListDataAssets(ctx context.Context, filter query.DataAssetListFilter) ([]query.DataAssetListItem, int, error)
+	GetDataAsset(ctx context.Context, id string) (*query.DataAssetDetail, error)
+	ListDataFolders(ctx context.Context, projectID string) ([]query.DataFolderItem, error)
+	ListHandoverDataItems(ctx context.Context, handoverID string) ([]query.HandoverDataLine, error)
+}
+
+type DataAssetWriter interface {
+	CreateDataAsset(ctx context.Context, input command.DataAssetCreateInput) (map[string]any, error)
+	UpdateDataAsset(ctx context.Context, input command.DataAssetUpdateInput) error
+	DeleteDataAsset(ctx context.Context, input command.DataAssetDeleteInput) error
+	CreateDataFolder(ctx context.Context, input command.DataFolderCreateInput) (*query.DataFolderItem, error)
+	DeleteDataFolder(ctx context.Context, id string) error
+	UpdateHandoverDataItems(ctx context.Context, input command.HandoverDataItemUpdateInput) (map[string]any, error)
 }
 
 type AssistantRepository interface {
