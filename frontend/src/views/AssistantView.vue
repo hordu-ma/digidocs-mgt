@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
+import { ChatDotRound } from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import api from "@/api";
@@ -44,6 +45,7 @@ type AssistantRequestItem = {
 
 const question = ref("");
 const loading = ref(false);
+const thinking = ref(false);
 const conversationsLoading = ref(false);
 const messagesLoading = ref(false);
 
@@ -301,6 +303,7 @@ async function pollRequest(requestID: string) {
     const data = res.data?.data as AssistantRequestItem;
     if (data.status === "completed" || data.status === "failed") {
       stopPolling();
+      thinking.value = false;
       await fetchConversations();
       if (activeConversationID.value) {
         await fetchMessages(activeConversationID.value);
@@ -315,6 +318,7 @@ async function pollRequest(requestID: string) {
     }, 2000);
   } catch (err: any) {
     stopPolling();
+    thinking.value = false;
     ElMessage.error(err.response?.data?.message ?? "查询 AI 请求状态失败");
   }
 }
@@ -349,6 +353,7 @@ async function submitQuestion() {
       activeConversationID.value = data.conversation_id;
     }
     question.value = "";
+    thinking.value = true;
     await fetchConversations();
     if (activeConversationID.value) {
       await fetchMessages(activeConversationID.value);
@@ -356,7 +361,6 @@ async function submitQuestion() {
     if (activeRequestID.value) {
       await pollRequest(activeRequestID.value);
     }
-    ElMessage.success("问题已提交");
   } catch (err: any) {
     ElMessage.error(err.response?.data?.message ?? "提交失败");
   } finally {
@@ -425,10 +429,11 @@ onBeforeUnmount(() => {
           </ElSelect>
         </div>
 
-        <ElEmpty
-          v-if="!conversationsLoading && conversations.length === 0"
-          description="暂无会话"
-        />
+        <div v-if="!conversationsLoading && conversations.length === 0" class="empty-state">
+          <el-icon :size="32" color="var(--el-text-color-placeholder)"><ChatDotRound /></el-icon>
+          <p class="empty-title">暂无会话</p>
+          <p class="empty-hint">选择项目后开始您的第一次对话</p>
+        </div>
         <div v-else v-loading="conversationsLoading" class="conversation-list">
           <button
             v-for="item in conversations"
@@ -460,24 +465,31 @@ onBeforeUnmount(() => {
               v-model="question"
               :rows="4"
               type="textarea"
-              placeholder="请输入您想问的问题…"
+              :disabled="thinking"
+              :placeholder="thinking ? 'AI 正在思考，请稍候…' : '请输入您想问的问题…'"
             />
             <div class="assistant-actions">
               <ElTag v-if="selectedProjectID || selectedDocumentID" size="default" type="info" disable-transitions>
                 {{ composerScopeLabel }}
               </ElTag>
               <span v-else class="assistant-hint">请先在左侧选择项目或文档</span>
-              <ElButton type="primary" :loading="loading" @click="submitQuestion">发送问题</ElButton>
+              <ElButton
+                type="primary"
+                :loading="loading"
+                :disabled="thinking"
+                @click="submitQuestion"
+              >{{ thinking ? 'AI 思考中…' : '发送问题' }}</ElButton>
             </div>
           </div>
         </ElCard>
 
         <ElCard class="page-card">
           <template #header>消息流</template>
-          <ElEmpty
-            v-if="!messagesLoading && messages.length === 0"
-            description="发起问题后会在这里显示会话消息"
-          />
+          <div v-if="!messagesLoading && messages.length === 0 && !thinking" class="empty-state">
+            <el-icon :size="36" color="var(--el-text-color-placeholder)"><ChatDotRound /></el-icon>
+            <p class="empty-title">暂无消息</p>
+            <p class="empty-hint">选择左侧会话或发起新提问，消息将显示在这里</p>
+          </div>
           <div v-else v-loading="messagesLoading" class="message-list">
             <div
               v-for="item in messages"
@@ -503,6 +515,18 @@ onBeforeUnmount(() => {
                     <div>OpenClaw ID：{{ item.metadata?.upstream_request_id || "-" }}</div>
                   </div>
                 </details>
+              </div>
+            </div>
+            <!-- AI 思考中占位气泡 -->
+            <div v-if="thinking" class="message-item assistant thinking-bubble">
+              <div class="message-meta">
+                <ElTag size="small" type="success">AI</ElTag>
+                <span>正在思考…</span>
+              </div>
+              <div class="thinking-dots">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
               </div>
             </div>
           </div>
@@ -668,5 +692,57 @@ onBeforeUnmount(() => {
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  text-align: center;
+}
+
+.empty-title {
+  margin: 12px 0 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-regular);
+}
+
+.empty-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--el-text-color-placeholder);
+}
+
+/* thinking bubble animation */
+.thinking-bubble {
+  background: #f8fbff;
+}
+
+.thinking-dots {
+  display: flex;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.thinking-dots .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--el-color-primary);
+  opacity: 0.4;
+  animation: thinking-bounce 1.4s infinite ease-in-out both;
+}
+
+.thinking-dots .dot:nth-child(1) { animation-delay: 0s; }
+.thinking-dots .dot:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots .dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes thinking-bounce {
+  0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
 }
 </style>

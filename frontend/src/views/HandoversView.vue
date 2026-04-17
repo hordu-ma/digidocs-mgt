@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
+import { Document as DocumentIcon } from "@element-plus/icons-vue";
 import { computed, onMounted, reactive, ref } from "vue";
 
 import AppLayout from "@/components/AppLayout.vue";
@@ -294,7 +295,11 @@ onMounted(async () => {
             </template>
           </ElTableColumn>
         </ElTable>
-        <ElEmpty v-else description="暂无交接记录" />
+        <div v-else class="empty-state">
+          <el-icon :size="36" color="var(--el-text-color-placeholder)"><DocumentIcon /></el-icon>
+          <p class="empty-title">暂无交接记录</p>
+          <p class="empty-hint">点击上方「新建交接」创建第一条交接单</p>
+        </div>
       </ElCard>
 
       <ElDialog v-model="showDialog" title="创建交接单" width="520px">
@@ -499,6 +504,28 @@ p {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  text-align: center;
+}
+
+.empty-title {
+  margin: 12px 0 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-regular);
+}
+
+.empty-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--el-text-color-placeholder);
 }
 
 @media (max-width: 900px) {

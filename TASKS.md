@@ -355,6 +355,13 @@
   - 记忆来源描述由英文 key 改为中文友好文案（"2 条历史对话、1 条已确认建议"）
   - 时间戳改为相对时间显示（鼠标悬停显示精确时间）
   - 后端 `ListConversations` / `GetConversation` 新增 `scope_display_name` 字段（JOIN projects/documents 获取名称）
+- 完成 Assistant 消息流 AI 思考中交互优化
+  - 提交后显示 AI 思考中占位气泡（三点呼吸动画）
+  - 发送按钮变为「AI 思考中…」并禁用输入区
+  - polling 结束后自动移除占位气泡并刷新真实消息
+- 完成全局空状态组件化替换
+  - 替换所有 ElEmpty 为轻量级引导空状态（小图标 + 引导文案）
+  - 覆盖 AssistantView（会话列表、消息流）和 HandoversView（交接记录）
 
 ## 进行中
 
