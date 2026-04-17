@@ -47,6 +47,7 @@ const projects = ref<ProjectOption[]>([]);
 const folderOptions = ref<FolderOption[]>([]);
 const referenceLoading = ref(false);
 const collapsedGroups = ref<Set<string>>(new Set());
+const allProjects = ref<{ id: string; name: string }[]>([]);
 
 const statusLabel: Record<string, string> = {
   draft: "草稿",
@@ -76,6 +77,10 @@ type DocumentGroup = {
 
 const groupedDocuments = computed<DocumentGroup[]>(() => {
   const groups = new Map<string, any[]>();
+  // Seed with all projects the user has access to
+  for (const p of allProjects.value) {
+    if (!groups.has(p.name)) groups.set(p.name, []);
+  }
   for (const doc of rows.value) {
     const key = doc.project_name || "未分类";
     if (!groups.has(key)) groups.set(key, []);
@@ -244,7 +249,12 @@ async function handleProjectChange(projectID: string) {
 }
 
 onMounted(async () => {
-  await Promise.all([fetchDocuments(), fetchReferenceData()]);
+  const [, , projRes] = await Promise.all([
+    fetchDocuments(),
+    fetchReferenceData(),
+    api.get("/projects"),
+  ]);
+  allProjects.value = (projRes.data?.data ?? []).map((p: any) => ({ id: p.id, name: p.name }));
 });
 </script>
 
@@ -289,8 +299,14 @@ onMounted(async () => {
               <span class="group-name">{{ group.projectName }}</span>
               <ElTag size="small" type="info" disable-transitions>{{ group.documents.length }} 篇</ElTag>
             </div>
+            <div
+              v-if="group.documents.length === 0 && !collapsedGroups.has(group.projectName)"
+              class="empty-project-hint"
+            >
+              暂无文档，点击右上角「新建文档」添加
+            </div>
             <ElTable
-              v-show="!collapsedGroups.has(group.projectName)"
+              v-show="!collapsedGroups.has(group.projectName) && group.documents.length > 0"
               :data="group.documents"
               style="width: 100%"
               @row-click="goDetail"
@@ -495,6 +511,13 @@ p {
 
 .empty-hint {
   margin: 0;
+  font-size: 13px;
+  color: var(--el-text-color-placeholder);
+}
+
+.empty-project-hint {
+  padding: 24px 16px;
+  text-align: center;
   font-size: 13px;
   color: var(--el-text-color-placeholder);
 }

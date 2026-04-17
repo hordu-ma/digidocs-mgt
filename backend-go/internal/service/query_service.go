@@ -25,16 +25,16 @@ func NewQueryService(
 	}
 }
 
-func (s QueryService) ListTeamSpaces(ctx context.Context) ([]query.TeamSpaceSummary, error) {
-	return s.teamSpaces.ListTeamSpaces(ctx)
+func (s QueryService) ListTeamSpaces(ctx context.Context, actorID, actorRole string) ([]query.TeamSpaceSummary, error) {
+	return s.teamSpaces.ListTeamSpaces(ctx, actorID, actorRole)
 }
 
 func (s QueryService) ListUsers(ctx context.Context) ([]query.UserOption, error) {
 	return s.users.ListUsers(ctx)
 }
 
-func (s QueryService) ListProjects(ctx context.Context, teamSpaceID string) ([]query.ProjectSummary, error) {
-	return s.projects.ListProjects(ctx, teamSpaceID)
+func (s QueryService) ListProjects(ctx context.Context, teamSpaceID, actorID, actorRole string) ([]query.ProjectSummary, error) {
+	return s.projects.ListProjects(ctx, teamSpaceID, actorID, actorRole)
 }
 
 func (s QueryService) GetFolderTree(ctx context.Context, projectID string) ([]query.FolderTreeNode, error) {

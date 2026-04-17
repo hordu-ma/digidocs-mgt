@@ -12,7 +12,7 @@ func NewProjectRepository() ProjectRepository {
 	return ProjectRepository{}
 }
 
-func (r ProjectRepository) ListProjects(ctx context.Context, teamSpaceID string) ([]query.ProjectSummary, error) {
+func (r ProjectRepository) ListProjects(ctx context.Context, teamSpaceID, actorID, actorRole string) ([]query.ProjectSummary, error) {
 	_ = ctx
 
 	return []query.ProjectSummary{

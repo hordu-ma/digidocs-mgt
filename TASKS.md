@@ -381,6 +381,11 @@
 - 修复管理页面布局与空状态细节
   - AdminView 补齐 AppLayout 包裹，修复左侧无边距贴边问题
   - 总览页近期流转表格空状态改为中文友好提示
+- 完成权限过滤与空项目可见性优化
+  - 后端 `ListTeamSpaces` / `ListProjects` 接口新增 `actorID` / `actorRole` 参数
+  - admin 角色可见全部空间与项目，非 admin 用户仅可见其所属项目及关联空间（通过 JOIN project_members 过滤）
+  - 文档页合并项目列表与文档分组，空项目也会显示卡片并提示"暂无文档"
+  - 已通过 curl 验证：admin 可见全部、maliguo 可见两个项目、liuzongyou 仅可见 err-graph
 
 ## 进行中
 

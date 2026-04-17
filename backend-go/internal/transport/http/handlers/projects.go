@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"digidocs-mgt/backend-go/internal/service"
+	"digidocs-mgt/backend-go/internal/transport/http/middleware"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
 )
 
@@ -16,7 +17,9 @@ func NewProjectHandler(queryService service.QueryService) ProjectHandler {
 }
 
 func (h ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
-	items, err := h.queryService.ListProjects(r.Context(), r.URL.Query().Get("team_space_id"))
+	actorID := middleware.UserIDFromContext(r.Context())
+	actorRole := middleware.UserRoleFromContext(r.Context())
+	items, err := h.queryService.ListProjects(r.Context(), r.URL.Query().Get("team_space_id"), actorID, actorRole)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list projects")
 		return

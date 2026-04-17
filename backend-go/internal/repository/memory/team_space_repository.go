@@ -12,7 +12,7 @@ func NewTeamSpaceRepository() TeamSpaceRepository {
 	return TeamSpaceRepository{}
 }
 
-func (r TeamSpaceRepository) ListTeamSpaces(ctx context.Context) ([]query.TeamSpaceSummary, error) {
+func (r TeamSpaceRepository) ListTeamSpaces(ctx context.Context, actorID, actorRole string) ([]query.TeamSpaceSummary, error) {
 	_ = ctx
 
 	return []query.TeamSpaceSummary{

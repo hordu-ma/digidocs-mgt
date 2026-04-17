@@ -10,7 +10,7 @@ import (
 )
 
 type TeamSpaceReader interface {
-	ListTeamSpaces(ctx context.Context) ([]query.TeamSpaceSummary, error)
+	ListTeamSpaces(ctx context.Context, actorID, actorRole string) ([]query.TeamSpaceSummary, error)
 }
 
 type UserReader interface {
@@ -18,7 +18,7 @@ type UserReader interface {
 }
 
 type ProjectReader interface {
-	ListProjects(ctx context.Context, teamSpaceID string) ([]query.ProjectSummary, error)
+	ListProjects(ctx context.Context, teamSpaceID, actorID, actorRole string) ([]query.ProjectSummary, error)
 	GetFolderTree(ctx context.Context, projectID string) ([]query.FolderTreeNode, error)
 }
 

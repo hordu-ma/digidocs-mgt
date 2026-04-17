@@ -14,24 +14,26 @@ func NewProjectRepository(db DBTX) ProjectRepository {
 	return ProjectRepository{db: db}
 }
 
-func (r ProjectRepository) ListProjects(ctx context.Context, teamSpaceID string) ([]query.ProjectSummary, error) {
-	rows, err := r.db.QueryContext(
-		ctx,
-		`
-		SELECT
-			p.id::text,
-			p.team_space_id::text,
-			p.name,
-			p.code,
-			u.id::text,
-			u.display_name
-		FROM projects p
-		JOIN users u ON u.id = p.owner_id
-		WHERE ($1 = '' OR p.team_space_id::text = $1)
-		ORDER BY p.name ASC
-		`,
-		teamSpaceID,
-	)
+func (r ProjectRepository) ListProjects(ctx context.Context, teamSpaceID, actorID, actorRole string) ([]query.ProjectSummary, error) {
+	var q string
+	var args []any
+	if actorRole == "admin" {
+		q = `SELECT p.id::text, p.team_space_id::text, p.name, p.code, u.id::text, u.display_name
+			FROM projects p
+			JOIN users u ON u.id = p.owner_id
+			WHERE ($1 = '' OR p.team_space_id::text = $1)
+			ORDER BY p.name ASC`
+		args = append(args, teamSpaceID)
+	} else {
+		q = `SELECT p.id::text, p.team_space_id::text, p.name, p.code, u.id::text, u.display_name
+			FROM projects p
+			JOIN users u ON u.id = p.owner_id
+			JOIN project_members pm ON pm.project_id = p.id
+			WHERE pm.user_id = $1::uuid AND ($2 = '' OR p.team_space_id::text = $2)
+			ORDER BY p.name ASC`
+		args = append(args, actorID, teamSpaceID)
+	}
+	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
