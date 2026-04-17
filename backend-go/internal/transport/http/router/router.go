@@ -54,6 +54,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 
 	// --- Protected routes (JWT required) ---
 	mux.Handle("GET "+cfg.APIV1Prefix+"/auth/me", protect(authHandler.Me))
+	mux.Handle("PATCH "+cfg.APIV1Prefix+"/auth/me", protect(authHandler.UpdateMe))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/logout", protect(authHandler.Logout))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/users", protect(userHandler.List))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/assistant/conversations", protect(assistantHandler.CreateConversation))

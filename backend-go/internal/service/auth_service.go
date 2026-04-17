@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -46,4 +47,38 @@ func (s AuthService) Login(ctx context.Context, username, password string) (stri
 	}
 
 	return token, claims, nil
+}
+
+func (s AuthService) GetProfile(ctx context.Context, userID string) (*auth.UserProfile, error) {
+	if strings.TrimSpace(userID) == "" {
+		return nil, ErrUnauthorized
+	}
+	return s.userRepo.GetUserProfile(ctx, userID)
+}
+
+func (s AuthService) UpdateProfile(ctx context.Context, userID string, input auth.ProfileUpdateInput) (*auth.UserProfile, error) {
+	if strings.TrimSpace(userID) == "" {
+		return nil, ErrUnauthorized
+	}
+
+	normalized := auth.ProfileUpdateInput{
+		DisplayName: strings.TrimSpace(input.DisplayName),
+		Email:       strings.TrimSpace(input.Email),
+		Phone:       strings.TrimSpace(input.Phone),
+		Wechat:      strings.TrimSpace(input.Wechat),
+	}
+	if normalized.DisplayName == "" {
+		return nil, ErrValidation
+	}
+	if len([]rune(normalized.DisplayName)) > 64 ||
+		len(normalized.Email) > 128 ||
+		len(normalized.Phone) > 32 ||
+		len(normalized.Wechat) > 64 {
+		return nil, ErrValidation
+	}
+	if normalized.Email != "" && !strings.Contains(normalized.Email, "@") {
+		return nil, ErrValidation
+	}
+
+	return s.userRepo.UpdateUserProfile(ctx, userID, normalized)
 }

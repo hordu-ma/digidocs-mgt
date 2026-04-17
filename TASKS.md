@@ -368,6 +368,9 @@
   - 已在 `docs/部署准备与运行说明.md` 记录最终 TLS / 反向代理 / 防火墙部署口径
   - 已新增并安装持久化运维资产：`ops/systemd/digidocs-route-fix.sh`、`ops/systemd/tailscaled-digidocs-routing.conf`、`scripts/codex/install-persistent-routing.sh`
   - 已在当前机器验证 `systemctl restart tailscaled` 后 `table 52` 仍保持 `throw 172.17.0.0/16`、`throw 172.18.0.0/16`、`throw 192.168.1.0/24`
+  - 已补充 RustDesk / 本机浏览器访问 `18080/18081` 超时的排查、临时修复与复发处理说明
+  - 已补充同一局域网用户访问方式：联调阶段使用宿主机局域网 IP 加 `18080` 访问前端
+  - 已补充登录后个人信息维护能力：`GET/PATCH /api/v1/auth/me` 支持当前用户读取和更新显示姓名、手机号、微信号和邮箱
 
 ## 待办
 

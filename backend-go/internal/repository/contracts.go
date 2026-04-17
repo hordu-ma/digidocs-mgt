@@ -87,6 +87,8 @@ type DocumentWriter interface {
 
 type UserAuthReader interface {
 	FindUserByUsername(ctx context.Context, username string) (*auth.UserRecord, error)
+	GetUserProfile(ctx context.Context, userID string) (*auth.UserProfile, error)
+	UpdateUserProfile(ctx context.Context, userID string, input auth.ProfileUpdateInput) (*auth.UserProfile, error)
 }
 
 type AssistantRepository interface {

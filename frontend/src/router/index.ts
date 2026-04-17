@@ -6,6 +6,7 @@ import DocumentDetailView from "@/views/DocumentDetailView.vue";
 import DocumentsView from "@/views/DocumentsView.vue";
 import HandoversView from "@/views/HandoversView.vue";
 import LoginView from "@/views/LoginView.vue";
+import ProfileView from "@/views/ProfileView.vue";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -17,6 +18,7 @@ const router = createRouter({
     { path: "/documents/:id", name: "document-detail", component: DocumentDetailView, meta: { requiresAuth: true } },
     { path: "/handovers", name: "handovers", component: HandoversView, meta: { requiresAuth: true } },
     { path: "/assistant", name: "assistant", component: AssistantView, meta: { requiresAuth: true } },
+    { path: "/profile", name: "profile", component: ProfileView, meta: { requiresAuth: true } },
   ],
 });
 
@@ -28,4 +30,3 @@ router.beforeEach((to) => {
 });
 
 export default router;
-

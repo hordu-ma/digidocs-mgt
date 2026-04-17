@@ -164,6 +164,8 @@ docker compose --profile app up -d backend-go backend-py-worker frontend
 - 本地开发模板：[.env.example](.env.example)
 - 生产部署模板：[.env.production.example](.env.production.example)
 - 部署说明：[部署准备与运行说明](docs/部署准备与运行说明.md)
+- 同一局域网用户联调访问示例：`http://192.168.1.142:18080`，实际地址以宿主机 `hostname -I` 输出的局域网 IP 为准。
+- RustDesk 或本机浏览器访问 `18080/18081` 超时时，按部署说明中的“前端 18080 / 后端 18081 访问超时排查”处理。
 
 ### Codex 协作环境
 
@@ -279,6 +281,8 @@ docker compose up -d postgres
 - 已重建 `frontend` 运行容器到当前仓库版本，并完成一轮前端无头联调：已覆盖总览、文档列表、文档详情、交接页、助手页与问答提交主路径
 - 已记录最终部署口径：TLS 终止在应用层反向代理，前端/后端容器仅走内网转发；群晖 `5001/5432` 仅对应用层主机放通
 - 已完成宿主机持久化运维配置安装与验证：`install-persistent-routing.sh`、`digidocs-route-fix.sh` 与 `tailscaled` drop-in 已在当前机器落地，`systemctl restart tailscaled` 后 `table 52` 仍保持 `throw 172.17/172.18/192.168.1`
+- 已补充 RustDesk / 本机浏览器访问 `18080/18081` 超时的排查与临时修复说明，复用现有 `digidocs-route-fix.sh` 路由修正脚本
+- 已补充登录后个人信息维护能力：当前用户可自助更新显示姓名、手机号、微信号和邮箱，账号、角色、状态与权限保持只读
 - 当前下一步聚焦：把当前 Linux 单机运维方案复制到目标正式主机，并复验一次正式环境联调
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

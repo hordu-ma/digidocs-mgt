@@ -30,6 +30,7 @@ async function submit() {
     auth.login({
       token: data.access_token,
       id: data.user.id,
+      username: data.user.username,
       displayName: data.user.display_name,
       role: data.user.role,
     });

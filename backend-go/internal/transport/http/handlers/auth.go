@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"digidocs-mgt/backend-go/internal/domain/auth"
 	"digidocs-mgt/backend-go/internal/service"
 	"digidocs-mgt/backend-go/internal/transport/http/request"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
@@ -67,13 +68,57 @@ func (h AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteData(w, http.StatusOK, map[string]any{
-		"id":            claims.UserID,
-		"username":      claims.Username,
-		"display_name":  claims.DisplayName,
-		"role":          claims.Role,
-		"last_login_at": nil,
+	profile, err := h.authService.GetProfile(r.Context(), claims.UserID)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to load current user")
+		return
+	}
+
+	response.WriteData(w, http.StatusOK, profile)
+}
+
+func (h AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	token := service.ExtractBearerToken(r.Header.Get("Authorization"))
+	if token == "" {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "missing bearer token")
+		return
+	}
+
+	claims, err := h.tokenService.Parse(token)
+	if err != nil {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid bearer token")
+		return
+	}
+
+	var payload request.UpdateProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid request body")
+		return
+	}
+
+	profile, err := h.authService.UpdateProfile(r.Context(), claims.UserID, auth.ProfileUpdateInput{
+		DisplayName: payload.DisplayName,
+		Email:       payload.Email,
+		Phone:       payload.Phone,
+		Wechat:      payload.Wechat,
 	})
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrValidation):
+			response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid profile data")
+		case errors.Is(err, service.ErrNotFound):
+			response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found")
+		default:
+			response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update current user")
+		}
+		return
+	}
+
+	response.WriteData(w, http.StatusOK, profile)
 }
 
 func (h AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
@@ -83,4 +128,3 @@ func (h AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 	})
 }
-

@@ -754,4 +754,28 @@ func TestAuth_Me(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
 	}
+	result := parseResponse(t, rec)
+	data, _ := result["data"].(map[string]any)
+	if data["email"] == "" || data["phone"] == "" || data["wechat"] == "" {
+		t.Fatalf("expected contact fields in current user profile, got %#v", data)
+	}
+}
+
+func TestAuth_UpdateMe(t *testing.T) {
+	handler, token := testServer(t)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, authedRequest("PATCH", "/api/v1/auth/me", jsonBody(map[string]string{
+		"display_name": "测试管理员",
+		"email":        "admin@example.com",
+		"phone":        "13900000000",
+		"wechat":       "admin_new",
+	}), token))
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	result := parseResponse(t, rec)
+	data, _ := result["data"].(map[string]any)
+	if data["display_name"] != "测试管理员" || data["wechat"] != "admin_new" {
+		t.Fatalf("expected updated profile data, got %#v", data)
+	}
 }

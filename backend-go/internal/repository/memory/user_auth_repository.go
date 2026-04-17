@@ -59,3 +59,37 @@ func (r UserAuthRepository) FindUserByUsername(_ context.Context, username strin
 		Role:         "admin",
 	}, nil
 }
+
+func (r UserAuthRepository) GetUserProfile(_ context.Context, userID string) (*auth.UserProfile, error) {
+	if userID != "00000000-0000-0000-0000-000000000001" {
+		return nil, service.ErrNotFound
+	}
+
+	return &auth.UserProfile{
+		ID:          userID,
+		Username:    r.username,
+		DisplayName: "开发管理员",
+		Role:        "admin",
+		Email:       "admin@example.com",
+		Phone:       "13800000000",
+		Wechat:      "admin_wechat",
+		Status:      "active",
+	}, nil
+}
+
+func (r UserAuthRepository) UpdateUserProfile(_ context.Context, userID string, input auth.ProfileUpdateInput) (*auth.UserProfile, error) {
+	if userID != "00000000-0000-0000-0000-000000000001" {
+		return nil, service.ErrNotFound
+	}
+
+	return &auth.UserProfile{
+		ID:          userID,
+		Username:    r.username,
+		DisplayName: input.DisplayName,
+		Role:        "admin",
+		Email:       input.Email,
+		Phone:       input.Phone,
+		Wechat:      input.Wechat,
+		Status:      "active",
+	}, nil
+}

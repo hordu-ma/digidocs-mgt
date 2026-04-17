@@ -75,12 +75,58 @@
     "username": "zhangsan",
     "display_name": "张三",
     "role": "member",
+    "email": "zhangsan@example.com",
+    "phone": "13800000000",
+    "wechat": "zhangsan_wechat",
+    "status": "active",
     "last_login_at": "2026-04-03T10:00:00Z"
   }
 }
 ```
 
-### 2.3 退出登录
+### 2.3 更新当前用户资料
+
+`PATCH /api/v1/auth/me`
+
+仅允许当前登录用户更新个人显示名称与联系方式，不允许通过该接口修改 `username`、`role`、`status` 或项目级权限。
+
+请求体：
+
+```json
+{
+  "display_name": "张三",
+  "email": "zhangsan@example.com",
+  "phone": "13800000000",
+  "wechat": "zhangsan_wechat"
+}
+```
+
+响应体：
+
+```json
+{
+  "data": {
+    "id": "uuid",
+    "username": "zhangsan",
+    "display_name": "张三",
+    "role": "member",
+    "email": "zhangsan@example.com",
+    "phone": "13800000000",
+    "wechat": "zhangsan_wechat",
+    "status": "active",
+    "last_login_at": "2026-04-03T10:00:00Z"
+  }
+}
+```
+
+校验规则：
+
+- `display_name` 必填，最长 64 字符；
+- `email`、`phone`、`wechat` 可为空，长度分别不超过 128 / 32 / 64；
+- 非空 `email` 需包含 `@`；
+- 权限、角色和账号状态仍由管理员侧用户管理能力维护。
+
+### 2.4 退出登录
 
 `POST /api/v1/auth/logout`
 

@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { useRoute } from "vue-router";
+import { ArrowDown } from "@element-plus/icons-vue";
+import { useRoute, useRouter } from "vue-router";
+
+import { useAuthStore } from "@/stores/auth";
 
 const route = useRoute();
+const router = useRouter();
+const auth = useAuthStore();
 
 const menus = [
   { label: "总览", path: "/dashboard" },
@@ -9,6 +14,17 @@ const menus = [
   { label: "交接", path: "/handovers" },
   { label: "助手", path: "/assistant" },
 ];
+
+function handleUserCommand(command: string) {
+  if (command === "profile") {
+    void router.push("/profile");
+    return;
+  }
+  if (command === "logout") {
+    auth.logout();
+    void router.push("/login");
+  }
+}
 </script>
 
 <template>
@@ -34,6 +50,25 @@ const menus = [
       </nav>
     </aside>
     <main class="content">
+      <header class="topbar">
+        <div></div>
+        <ElDropdown trigger="click" @command="handleUserCommand">
+          <button class="user-menu" type="button">
+            <span class="user-avatar">{{ auth.displayName.slice(0, 1) || "用" }}</span>
+            <span class="user-meta">
+              <span class="user-name">{{ auth.displayName || auth.username || "当前用户" }}</span>
+              <span class="user-role">{{ auth.role || "-" }}</span>
+            </span>
+            <ElIcon><ArrowDown /></ElIcon>
+          </button>
+          <template #dropdown>
+            <ElDropdownMenu>
+              <ElDropdownItem command="profile">个人信息</ElDropdownItem>
+              <ElDropdownItem divided command="logout">退出登录</ElDropdownItem>
+            </ElDropdownMenu>
+          </template>
+        </ElDropdown>
+      </header>
       <slot />
     </main>
   </div>
@@ -100,6 +135,53 @@ const menus = [
 
 .content {
   padding: 24px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.user-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid rgba(16, 36, 62, 0.1);
+  border-radius: 12px;
+  background: #fff;
+  color: #10243e;
+  cursor: pointer;
+}
+
+.user-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #123e73;
+  color: #fff;
+  font-weight: 700;
+}
+
+.user-meta {
+  display: grid;
+  min-width: 88px;
+  text-align: left;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.user-role {
+  color: #61748d;
+  font-size: 12px;
 }
 
 @media (max-width: 900px) {
