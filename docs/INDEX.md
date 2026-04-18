@@ -18,6 +18,7 @@
 | [frontend代码说明.md](frontend代码说明.md) | frontend 目录逐文件职责说明与前端页面协作链路说明 |
 | [项目端到端总览.md](项目端到端总览.md) | 从前端、Go、Worker、群晖、数据库到 OpenClaw 的整体业务与实现链路总览 |
 | [digidocs-mgt-customer-intro.md](digidocs-mgt-customer-intro.md) | 面向课题组负责人的产品介绍、部署清单与基础预算口径 |
+| [用户使用说明.md](用户使用说明.md) | 面向团队负责人和成员的平台功能使用说明（按模块逐一说明） |
 
 ## 架构决策记录（ADR）
 
