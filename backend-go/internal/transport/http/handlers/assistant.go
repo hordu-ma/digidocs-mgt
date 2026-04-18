@@ -212,7 +212,7 @@ func (h AssistantHandler) GetRequest(w http.ResponseWriter, r *http.Request) {
 
 func (h AssistantHandler) ListRequests(w http.ResponseWriter, r *http.Request) {
 	page := parseIntOrDefault(r.URL.Query().Get("page"), 1)
-	pageSize := parseIntOrDefault(r.URL.Query().Get("page_size"), 20)
+	pageSize := parsePageSize(r.URL.Query().Get("page_size"))
 
 	items, total, err := h.service.ListRequests(r.Context(), query.AssistantRequestFilter{
 		RequestType:    r.URL.Query().Get("request_type"),

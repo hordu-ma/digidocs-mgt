@@ -415,6 +415,16 @@
   - 根因：`HandoversView.loadProjectDataAssets` 解析响应用 `res.data?.data`，但 `/data-assets` 返回格式为 `{ data: { items, total } }`，导致 `buildEditableDataItems` 对非数组调 `.map()` 抛 TypeError
   - 修复：改为 `res.data?.data?.items ?? []`，对齐实际响应结构
 
+- 完成交付前安全与可靠性加固
+  - HTTP 服务器新增 `WriteTimeout: 5min`、`IdleTimeout: 2min`，防止慢速客户端占用连接
+  - PostgreSQL 连接池配置：`MaxOpenConns=25`、`MaxIdleConns=10`、`ConnMaxLifetime=5min`
+  - postgres queue `Poll()` 前自动将卡住超过 10 分钟的 `running` 任务重置为 `pending`，防止 Worker 崩溃后任务永久丢失
+  - 分页接口统一新增 `page_size` 上限（200），防止全表扫描
+  - `docker-compose.yml` postgres 服务新增 healthcheck，`backend-go` 改为 `condition: service_healthy` 依赖
+  - 生产模式新增 `CORS_ALLOW_ORIGINS != "*"` 启动校验
+  - 移除顶部导航栏冗余"新建工作"按钮（`AppLayout.vue`），同步清理未使用的 `Plus` 图标导入
+  - 已通过 `go build ./...`、`go test ./...`、`npm run build` 全量验证，容器已重建
+
 ## 待办
 
 - ~~跑通 Alembic 初始迁移~~ ✅ 已完成

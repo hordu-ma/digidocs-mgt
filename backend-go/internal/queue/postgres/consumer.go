@@ -24,6 +24,18 @@ func (c Consumer) Poll(ctx context.Context, limit int) []task.Message {
 		limit = 10
 	}
 
+	// Recover tasks stuck in 'running' for more than 10 minutes (e.g. worker crash).
+	_, recoverErr := c.db.ExecContext(
+		ctx,
+		`UPDATE assistant_requests
+		 SET status = 'pending', updated_at = NOW()
+		 WHERE status = 'running'
+		   AND updated_at < NOW() - INTERVAL '10 minutes'`,
+	)
+	if recoverErr != nil {
+		log.Printf("postgres-queue recover-running failed: %v", recoverErr)
+	}
+
 	tx, err := c.db.BeginTx(ctx, nil)
 	if err != nil {
 		log.Printf("postgres-queue begin tx failed: %v", err)

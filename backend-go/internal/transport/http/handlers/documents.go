@@ -130,7 +130,7 @@ func (h DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 		Keyword:         r.URL.Query().Get("keyword"),
 		IncludeArchived: r.URL.Query().Get("include_archived") == "true",
 		Page:            parseIntOrDefault(r.URL.Query().Get("page"), 1),
-		PageSize:        parseIntOrDefault(r.URL.Query().Get("page_size"), 20),
+		PageSize:        parsePageSize(r.URL.Query().Get("page_size")),
 	}
 
 	items, total, err := h.service.ListDocuments(r.Context(), filter)
@@ -267,4 +267,14 @@ func parseIntOrDefault(raw string, fallback int) int {
 	}
 
 	return value
+}
+
+const maxPageSize = 200
+
+func parsePageSize(raw string) int {
+	size := parseIntOrDefault(raw, 20)
+	if size > maxPageSize {
+		size = maxPageSize
+	}
+	return size
 }

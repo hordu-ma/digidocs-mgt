@@ -8,7 +8,6 @@ import {
   DataBoard,
   Document,
   Folder,
-  Plus,
   Search,
   Setting,
 } from "@element-plus/icons-vue";
@@ -238,10 +237,6 @@ onBeforeUnmount(() => {
             <ElIcon><Search /></ElIcon>
             <span>搜索 / 跳转</span>
             <span class="app-kbd">Ctrl K</span>
-          </button>
-          <button class="quick-create" type="button" @click="router.push('/documents')">
-            <ElIcon><Plus /></ElIcon>
-            <span>新建工作</span>
           </button>
           <span class="topbar-signal">
             <ElIcon><Bell /></ElIcon>

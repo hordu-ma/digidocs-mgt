@@ -18,7 +18,7 @@ func NewAuditEventHandler(queryService service.AuditQueryService) AuditEventHand
 
 func (h AuditEventHandler) List(w http.ResponseWriter, r *http.Request) {
 	page := parseIntOrDefault(r.URL.Query().Get("page"), 1)
-	pageSize := parseIntOrDefault(r.URL.Query().Get("page_size"), 20)
+	pageSize := parsePageSize(r.URL.Query().Get("page_size"))
 
 	items, total, err := h.queryService.List(r.Context(), query.AuditEventFilter{
 		ProjectID:  r.URL.Query().Get("project_id"),

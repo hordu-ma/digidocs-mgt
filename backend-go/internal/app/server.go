@@ -21,5 +21,7 @@ func NewServer(cfg config.Config) (*http.Server, error) {
 		Addr:              cfg.HTTPAddr,
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      5 * time.Minute,
+		IdleTimeout:       2 * time.Minute,
 	}, nil
 }

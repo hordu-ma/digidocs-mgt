@@ -59,6 +59,9 @@ func Load() Config {
 		if cfg.WorkerCallbackToken == "replace-me" {
 			log.Fatal("FATAL: WORKER_CALLBACK_TOKEN must be set to a secure value in production")
 		}
+		if cfg.CORSAllowOrigins == "*" {
+			log.Fatal("FATAL: CORS_ALLOW_ORIGINS must not be '*' in production")
+		}
 	}
 
 	return cfg
