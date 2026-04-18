@@ -228,7 +228,7 @@ docker compose up -d postgres
 - 已实际跑通 `make verify`，当前通过 Go 测试、Python Worker 测试与前端构建验证
 - 已完成第三阶段自动化门禁骨架：本地 hooks、GitHub Actions、状态报告与联调 smoke 脚本
 - 已启用仓库本地 `.githooks`，并已跑通 `make status`
-- 已执行 `make smoke`，当前容器存在但宿主机 `18081/healthz` 不可达，脚本按非严格模式跳过
+- 已跑通 `STRICT_SMOKE=1 make smoke`，当前覆盖登录、文档查询、Dashboard、交接、审计、版本上传/下载/预览、Assistant 完成态与群晖前置验收
 - 已完成 `AGENTS.md` 会话启动清单、状态账本同步规则与验证约束增强
 - 已完成 Harness Engineering 学习笔记初版（后续已迁移至 Obsidian）
 - 已完成数据库种子数据创建与加载（`backend-go/sql/seed.sql`）
@@ -258,6 +258,7 @@ docker compose up -d postgres
 - 已完成群晖前置验收 smoke 收口：`make smoke` 现可选直连 DSM / File Station API 做登录、上传、下载、共享链接与清理
 - 已补群晖 HTTPS 受控兼容开关：自签名证书环境可通过 `SYNOLOGY_INSECURE_SKIP_VERIFY=true` 临时接入 Go 服务
 - 已完成版本文件链路强化验证：`make smoke` 已覆盖现有文档的版本上传、下载与预览闭环
+- 已修正 smoke 对 `assistant.ask` 的默认轮询容忍度，避免 OpenClaw 正常但响应稍慢时被误判失败
 - 已补 Synology provider 分层契约测试与 memory 存储版本仓储联动，上传后再查询/下载/预览不再依赖静态占位返回
 - 已完成 P1 AI 持久化闭环首轮修复（`assistant_requests` 落库、Worker 回调幂等更新、`assistant_suggestions` 查询/确认/忽略真实接线）
 - 已完成 P2 持久化任务消费与 AI 结果展示首轮修复（PostgreSQL 任务轮询、摘要结果回写、文档详情页 AI 建议展示）

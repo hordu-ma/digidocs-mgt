@@ -21,6 +21,9 @@ backend_ready=0
 tmp_files=()
 use_docker_curl=0
 docker_network_name=""
+assistant_poll_interval="${ASSISTANT_SMOKE_POLL_INTERVAL:-2}"
+assistant_poll_attempts="${ASSISTANT_SMOKE_POLL_ATTEMPTS:-20}"
+version_smoke_timeout="${VERSION_SMOKE_TIMEOUT:-20}"
 
 is_truthy() {
   case "${1:-}" in
@@ -222,7 +225,7 @@ if [[ "$backend_ready" == "1" ]]; then
       printf 'smoke second version\n' >"$upload_tmp"
       chmod 644 "$upload_tmp"
 
-      version_resp=$(smoke_curl -sS --max-time 10 -X POST "$backend_url/api/v1/documents/$document_id/versions" \
+      version_resp=$(smoke_curl -sS --max-time "$version_smoke_timeout" -X POST "$backend_url/api/v1/documents/$document_id/versions" \
         -H "$auth_header" \
         -F 'commit_message=smoke second upload' \
         -F "file=@$upload_tmp;filename=smoke-v2.txt;type=text/plain" 2>/dev/null || true)
@@ -231,7 +234,7 @@ if [[ "$backend_ready" == "1" ]]; then
       if [[ -n "$version_id" ]]; then
         download_tmp=$(mktemp)
         tmp_files+=("$download_tmp")
-        download_status=$(smoke_curl -sS -o "$download_tmp" -w '%{http_code}' --max-time 10 \
+        download_status=$(smoke_curl -sS -o "$download_tmp" -w '%{http_code}' --max-time "$version_smoke_timeout" \
           -H "$auth_header" "$backend_url/api/v1/versions/$version_id/download" 2>/dev/null)
         if [[ "$download_status" == "200" && "$(cat "$download_tmp")" == 'smoke second version' ]]; then
           echo "[OK] version upload/download -> $download_status"
@@ -241,7 +244,7 @@ if [[ "$backend_ready" == "1" ]]; then
 
         preview_tmp=$(mktemp)
         tmp_files+=("$preview_tmp")
-        preview_status=$(smoke_curl -sS -o "$preview_tmp" -w '%{http_code}' --max-time 10 \
+        preview_status=$(smoke_curl -sS -o "$preview_tmp" -w '%{http_code}' --max-time "$version_smoke_timeout" \
           -H "$auth_header" "$backend_url/api/v1/versions/$version_id/preview" 2>/dev/null)
         if [[ "$preview_status" == "200" && "$(cat "$preview_tmp")" == 'smoke second version' ]]; then
           echo "[OK] version preview -> $preview_status"
@@ -249,7 +252,7 @@ if [[ "$backend_ready" == "1" ]]; then
           require_or_skip "version preview smoke failed (status=$preview_status version_id=$version_id)"
         fi
       else
-        require_or_skip "version smoke did not return expected version id"
+        require_or_skip "version smoke did not return expected version id; body=$version_resp"
       fi
     else
       require_or_skip "document lookup failed; cannot run version smoke"
@@ -266,19 +269,19 @@ if [[ "$backend_ready" == "1" ]]; then
       echo "[OK] POST /assistant/ask queued request_id=$request_id"
       final_status=""
       final_body=""
-      for _ in 1 2 3 4 5 6 7 8; do
+      for ((poll_index=1; poll_index<=assistant_poll_attempts; poll_index++)); do
         final_body=$(smoke_curl -sS --max-time 10 -H "$auth_header" "$backend_url/api/v1/assistant/requests/$request_id" 2>/dev/null || true)
         final_status=$(echo "$final_body" | extract_json_string status)
         if [[ "$final_status" == "completed" || "$final_status" == "failed" ]]; then
           break
         fi
-        sleep 2
+        sleep "$assistant_poll_interval"
       done
 
       if [[ "$final_status" == "completed" ]]; then
         echo "[OK] GET /assistant/requests/$request_id -> completed"
       else
-        require_or_skip "GET /assistant/requests/$request_id -> ${final_status:-unknown}; body=$final_body"
+        require_or_skip "GET /assistant/requests/$request_id -> ${final_status:-unknown} after ${assistant_poll_attempts} polls x ${assistant_poll_interval}s; body=$final_body"
       fi
     else
       require_or_skip "POST /assistant/ask did not return request_id"
