@@ -526,17 +526,18 @@
 
 `GET /api/v1/versions/{version_id}/preview`
 
-响应体：
+当前实现：响应文件流，行为与下载接口类似，但以浏览器内联打开为目标。
 
-```json
-{
-  "data": {
-    "preview_type": "pdf",
-    "preview_url": "https://example.com/preview/xxx",
-    "watermark_enabled": true
-  }
-}
-```
+- `Content-Disposition: inline`
+- `Content-Type: 根据文件名或存储元数据推断`
+
+说明：
+
+- 当前接口不承诺返回独立的预览地址；
+- `preview_type`、`preview_url`、`watermark_enabled` 相关 richer preview 契约保留为未来可选增强；
+- 若后续启动 PDF 预览 / 水印能力，建议新增或扩展单独的预览编排返回结构，而不是改变现有文件流语义。
+
+响应：文件流。
 
 ---
 
@@ -1354,7 +1355,7 @@
 ### 12.2 第二批实现
 
 - 删除与恢复文档
-- 版本预览信息
+- 版本预览增强信息（未来可选）
 - 审计事件明细列表
 - 建议确认与忽略
 - 交接项编辑
