@@ -181,6 +181,11 @@
   - P2：毕业交接页改为交接任务卡、人员流向、流程步骤与清单工作台；OpenClaw 助手页改为左侧会话/范围与右侧消息工作区
   - P3：移除顶部“主业务账本”用户不可理解文案，补充取消交接确认、响应式布局和路由懒加载
   - 已完成 `cd frontend && npm run build` 验证，前端构建不再出现 chunk 超过 500KB 的警告
+- 完成前端移动端壳层与响应式基础收口
+  - `AppLayout` 改为桌面侧栏 + 移动端抽屉导航，手机端顶栏收敛为菜单、标题、搜索与用户入口
+  - `GlobalCommandDialog` 支持移动端宽度与更紧凑布局，可直接作为手机端快捷入口
+  - `styles.css` 补充移动端页面间距、动态视口高度与 Dialog 通用收口规则
+  - 已完成 `cd frontend && npm run build`，并将最新 `dist/` 同步到运行中的 `digidocs-frontend` 容器供预览
 - 完成 Handler 层集成测试
   - 新增 `handlers_test.go`，基于 memory 仓储的端到端 HTTP 测试
   - 覆盖 18 个测试用例：文档 CRUD、Dashboard、交接、审计、认证、鉴权拦截

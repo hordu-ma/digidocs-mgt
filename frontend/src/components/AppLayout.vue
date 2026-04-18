@@ -8,10 +8,11 @@ import {
   DataBoard,
   Document,
   Folder,
+  Menu,
   Search,
   Setting,
 } from "@element-plus/icons-vue";
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import GlobalCommandDialog from "@/components/GlobalCommandDialog.vue";
@@ -21,6 +22,8 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const commandVisible = ref(false);
+const isMobile = ref(false);
+const mobileNavVisible = ref(false);
 
 const isAdmin = computed(() => auth.role === "admin");
 
@@ -135,6 +138,24 @@ function openCommandDialog() {
   commandVisible.value = true;
 }
 
+function syncViewport() {
+  isMobile.value = window.innerWidth <= 767;
+  if (!isMobile.value) {
+    mobileNavVisible.value = false;
+  }
+}
+
+function openMobileNav() {
+  mobileNavVisible.value = true;
+}
+
+function navigateTo(path: string) {
+  mobileNavVisible.value = false;
+  if (route.path !== path) {
+    void router.push(path);
+  }
+}
+
 function handleGlobalKeydown(event: KeyboardEvent) {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
     event.preventDefault();
@@ -143,6 +164,7 @@ function handleGlobalKeydown(event: KeyboardEvent) {
 }
 
 function handleUserCommand(command: string) {
+  mobileNavVisible.value = false;
   if (command === "profile") {
     void router.push("/profile");
     return;
@@ -153,18 +175,28 @@ function handleUserCommand(command: string) {
   }
 }
 
+watch(
+  () => route.fullPath,
+  () => {
+    mobileNavVisible.value = false;
+  },
+);
+
 onMounted(() => {
+  syncViewport();
   window.addEventListener("keydown", handleGlobalKeydown);
+  window.addEventListener("resize", syncViewport);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleGlobalKeydown);
+  window.removeEventListener("resize", syncViewport);
 });
 </script>
 
 <template>
   <div class="layout">
-    <aside class="sidebar">
+    <aside class="sidebar desktop-sidebar">
       <div class="brand">
         <div class="brand-mark">DG</div>
         <div>
@@ -218,34 +250,47 @@ onBeforeUnmount(() => {
     <main class="content">
       <header class="topbar">
         <div class="topbar-context">
-          <div class="topbar-breadcrumbs">
-            <RouterLink
-              v-for="(item, index) in breadcrumbs"
-              :key="item.path"
-              :to="item.path"
-              class="topbar-crumb"
+          <div class="topbar-heading">
+            <button
+              v-if="isMobile"
+              class="mobile-nav-trigger"
+              type="button"
+              aria-label="打开导航菜单"
+              @click="openMobileNav"
             >
-              <span>{{ item.label }}</span>
-              <ElIcon v-if="index < breadcrumbs.length - 1"><ArrowRight /></ElIcon>
-            </RouterLink>
+              <ElIcon><Menu /></ElIcon>
+            </button>
+            <div class="topbar-heading-copy">
+              <div v-if="!isMobile" class="topbar-breadcrumbs">
+                <RouterLink
+                  v-for="(item, index) in breadcrumbs"
+                  :key="item.path"
+                  :to="item.path"
+                  class="topbar-crumb"
+                >
+                  <span>{{ item.label }}</span>
+                  <ElIcon v-if="index < breadcrumbs.length - 1"><ArrowRight /></ElIcon>
+                </RouterLink>
+              </div>
+              <div class="topbar-title">{{ routeMeta.title }}</div>
+              <div v-if="!isMobile" class="topbar-caption">{{ routeMeta.caption }}</div>
+            </div>
           </div>
-          <div class="topbar-title">{{ routeMeta.title }}</div>
-          <div class="topbar-caption">{{ routeMeta.caption }}</div>
         </div>
         <div class="topbar-tools">
           <button class="search-trigger" type="button" @click="openCommandDialog">
             <ElIcon><Search /></ElIcon>
-            <span>搜索 / 跳转</span>
-            <span class="app-kbd">Ctrl K</span>
+            <span>{{ isMobile ? "搜索" : "搜索 / 跳转" }}</span>
+            <span v-if="!isMobile" class="app-kbd">Ctrl K</span>
           </button>
-          <span class="topbar-signal">
+          <span v-if="!isMobile" class="topbar-signal">
             <ElIcon><Bell /></ElIcon>
             <span>工作流在线</span>
           </span>
           <ElDropdown trigger="click" @command="handleUserCommand">
             <button class="user-menu" type="button">
               <span class="user-avatar">{{ auth.displayName.slice(0, 1) || "用" }}</span>
-              <span class="user-meta">
+              <span v-if="!isMobile" class="user-meta">
                 <span class="user-name">{{ auth.displayName || auth.username || "当前用户" }}</span>
                 <span class="user-role">{{ roleLabel }}</span>
               </span>
@@ -263,6 +308,74 @@ onBeforeUnmount(() => {
       <slot />
     </main>
   </div>
+  <ElDrawer
+    v-model="mobileNavVisible"
+    class="mobile-nav-drawer"
+    direction="ltr"
+    size="min(88vw, 320px)"
+    :with-header="false"
+    append-to-body
+  >
+    <div class="mobile-nav-panel">
+      <div class="brand mobile-brand">
+        <div class="brand-mark">DG</div>
+        <div>
+          <div class="brand-title">DigiDocs</div>
+          <div class="brand-subtitle">文档资产平台</div>
+        </div>
+      </div>
+      <nav class="nav mobile-nav-list">
+        <button
+          v-for="menu in menus"
+          :key="menu.path"
+          class="nav-item nav-button"
+          :class="{ active: route.path === menu.path || route.path.startsWith(`${menu.path}/`) }"
+          type="button"
+          @click="navigateTo(menu.path)"
+        >
+          <ElIcon :size="17"><component :is="menu.icon" /></ElIcon>
+          {{ menu.label }}
+        </button>
+      </nav>
+      <section class="sidebar-workbench mobile-workbench">
+        <div class="sidebar-section-label">快捷工作</div>
+        <button
+          v-for="action in workbenchActions"
+          :key="action.path"
+          class="workbench-card"
+          type="button"
+          @click="navigateTo(action.path)"
+        >
+          <span class="workbench-icon">
+            <ElIcon :size="16"><component :is="action.icon" /></ElIcon>
+          </span>
+          <span class="workbench-copy">
+            <strong>{{ action.label }}</strong>
+            <small>{{ action.caption }}</small>
+          </span>
+          <ElIcon class="workbench-arrow"><ArrowRight /></ElIcon>
+        </button>
+      </section>
+      <div class="mobile-nav-footer">
+        <div class="mobile-user-card">
+          <span class="user-avatar">{{ auth.displayName.slice(0, 1) || "用" }}</span>
+          <span class="user-meta">
+            <span class="user-name">{{ auth.displayName || auth.username || "当前用户" }}</span>
+            <span class="user-role">{{ roleLabel }}</span>
+          </span>
+        </div>
+        <button
+          v-if="isAdmin"
+          class="nav-item nav-item-admin nav-button"
+          type="button"
+          @click="navigateTo('/admin')"
+        >
+          <ElIcon :size="16"><Setting /></ElIcon>
+          系统管理
+        </button>
+      </div>
+    </div>
+  </ElDrawer>
   <GlobalCommandDialog
     v-model="commandVisible"
     :is-admin="isAdmin"
@@ -274,6 +387,10 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   min-height: 100vh;
+}
+
+.desktop-sidebar {
+  display: flex;
 }
 
 .sidebar {
@@ -463,6 +580,17 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.topbar-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.topbar-heading-copy {
+  min-width: 0;
+}
+
 .topbar-breadcrumbs {
   display: flex;
   align-items: center;
@@ -494,6 +622,31 @@ onBeforeUnmount(() => {
   margin-top: 2px;
   color: var(--dd-muted);
   font-size: 12px;
+}
+
+.mobile-nav-trigger,
+.nav-button {
+  border: none;
+  font: inherit;
+}
+
+.nav-button {
+  width: 100%;
+  background: transparent;
+  text-align: left;
+}
+
+.mobile-nav-trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--dd-ink);
+  box-shadow: var(--dd-shadow-xs);
+  cursor: pointer;
 }
 
 .topbar-tools {
@@ -581,7 +734,40 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 
-@media (max-width: 900px) {
+.mobile-nav-panel {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  min-height: 100%;
+  padding: 4px 4px calc(12px + env(safe-area-inset-bottom));
+}
+
+.mobile-brand {
+  margin-bottom: 0;
+  padding-top: 6px;
+}
+
+.mobile-nav-list,
+.mobile-workbench {
+  grid-template-columns: 1fr;
+}
+
+.mobile-nav-footer {
+  display: grid;
+  gap: 12px;
+}
+
+.mobile-user-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--dd-line);
+  border-radius: 14px;
+  background: var(--dd-surface-soft);
+}
+
+@media (max-width: 1023px) {
   .layout {
     grid-template-columns: 1fr;
   }
@@ -601,22 +787,95 @@ onBeforeUnmount(() => {
     padding: 14px 18px;
   }
 
-  .topbar,
-  .topbar-tools {
-    flex-wrap: wrap;
-  }
-
-  .topbar-tools {
-    width: 100%;
-  }
-
   .search-trigger {
     min-width: 0;
-    flex: 1;
   }
 
   .sidebar-workbench {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .layout {
+    min-height: 100dvh;
+  }
+
+  .mobile-nav-panel {
+    gap: 14px;
+    padding: 8px 8px calc(16px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+  }
+
+  .desktop-sidebar {
+    display: none;
+  }
+
+  .mobile-nav-list,
+  .mobile-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-nav-list .nav-item,
+  .mobile-workbench .workbench-card {
+    width: 100%;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    min-height: 64px;
+    padding: 12px;
+  }
+
+  .topbar-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 16px;
+  }
+
+  .topbar-caption,
+  .topbar-breadcrumbs,
+  .topbar-signal {
+    display: none;
+  }
+
+  .topbar-tools {
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+
+  .search-trigger {
+    min-width: 0;
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  .user-menu {
+    min-height: 42px;
+    padding: 5px 8px 5px 5px;
+    gap: 8px;
+  }
+
+  .user-avatar {
+    width: 30px;
+    height: 30px;
+  }
+
+  .workbench-copy strong,
+  .workbench-copy small {
+    white-space: normal;
+  }
+
+  .mobile-workbench .workbench-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-height: 68px;
+  }
+
+  .mobile-nav-drawer :deep(.el-drawer__body) {
+    padding: 0;
   }
 }
 </style>

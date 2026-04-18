@@ -10,7 +10,7 @@ import {
   Setting,
   User,
 } from "@element-plus/icons-vue";
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import api from "@/api";
@@ -28,7 +28,11 @@ const router = useRouter();
 const keyword = ref("");
 const loading = ref(false);
 const documents = ref<any[]>([]);
+const isMobile = ref(false);
 let searchTimer: number | null = null;
+
+const dialogWidth = computed(() => (isMobile.value ? "calc(100vw - 24px)" : "720px"));
+const dialogTop = computed(() => (isMobile.value ? "16px" : "10vh"));
 
 const quickActions = computed(() => {
   const base = [
@@ -140,14 +144,27 @@ function openDocument(id: string) {
   closeDialog();
   void router.push(`/documents/${id}`);
 }
+
+function syncViewport() {
+  isMobile.value = window.innerWidth <= 767;
+}
+
+onMounted(() => {
+  syncViewport();
+  window.addEventListener("resize", syncViewport);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", syncViewport);
+});
 </script>
 
 <template>
   <ElDialog
     :model-value="modelValue"
     class="command-dialog"
-    width="720px"
-    top="10vh"
+    :width="dialogWidth"
+    :top="dialogTop"
     :show-close="false"
     append-to-body
     @update:model-value="emit('update:modelValue', $event)"
@@ -361,6 +378,23 @@ function openDocument(id: string) {
 }
 
 @media (max-width: 720px) {
+  .command-panel {
+    gap: 14px;
+  }
+
+  .command-section-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .command-search {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .command-search > .app-kbd {
+    display: none;
+  }
+
   .command-grid {
     grid-template-columns: 1fr;
   }

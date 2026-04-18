@@ -243,6 +243,10 @@ docker compose up -d postgres
   - 新增全局搜索/跳转命令面板与快捷工作入口
   - 重构 Dashboard、文档工作台、文档档案页、交接工作台与助手工作区
   - 补强数据资产页、系统管理页与个人信息页的一致性体验
+- 已完成前端移动端壳层与响应式基础收口
+  - `AppLayout` 改为桌面侧栏 + 移动端抽屉导航，手机端顶栏信息密度明显下降
+  - `GlobalCommandDialog` 和全局 Dialog 宽度改为适配手机视口
+  - 当前预览已同步到运行中的 `digidocs-frontend` 容器，可直接通过 `18080` 查看效果
 - 已完善客户介绍文档展示素材，补充系统架构图与系统截图，便于客户侧方案说明与 PDF 输出准备
 - 已通过宿主机验证所有 API 端点：login、auth/me、documents、dashboard、versions、flows、handovers
 - 已完成前后端联调验证（Vite proxy → backend-go → PostgreSQL 全链路通过）
