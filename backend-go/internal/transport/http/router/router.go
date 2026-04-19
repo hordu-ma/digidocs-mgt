@@ -36,6 +36,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	versionHandler := handlers.NewVersionHandler(container.VersionService, container.AssistantService)
 	adminHandler := handlers.NewAdminHandler(container.AdminService)
 	dataAssetHandler := handlers.NewDataAssetHandler(container.DataAssetService)
+	codeRepositoryHandler := handlers.NewCodeRepositoryHandler(container.CodeRepositoryService, cfg.APIV1Prefix)
 
 	authMw := middleware.Auth(container.TokenService)
 	protect := func(h http.HandlerFunc) http.Handler {
@@ -120,6 +121,14 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.Handle("DELETE "+cfg.APIV1Prefix+"/data-folders/{id}", protect(dataAssetHandler.DeleteFolder))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/handovers/{id}/data-items", protect(dataAssetHandler.ListHandoverDataItems))
 	mux.Handle("PUT "+cfg.APIV1Prefix+"/handovers/{id}/data-items", protect(dataAssetHandler.UpdateHandoverDataItems))
+
+	// --- Code routes ---
+	mux.Handle("GET "+cfg.APIV1Prefix+"/code-repositories", protect(codeRepositoryHandler.List))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/code-repositories", protect(codeRepositoryHandler.Create))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/code-repositories/{id}", protect(codeRepositoryHandler.Get))
+	mux.Handle("PATCH "+cfg.APIV1Prefix+"/code-repositories/{id}", protect(codeRepositoryHandler.Update))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/code-repositories/{id}/push-events", protect(codeRepositoryHandler.ListPushEvents))
+	mux.Handle(cfg.APIV1Prefix+"/git/", http.StripPrefix("", http.HandlerFunc(codeRepositoryHandler.ServeGit)))
 
 	mux.Handle("GET "+cfg.APIV1Prefix+"/dashboard/recent-flows", protect(dashboardHandler.RecentFlows))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/dashboard/risk-documents", protect(dashboardHandler.RiskDocuments))

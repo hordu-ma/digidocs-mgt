@@ -18,14 +18,16 @@ type Config struct {
 	CORSAllowOrigins    string
 
 	// Synology DSM connection (used when STORAGE_BACKEND=synology)
-	StorageBackend    string
-	SynologyHost      string
-	SynologyPort      int
-	SynologyHTTPS     bool
+	StorageBackend             string
+	SynologyHost               string
+	SynologyPort               int
+	SynologyHTTPS              bool
 	SynologyInsecureSkipVerify bool
-	SynologyAccount   string
-	SynologyPassword  string
-	SynologySharePath string // shared folder path, e.g. "/DigiDocs"
+	SynologyAccount            string
+	SynologyPassword           string
+	SynologySharePath          string // shared folder path, e.g. "/DigiDocs"
+
+	CodeRepoRoot string
 }
 
 func Load() Config {
@@ -42,14 +44,15 @@ func Load() Config {
 		JWTSecret:           getEnv("JWT_SECRET", "dev-secret"),
 		CORSAllowOrigins:    getEnv("CORS_ALLOW_ORIGINS", "*"),
 
-		StorageBackend:    getEnv("STORAGE_BACKEND", "memory"),
-		SynologyHost:      getEnv("SYNOLOGY_HOST", ""),
-		SynologyPort:      synoPort,
-		SynologyHTTPS:     getEnv("SYNOLOGY_HTTPS", "false") == "true",
+		StorageBackend:             getEnv("STORAGE_BACKEND", "memory"),
+		SynologyHost:               getEnv("SYNOLOGY_HOST", ""),
+		SynologyPort:               synoPort,
+		SynologyHTTPS:              getEnv("SYNOLOGY_HTTPS", "false") == "true",
 		SynologyInsecureSkipVerify: getEnv("SYNOLOGY_INSECURE_SKIP_VERIFY", "false") == "true",
-		SynologyAccount:   getEnv("SYNOLOGY_ACCOUNT", ""),
-		SynologyPassword:  getEnv("SYNOLOGY_PASSWORD", ""),
-		SynologySharePath: getEnv("SYNOLOGY_SHARE_PATH", "/DigiDocs"),
+		SynologyAccount:            getEnv("SYNOLOGY_ACCOUNT", ""),
+		SynologyPassword:           getEnv("SYNOLOGY_PASSWORD", ""),
+		SynologySharePath:          getEnv("SYNOLOGY_SHARE_PATH", "/DigiDocs"),
+		CodeRepoRoot:               getEnv("CODE_REPO_ROOT", "/tmp/digidocs-code-repos"),
 	}
 
 	if cfg.AppEnv == "production" {

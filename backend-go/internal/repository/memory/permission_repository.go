@@ -47,3 +47,15 @@ func (r PermissionRepository) CanUploadDataAsset(context.Context, string, string
 func (r PermissionRepository) CanManageDataAsset(context.Context, string, string, string) (bool, error) {
 	return true, nil
 }
+
+func (r PermissionRepository) CanCreateCodeRepository(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+
+func (r PermissionRepository) CanManageCodeRepository(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+
+func (r PermissionRepository) CanPushCodeRepository(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}

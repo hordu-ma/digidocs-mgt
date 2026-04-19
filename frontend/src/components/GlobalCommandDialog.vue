@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   ChatDotRound,
+  Coin,
   Connection,
   DataBoard,
   Document,
@@ -53,6 +54,12 @@ const quickActions = computed(() => {
       caption: "查看图片、模型和压缩包",
       route: "/data",
       icon: Folder,
+    },
+    {
+      title: "代码资产库",
+      caption: "配置 Git 远程仓库与推送记录",
+      route: "/code",
+      icon: Coin,
     },
     {
       title: "工作交接",

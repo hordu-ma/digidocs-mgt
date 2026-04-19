@@ -95,6 +95,30 @@ func (s PermissionService) EnsureManageDataAsset(ctx context.Context, actorID st
 	return permissionResult(ok, err, "manage data asset")
 }
 
+func (s PermissionService) EnsureCreateCodeRepository(ctx context.Context, actorID string, actorRole string, projectID string) error {
+	if s.reader == nil {
+		return nil
+	}
+	ok, err := s.reader.CanCreateCodeRepository(ctx, actorID, actorRole, projectID)
+	return permissionResult(ok, err, "create code repository")
+}
+
+func (s PermissionService) EnsureManageCodeRepository(ctx context.Context, actorID string, actorRole string, repositoryID string) error {
+	if s.reader == nil {
+		return nil
+	}
+	ok, err := s.reader.CanManageCodeRepository(ctx, actorID, actorRole, repositoryID)
+	return permissionResult(ok, err, "manage code repository")
+}
+
+func (s PermissionService) EnsurePushCodeRepository(ctx context.Context, actorID string, actorRole string, repositoryID string) error {
+	if s.reader == nil {
+		return nil
+	}
+	ok, err := s.reader.CanPushCodeRepository(ctx, actorID, actorRole, repositoryID)
+	return permissionResult(ok, err, "push code repository")
+}
+
 func permissionResult(ok bool, err error, action string) error {
 	if err != nil {
 		return err

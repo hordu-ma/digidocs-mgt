@@ -28,9 +28,9 @@ func (c Consumer) Poll(ctx context.Context, limit int) []task.Message {
 	_, recoverErr := c.db.ExecContext(
 		ctx,
 		`UPDATE assistant_requests
-		 SET status = 'pending', updated_at = NOW()
+		 SET status = 'pending'
 		 WHERE status = 'running'
-		   AND updated_at < NOW() - INTERVAL '10 minutes'`,
+		   AND created_at < NOW() - INTERVAL '10 minutes'`,
 	)
 	if recoverErr != nil {
 		log.Printf("postgres-queue recover-running failed: %v", recoverErr)

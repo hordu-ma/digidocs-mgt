@@ -440,7 +440,6 @@ function inferAssetFileType(fileName: string): string {
   if (["zip", "tar", "gz", "rar", "7z", "bz2", "xz", "tgz"].includes(ext)) return "zip";
   if (["pt", "pth", "pkl", "onnx", "h5", "pb", "safetensors", "bin", "npz", "npy", "ckpt"].includes(ext)) return "mdl";
   if (["csv", "json", "jsonl", "parquet", "hdf5", "tsv"].includes(ext)) return "dat";
-  if (["py", "js", "ts", "sh", "ipynb", "r", "m", "cpp", "c", "java", "go"].includes(ext)) return "code";
   if (["pdf", "docx", "doc", "pptx", "ppt", "txt", "md"].includes(ext)) return "doc";
   return "file";
 }
@@ -457,7 +456,6 @@ const assetTypeOptions = [
   { key: "zip", label: "压缩包" },
   { key: "mdl", label: "模型" },
   { key: "dat", label: "数据集" },
-  { key: "code", label: "代码" },
   { key: "doc", label: "文档" },
 ];
 
@@ -971,7 +969,6 @@ onMounted(async () => {
 .file-badge.zip  { background: #e6f5f0; color: #1a7a5e; }
 .file-badge.mdl  { background: #e6eeff; color: #1d42a2; }
 .file-badge.dat  { background: #e6f7ea; color: #1a7a40; }
-.file-badge.code { background: #f0f4ff; color: #3d61b0; }
 .file-badge.doc  { background: #f5f5f5; color: #555;    }
 .file-badge.file { background: #f5f5f5; color: #888;    }
 

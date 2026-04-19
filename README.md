@@ -258,6 +258,11 @@ docker compose up -d postgres
 - 已完成前端 Element Plus 按需引入（JS bundle 从 1,041 KB 降至 470 KB）
 - 已完成 Python Worker 真实队列消费链路（Go/HTTP 轮询 → 处理 → 回写）
 - 已完成前端写操作 UI（文档流转操作、AI 助手问答提交、交接单创建）
+- 已完成“代码”模块第一版
+  - 新增代码仓库配置、Git remote 地址、push token 和 push 事件记录
+  - 后端新增 `code_repositories` / `code_push_events` 迁移、REST API 与 Git smart HTTP 接收入口
+  - 前端新增独立“代码”导航页，位于“数据”之后、“助手”之前，展示推送命令、同步目标和事件历史
+  - 已移除“数据”模块中的“代码”文件小类别，避免与独立代码模块混淆
 - 已完成 P0 文档/契约收口首轮修复（验证命令、README/AGENTS 迁移描述、前后端错误读取、转交流程、AI 问答契约）
 - 已完成群晖前置验收 smoke 收口：`make smoke` 现可选直连 DSM / File Station API 做登录、上传、下载、共享链接与清理
 - 已补群晖 HTTPS 受控兼容开关：自签名证书环境可通过 `SYNOLOGY_INSECURE_SKIP_VERIFY=true` 临时接入 Go 服务

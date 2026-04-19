@@ -73,6 +73,9 @@ type PermissionReader interface {
 	CanApplyHandover(ctx context.Context, actorID string, actorRole string, handoverID string, action string) (bool, error)
 	CanUploadDataAsset(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
 	CanManageDataAsset(ctx context.Context, actorID string, actorRole string, dataAssetID string) (bool, error)
+	CanCreateCodeRepository(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
+	CanManageCodeRepository(ctx context.Context, actorID string, actorRole string, repositoryID string) (bool, error)
+	CanPushCodeRepository(ctx context.Context, actorID string, actorRole string, repositoryID string) (bool, error)
 }
 
 type DocumentReader interface {
@@ -109,6 +112,20 @@ type DataAssetWriter interface {
 	CreateDataFolder(ctx context.Context, input command.DataFolderCreateInput) (*query.DataFolderItem, error)
 	DeleteDataFolder(ctx context.Context, id string) error
 	UpdateHandoverDataItems(ctx context.Context, input command.HandoverDataItemUpdateInput) (map[string]any, error)
+}
+
+type CodeRepositoryReader interface {
+	ListCodeRepositories(ctx context.Context, filter query.CodeRepositoryListFilter) ([]query.CodeRepositoryItem, int, error)
+	GetCodeRepository(ctx context.Context, id string) (*query.CodeRepositoryDetail, error)
+	GetCodeRepositoryBySlug(ctx context.Context, slug string) (*query.CodeRepositoryDetail, error)
+	ListCodePushEvents(ctx context.Context, repositoryID string) ([]query.CodePushEventItem, error)
+}
+
+type CodeRepositoryWriter interface {
+	CreateCodeRepository(ctx context.Context, input command.CodeRepositoryCreateInput) (*query.CodeRepositoryDetail, error)
+	UpdateCodeRepository(ctx context.Context, input command.CodeRepositoryUpdateInput) (*query.CodeRepositoryDetail, error)
+	CreateCodePushEvent(ctx context.Context, input command.CodePushEventCreateInput) (*query.CodePushEventItem, error)
+	UpdateCodeRepositoryAfterPush(ctx context.Context, repositoryID string, commitSHA string, status string) error
 }
 
 type AssistantRepository interface {

@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Bell,
   ChatDotRound,
+  Coin,
   Connection,
   DataBoard,
   Document,
@@ -31,6 +32,7 @@ const menus = [
   { label: "总览", path: "/dashboard", icon: DataBoard, caption: "负责人工作台" },
   { label: "文档", path: "/documents", icon: Document, caption: "文档资产与流转" },
   { label: "数据", path: "/data", icon: Folder, caption: "图片、模型与数据文件" },
+  { label: "代码", path: "/code", icon: Coin, caption: "Git 推送与代码目录" },
   { label: "交接", path: "/handovers", icon: Connection, caption: "成员交接闭环" },
   { label: "助手", path: "/assistant", icon: ChatDotRound, caption: "可信 AI 工作区" },
 ];
@@ -74,6 +76,12 @@ const routeMeta = computed(() => {
     return {
       title: "数据资产库",
       caption: "以项目为核心的轻量文件仓库",
+    };
+  }
+  if (path.startsWith("/code")) {
+    return {
+      title: "代码资产库",
+      caption: "Git 推送与课题代码目录同步",
     };
   }
   if (path.startsWith("/handovers")) {

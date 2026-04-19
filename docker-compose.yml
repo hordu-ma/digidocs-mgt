@@ -41,6 +41,9 @@ services:
       SYNOLOGY_ACCOUNT: ${SYNOLOGY_ACCOUNT:-}
       SYNOLOGY_PASSWORD: ${SYNOLOGY_PASSWORD:-}
       SYNOLOGY_SHARE_PATH: ${SYNOLOGY_SHARE_PATH:-/DigiDocs}
+      CODE_REPO_ROOT: ${CODE_REPO_ROOT:-/tmp/digidocs-code-repos}
+    volumes:
+      - code_repos:/tmp/digidocs-code-repos
     ports:
       - "${BACKEND_GO_PORT:-18081}:8080"
     extra_hosts:
@@ -88,3 +91,4 @@ services:
 
 volumes:
   postgres_data:
+  code_repos:

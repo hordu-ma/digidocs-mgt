@@ -258,6 +258,11 @@
   - `README.md` / `TASKS.md` 当前阶段同步更新为“交付闭环收口与部署验收准备阶段”
   - 清理待办中已完成的 OCR / Assistant 历史筛选陈旧项
   - 新增 `GET /api/v1/users` 只读接口，供前端责任人/接收人选择器复用
+- 完成“代码”模块第一版
+  - 新增 `code_repositories` / `code_push_events` 数据库迁移
+  - 新增代码仓库 REST API、Git smart HTTP 接收入口与 push 事件记录
+  - 新增前端“代码”页面，放在“数据”模块后、“助手”模块前
+  - 删除“数据”模块中的“代码”文件小类别
 - 完成 P1 前端交付收口
   - `DocumentsView` 改为团队空间 / 课题 / 目录 / 当前责任人选择器，补齐 `current_owner_id` 提交
   - `DocumentDetailView` 转交流程改为成员选择，不再手填用户 UUID

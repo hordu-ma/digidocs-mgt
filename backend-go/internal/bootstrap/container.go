@@ -33,6 +33,7 @@ type Container struct {
 	FlowService           service.FlowService
 	HandoverService       service.HandoverService
 	DataAssetService      service.DataAssetService
+	CodeRepositoryService service.CodeRepositoryService
 	AuthService           service.AuthService
 	TokenService          service.TokenService
 	AuditService          service.AuditService
@@ -66,6 +67,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 		permissionService := service.NewPermissionService(pgrepo.NewPermissionRepository(postgresDB))
 
 		dataAssetRepo := pgrepo.NewDataAssetRepository(postgresDB)
+		codeRepo := pgrepo.NewCodeRepositoryRepository(postgresDB)
 		return Container{
 			DB:            postgresDB,
 			QueueConsumer: pgqueue.NewConsumer(postgresDB),
@@ -83,6 +85,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			FlowService:           service.NewFlowService(pgrepo.NewFlowRepository(postgresDB), actionRepo, permissionService),
 			HandoverService:       service.NewHandoverService(pgrepo.NewHandoverRepository(postgresDB), actionRepo, permissionService),
 			DataAssetService:      service.NewDataAssetService(dataAssetRepo, dataAssetRepo, storageProvider, permissionService),
+			CodeRepositoryService: service.NewCodeRepositoryService(codeRepo, codeRepo, permissionService, cfg.CodeRepoRoot),
 			AuthService:           authService,
 			TokenService:          tokenService,
 			AuditService:          auditService,
@@ -95,6 +98,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 		versionWorkflow := memory.NewVersionWorkflow(versionRepo)
 		permissionService := service.NewPermissionService(memory.NewPermissionRepository())
 		dataAssetRepo := memory.NewDataAssetRepository()
+		codeRepo := memory.NewCodeRepositoryRepository()
 		return Container{
 			QueueConsumer: publisher,
 			QueryService: service.NewQueryService(
@@ -110,6 +114,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			FlowService:           service.NewFlowService(memory.NewFlowRepository(), actionRepo, permissionService),
 			HandoverService:       service.NewHandoverService(memory.NewHandoverRepository(), actionRepo, permissionService),
 			DataAssetService:      service.NewDataAssetService(dataAssetRepo, dataAssetRepo, storageProvider, permissionService),
+			CodeRepositoryService: service.NewCodeRepositoryService(codeRepo, codeRepo, permissionService, cfg.CodeRepoRoot),
 			AuthService:           authService,
 			TokenService:          tokenService,
 			AuditService:          auditService,

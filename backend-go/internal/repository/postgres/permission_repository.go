@@ -212,3 +212,50 @@ func (r PermissionRepository) CanManageDataAsset(ctx context.Context, actorID st
 		)
 	`, dataAssetID, actorID)
 }
+
+func (r PermissionRepository) CanCreateCodeRepository(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error) {
+	if isAdmin(actorRole) {
+		return true, nil
+	}
+	return r.isProjectManager(ctx, actorID, projectID)
+}
+
+func (r PermissionRepository) CanManageCodeRepository(ctx context.Context, actorID string, actorRole string, repositoryID string) (bool, error) {
+	if isAdmin(actorRole) {
+		return true, nil
+	}
+	return r.exists(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM code_repositories cr
+			JOIN projects p ON p.id = cr.project_id
+			LEFT JOIN project_members pm
+			  ON pm.project_id = p.id
+			 AND pm.user_id::text = $2
+			 AND pm.project_role IN ('owner', 'manager')
+			WHERE cr.id::text = $1
+			  AND cr.is_deleted = false
+			  AND (p.owner_id::text = $2 OR pm.id IS NOT NULL)
+		)
+	`, repositoryID, actorID)
+}
+
+func (r PermissionRepository) CanPushCodeRepository(ctx context.Context, actorID string, actorRole string, repositoryID string) (bool, error) {
+	if isAdmin(actorRole) {
+		return true, nil
+	}
+	return r.exists(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM code_repositories cr
+			JOIN projects p ON p.id = cr.project_id
+			LEFT JOIN project_members pm
+			  ON pm.project_id = p.id
+			 AND pm.user_id::text = $2
+			 AND pm.project_role IN ('owner', 'manager', 'contributor')
+			WHERE cr.id::text = $1
+			  AND cr.is_deleted = false
+			  AND (p.owner_id::text = $2 OR pm.id IS NOT NULL)
+		)
+	`, repositoryID, actorID)
+}

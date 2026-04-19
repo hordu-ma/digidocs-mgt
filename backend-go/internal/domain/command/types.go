@@ -131,3 +131,40 @@ type HandoverDataItemUpdateInput struct {
 	ActorID    string
 	ActorRole  string
 }
+
+// ========== Code Repository ==========
+
+type CodeRepositoryCreateInput struct {
+	TeamSpaceID      string
+	ProjectID        string
+	Name             string
+	Slug             string
+	Description      string
+	DefaultBranch    string
+	TargetFolderPath string
+	RepoStoragePath  string
+	PushToken        string
+	ActorID          string
+	ActorRole        string
+}
+
+type CodeRepositoryUpdateInput struct {
+	RepositoryID     string
+	Name             string
+	Description      string
+	DefaultBranch    string
+	TargetFolderPath string
+	ActorID          string
+	ActorRole        string
+}
+
+type CodePushEventCreateInput struct {
+	RepositoryID  string
+	Branch        string
+	BeforeSHA     string
+	AfterSHA      string
+	CommitMessage string
+	PusherID      string
+	SyncStatus    string
+	ErrorMessage  string
+}
