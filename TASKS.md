@@ -185,6 +185,7 @@
   - `AppLayout` 改为桌面侧栏 + 移动端抽屉导航，手机端顶栏收敛为菜单、标题、搜索与用户入口
   - `GlobalCommandDialog` 支持移动端宽度与更紧凑布局，可直接作为手机端快捷入口
   - `styles.css` 补充移动端页面间距、动态视口高度与 Dialog 通用收口规则
+  - `CodeView` 已补齐仓库摘要卡、手机端横向仓库列表、单列指标区与 push 记录卡片化，代码模块可在手机端完成仓库切换和历史查看
   - 已完成 `cd frontend && npm run build`，并将最新 `dist/` 同步到运行中的 `digidocs-frontend` 容器供预览
 - 完成 Handler 层集成测试
   - 新增 `handlers_test.go`，基于 memory 仓储的端到端 HTTP 测试

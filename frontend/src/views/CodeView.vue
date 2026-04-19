@@ -240,6 +240,16 @@ onMounted(async () => {
             <ElIcon><Coin /></ElIcon>
             代码仓库
           </div>
+          <div class="rail-summary">
+            <div>
+              <span>当前查看</span>
+              <strong>{{ selectedRepo?.name || "未选择仓库" }}</strong>
+            </div>
+            <div>
+              <span>课题数</span>
+              <strong>{{ allProjects.length }}</strong>
+            </div>
+          </div>
           <ElInput
             v-model="keyword"
             placeholder="搜索仓库"
@@ -264,7 +274,13 @@ onMounted(async () => {
               @click="selectRepository(repo.id)"
             >
               <strong>{{ repo.name }}</strong>
-              <span>{{ repo.project_name || repo.slug }}</span>
+              <div class="repo-tab-head">
+                <span>{{ repo.project_name || repo.slug }}</span>
+                <span class="repo-state-pill" :class="repo.status">
+                  {{ statusLabel(repo.status) }}
+                </span>
+              </div>
+              <small>{{ formatTime(repo.last_pushed_at) }}</small>
             </button>
           </div>
         </aside>
@@ -278,12 +294,24 @@ onMounted(async () => {
 
           <template v-else>
             <section class="repo-hero page-card">
-              <div class="repo-title-block">
-                <div class="repo-avatar"><ElIcon><Coin /></ElIcon></div>
-                <div>
-                  <div class="repo-kicker">{{ selectedProjectName }}</div>
-                  <h2>{{ selectedRepo.name }}</h2>
-                  <p>{{ selectedRepo.description || "该仓库用于沉淀课题代码并记录 push 同步历史。" }}</p>
+              <div class="repo-hero-main">
+                <div class="repo-title-block">
+                  <div class="repo-avatar"><ElIcon><Coin /></ElIcon></div>
+                  <div>
+                    <div class="repo-kicker">{{ selectedProjectName }}</div>
+                    <h2>{{ selectedRepo.name }}</h2>
+                    <p>{{ selectedRepo.description || "该仓库用于沉淀课题代码并记录 push 同步历史。" }}</p>
+                  </div>
+                </div>
+                <div class="repo-hero-actions">
+                  <ElButton @click="selectRepository(selectedRepo.id)">
+                    <ElIcon><Refresh /></ElIcon>
+                    刷新仓库
+                  </ElButton>
+                  <ElButton type="primary" plain @click="copyText(remoteWithToken(selectedRepo), 'Remote URL')">
+                    <ElIcon><CopyDocument /></ElIcon>
+                    复制 remote
+                  </ElButton>
                 </div>
               </div>
               <div class="repo-metrics">
@@ -296,8 +324,12 @@ onMounted(async () => {
                   <strong>{{ shortSHA(selectedRepo.last_commit_sha) }}</strong>
                 </div>
                 <div>
-                  <span>状态</span>
+                  <span>仓库状态</span>
                   <strong>{{ statusLabel(selectedRepo.status) }}</strong>
+                </div>
+                <div>
+                  <span>推送记录</span>
+                  <strong>{{ pushEvents.length }}</strong>
                 </div>
               </div>
             </section>
@@ -360,13 +392,20 @@ git push digidocs {{ selectedRepo.default_branch }}</code></pre>
                     <ElIcon><CircleCheck v-if="event.sync_status === 'synced'" /><Warning v-else /></ElIcon>
                   </div>
                   <div class="event-main">
-                    <strong>{{ event.commit_message || "Git push" }}</strong>
-                    <span>{{ event.branch }} · {{ shortSHA(event.after_sha) }} · {{ formatTime(event.created_at) }}</span>
+                    <div class="event-main-head">
+                      <strong>{{ event.commit_message || "Git push" }}</strong>
+                      <ElTag :type="event.sync_status === 'synced' ? 'success' : 'danger'" effect="light">
+                        {{ eventStatusLabel(event.sync_status) }}
+                      </ElTag>
+                    </div>
+                    <span class="event-meta-line">
+                      <span>{{ event.branch }}</span>
+                      <span>{{ shortSHA(event.after_sha) }}</span>
+                      <span>{{ formatTime(event.created_at) }}</span>
+                    </span>
+                    <small v-if="event.pusher_name">推送人：{{ event.pusher_name }}</small>
                     <small v-if="event.error_message">{{ event.error_message }}</small>
                   </div>
-                  <ElTag :type="event.sync_status === 'synced' ? 'success' : 'danger'" effect="light">
-                    {{ eventStatusLabel(event.sync_status) }}
-                  </ElTag>
                 </div>
               </div>
             </section>
@@ -438,6 +477,39 @@ git push digidocs {{ selectedRepo.default_branch }}</code></pre>
   color: var(--dd-ink);
 }
 
+.rail-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.rail-summary div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--dd-line);
+  border-radius: 10px;
+  background: var(--dd-surface-soft);
+  display: grid;
+  gap: 6px;
+}
+
+.rail-summary span,
+.repo-tab small,
+.repo-kicker,
+.section-head p,
+.target-line span,
+.event-main span,
+.event-main small {
+  color: var(--dd-muted);
+  font-size: 13px;
+}
+
+.rail-summary strong {
+  color: var(--dd-ink);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
 .repo-count {
   color: var(--dd-muted);
   font-size: 13px;
@@ -461,19 +533,48 @@ git push digidocs {{ selectedRepo.default_branch }}</code></pre>
   cursor: pointer;
 }
 
+.repo-tab strong {
+  color: var(--dd-ink);
+  font-size: 14px;
+}
+
+.repo-tab-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .repo-tab.active {
   border-color: var(--dd-primary);
   background: #eef6ff;
 }
 
-.repo-tab span,
-.repo-kicker,
-.section-head p,
-.target-line span,
-.event-main span,
-.event-main small {
-  color: var(--dd-muted);
-  font-size: 13px;
+.repo-state-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.repo-state-pill.active {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.repo-state-pill.syncing {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.repo-state-pill.failed {
+  background: #fef2f2;
+  color: #dc2626;
 }
 
 .code-main {
@@ -496,10 +597,16 @@ git push digidocs {{ selectedRepo.default_branch }}</code></pre>
 }
 
 .repo-hero {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
   gap: 24px;
   padding: 22px;
+}
+
+.repo-hero-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
 }
 
 .repo-title-block {
@@ -529,11 +636,17 @@ git push digidocs {{ selectedRepo.default_branch }}</code></pre>
   color: var(--dd-ink-2);
 }
 
+.repo-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .repo-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(96px, 1fr));
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
   gap: 10px;
-  min-width: 360px;
 }
 
 .repo-metrics div,
@@ -585,7 +698,7 @@ pre {
 
 .event-row {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto;
+  grid-template-columns: 36px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
   border: 1px solid var(--dd-line);
@@ -613,6 +726,29 @@ pre {
   gap: 3px;
 }
 
+.event-main-head,
+.event-meta-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.event-main-head strong {
+  color: var(--dd-ink);
+}
+
+.event-meta-line span {
+  position: relative;
+}
+
+.event-meta-line span:not(:last-child)::after {
+  content: "·";
+  margin-left: 10px;
+  color: var(--dd-subtle);
+}
+
 .event-empty {
   min-height: 140px;
   display: grid;
@@ -632,13 +768,86 @@ pre {
     position: static;
   }
 
-  .repo-hero {
-    display: grid;
+  .repo-hero-main {
+    flex-direction: column;
+  }
+
+  .repo-hero-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .repo-metrics {
-    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .repo-rail {
+    padding: 14px;
+  }
+
+  .rail-summary {
     grid-template-columns: 1fr;
+  }
+
+  .repo-list {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(220px, 82vw);
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin: 0 -2px;
+  }
+
+  .repo-tab {
+    min-height: 110px;
+  }
+
+  .repo-tab-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .repo-hero,
+  .command-card,
+  .target-card,
+  .event-panel {
+    padding: 16px;
+  }
+
+  .repo-title-block {
+    gap: 12px;
+  }
+
+  .repo-avatar {
+    width: 42px;
+    height: 42px;
+    font-size: 20px;
+  }
+
+  .repo-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .section-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  pre {
+    margin-top: 12px;
+    padding: 14px;
+    font-size: 12px;
+  }
+
+  .event-row {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+
+  .event-status {
+    width: 28px;
+    height: 28px;
   }
 }
 </style>
