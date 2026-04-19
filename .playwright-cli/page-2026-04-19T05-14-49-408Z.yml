@@ -1,0 +1,277 @@
+- generic [ref=e28]:
+  - complementary [ref=e29]:
+    - generic [ref=e30]:
+      - generic [ref=e31]: DG
+      - generic [ref=e32]:
+        - generic [ref=e33]: DigiDocs
+        - generic [ref=e34]: 文档资产平台
+    - navigation [ref=e35]:
+      - link "总览" [ref=e36] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e38]
+        - text: 总览
+      - link "文档" [ref=e42] [cursor=pointer]:
+        - /url: /documents
+        - img [ref=e44]
+        - text: 文档
+      - link "数据" [ref=e46] [cursor=pointer]:
+        - /url: /data
+        - img [ref=e48]
+        - text: 数据
+      - link "代码" [ref=e50] [cursor=pointer]:
+        - /url: /code
+        - img [ref=e52]
+        - text: 代码
+      - link "交接" [ref=e56] [cursor=pointer]:
+        - /url: /handovers
+        - img [ref=e58]
+        - text: 交接
+      - link "助手" [ref=e61] [cursor=pointer]:
+        - /url: /assistant
+        - img [ref=e63]
+        - text: 助手
+    - generic [ref=e66]:
+      - generic [ref=e67]: 快捷工作
+      - button "打开文档工作台 进入文档筛选与流转视图" [ref=e68] [cursor=pointer]:
+        - img [ref=e71]
+        - generic [ref=e73]:
+          - strong [ref=e74]: 打开文档工作台
+          - generic [ref=e75]: 进入文档筛选与流转视图
+        - img [ref=e77]
+      - button "推进交接任务 优先处理待确认交接单" [ref=e79] [cursor=pointer]:
+        - img [ref=e82]
+        - generic [ref=e85]:
+          - strong [ref=e86]: 推进交接任务
+          - generic [ref=e87]: 优先处理待确认交接单
+        - img [ref=e89]
+      - button "进入 OpenClaw 在受控范围内提问与整理" [ref=e91] [cursor=pointer]:
+        - img [ref=e94]
+        - generic [ref=e97]:
+          - strong [ref=e98]: 进入 OpenClaw
+          - generic [ref=e99]: 在受控范围内提问与整理
+        - img [ref=e101]
+    - link "系统管理" [ref=e105] [cursor=pointer]:
+      - /url: /admin
+      - img [ref=e107]
+      - text: 系统管理
+  - main [ref=e109]:
+    - generic [ref=e110]:
+      - generic [ref=e113]:
+        - generic [ref=e114]:
+          - link "工作台" [ref=e115] [cursor=pointer]:
+            - /url: /dashboard
+            - generic [ref=e116]: 工作台
+            - img [ref=e118]
+          - link "总览" [ref=e120] [cursor=pointer]:
+            - /url: /dashboard
+            - generic [ref=e121]: 总览
+        - generic [ref=e122]: 负责人总览
+        - generic [ref=e123]: 课题文档、流转和交接风险
+      - generic [ref=e124]:
+        - button "搜索 / 跳转 Ctrl K" [ref=e125] [cursor=pointer]:
+          - img [ref=e127]
+          - generic [ref=e129]: 搜索 / 跳转
+          - generic [ref=e130]: Ctrl K
+        - generic [ref=e131]:
+          - img [ref=e133]
+          - generic [ref=e137]: 工作流在线
+        - button "系 系统管理员 平台管理员" [ref=e139] [cursor=pointer]:
+          - generic [ref=e140]: 系
+          - generic [ref=e141]:
+            - generic [ref=e142]: 系统管理员
+            - generic [ref=e143]: 平台管理员
+          - img [ref=e145]
+    - generic [ref=e147]:
+      - generic [ref=e149]:
+        - generic [ref=e150]: 负责人工作台
+        - heading "负责人总览" [level=1] [ref=e151]
+        - paragraph [ref=e152]: 优先呈现需要负责人关注的文档状态、近期流转和交接风险。
+      - generic [ref=e153]:
+        - button "待负责人推进 0 需要继续确认接收与交接闭环 打开交接工作台" [ref=e154] [cursor=pointer]:
+          - generic [ref=e155]:
+            - generic [ref=e156]:
+              - generic [ref=e157]: 待负责人推进
+              - generic [ref=e158]: "0"
+            - img [ref=e161]
+          - paragraph [ref=e163]: 需要继续确认接收与交接闭环
+          - generic [ref=e164]: 打开交接工作台
+        - button "风险文档 0 优先处理长期未更新或交接异常文档 查看文档资产库" [ref=e165] [cursor=pointer]:
+          - generic [ref=e166]:
+            - generic [ref=e167]:
+              - generic [ref=e168]: 风险文档
+              - generic [ref=e169]: "0"
+            - img [ref=e172]
+          - paragraph [ref=e174]: 优先处理长期未更新或交接异常文档
+          - generic [ref=e175]: 查看文档资产库
+        - button "处理中资产 12 仍处于草稿、处理中和待交接状态 进入文档工作台" [ref=e176] [cursor=pointer]:
+          - generic [ref=e177]:
+            - generic [ref=e178]:
+              - generic [ref=e179]: 处理中资产
+              - generic [ref=e180]: "12"
+            - img [ref=e183]
+          - paragraph [ref=e185]: 仍处于草稿、处理中和待交接状态
+          - generic [ref=e186]: 进入文档工作台
+      - generic [ref=e187]:
+        - generic [ref=e188]:
+          - generic [ref=e189]: 今日关注
+          - paragraph [ref=e190]: 当前有 12 份文档仍处于草稿、处理中或待交接状态。
+        - generic [ref=e191]:
+          - generic [ref=e192]:
+            - generic [ref=e193]: 草稿
+            - strong [ref=e194]: "0"
+          - generic [ref=e195]:
+            - generic [ref=e196]: 处理中
+            - strong [ref=e197]: "12"
+          - generic [ref=e198]:
+            - generic [ref=e199]: 待交接
+            - strong [ref=e200]: "0"
+          - generic [ref=e201]:
+            - generic [ref=e202]: 已交接
+            - strong [ref=e203]: "1"
+          - generic [ref=e204]:
+            - generic [ref=e205]: 定稿
+            - strong [ref=e206]: "0"
+          - generic [ref=e207]:
+            - generic [ref=e208]: 已归档
+            - strong [ref=e209]: "2"
+      - generic [ref=e210]:
+        - generic [ref=e211]:
+          - img [ref=e214]
+          - generic [ref=e216]:
+            - generic [ref=e217]: 文档总量
+            - generic [ref=e218]: "15"
+            - generic [ref=e219]: 纳入团队空间的文档资产
+        - generic [ref=e220]:
+          - img [ref=e223]
+          - generic [ref=e227]:
+            - generic [ref=e228]: 处理中
+            - generic [ref=e229]: "12"
+            - generic [ref=e230]: 仍在责任人处理中的文档
+        - generic [ref=e231]:
+          - img [ref=e234]
+          - generic [ref=e237]:
+            - generic [ref=e238]: 待交接
+            - generic [ref=e239]: "0"
+            - generic [ref=e240]: 需要负责人继续推进
+        - generic [ref=e241]:
+          - img [ref=e244]
+          - generic [ref=e246]:
+            - generic [ref=e247]: 风险文档
+            - generic [ref=e248]: "0"
+            - generic [ref=e249]: 长期未更新或交接异常
+      - generic [ref=e250]:
+        - generic [ref=e251]:
+          - generic [ref=e252]:
+            - generic [ref=e253]:
+              - heading "近期流转" [level=2] [ref=e254]
+              - paragraph [ref=e255]: 跟踪文档责任和状态变化
+            - img [ref=e257]
+          - generic [ref=e259]:
+            - generic [ref=e262]:
+              - generic [ref=e263]: 职业生涯规划分享
+              - generic [ref=e264]:
+                - generic [ref=e265]: 归档
+                - generic [ref=e266]: 04/17 21:25
+              - generic [ref=e267]:
+                - generic [ref=e268]: 定稿
+                - generic [ref=e269]: →
+                - generic [ref=e270]: 已归档
+            - generic [ref=e273]:
+              - generic [ref=e274]: agent-learning
+              - generic [ref=e275]:
+                - generic [ref=e276]: 归档
+                - generic [ref=e277]: 04/17 21:14
+              - generic [ref=e278]:
+                - generic [ref=e279]: 定稿
+                - generic [ref=e280]: →
+                - generic [ref=e281]: 已归档
+            - generic [ref=e284]:
+              - generic [ref=e285]: agent-learning
+              - generic [ref=e286]:
+                - generic [ref=e287]: 定稿
+                - generic [ref=e288]: 04/17 21:14
+              - generic [ref=e289]:
+                - generic [ref=e290]: 处理中
+                - generic [ref=e291]: →
+                - generic [ref=e292]: 定稿
+            - generic [ref=e295]:
+              - generic [ref=e296]: 职业生涯规划分享
+              - generic [ref=e297]:
+                - generic [ref=e298]: 取消归档
+                - generic [ref=e299]: 04/17 15:59
+              - generic [ref=e300]:
+                - generic [ref=e301]: 已归档
+                - generic [ref=e302]: →
+                - generic [ref=e303]: 定稿
+            - generic [ref=e306]:
+              - generic [ref=e307]: 职业生涯规划分享
+              - generic [ref=e308]:
+                - generic [ref=e309]: 归档
+                - generic [ref=e310]: 04/17 15:59
+              - generic [ref=e311]:
+                - generic [ref=e312]: 定稿
+                - generic [ref=e313]: →
+                - generic [ref=e314]: 已归档
+            - generic [ref=e317]:
+              - generic [ref=e318]: 公示内容_网信算备330110507206401240101号
+              - generic [ref=e319]:
+                - generic [ref=e320]: 定稿
+                - generic [ref=e321]: 04/17 15:57
+              - generic [ref=e322]:
+                - generic [ref=e323]: 处理中
+                - generic [ref=e324]: →
+                - generic [ref=e325]: 定稿
+            - generic [ref=e328]:
+              - generic [ref=e329]: 寒假特训营日志
+              - generic [ref=e330]:
+                - generic [ref=e331]: 接收移交
+                - generic [ref=e332]: 04/17 15:57
+              - generic [ref=e333]:
+                - generic [ref=e334]: 待交接
+                - generic [ref=e335]: →
+                - generic [ref=e336]: 处理中
+            - generic [ref=e339]:
+              - generic [ref=e340]: 寒假特训营日志
+              - generic [ref=e341]:
+                - generic [ref=e342]: 移交
+                - generic [ref=e343]: 04/17 15:57
+              - generic [ref=e344]:
+                - generic [ref=e345]: 处理中
+                - generic [ref=e346]: →
+                - generic [ref=e347]: 待交接
+            - generic [ref=e350]:
+              - generic [ref=e351]: 职业生涯规划分享
+              - generic [ref=e352]:
+                - generic [ref=e353]: 取消归档
+                - generic [ref=e354]: 04/17 15:56
+              - generic [ref=e355]:
+                - generic [ref=e356]: 已归档
+                - generic [ref=e357]: →
+                - generic [ref=e358]: 定稿
+            - generic [ref=e361]:
+              - generic [ref=e362]: 职业生涯规划分享
+              - generic [ref=e363]:
+                - generic [ref=e364]: 归档
+                - generic [ref=e365]: 04/17 15:56
+              - generic [ref=e366]:
+                - generic [ref=e367]: 定稿
+                - generic [ref=e368]: →
+                - generic [ref=e369]: 已归档
+            - generic [ref=e372]:
+              - generic [ref=e373]: 职业生涯规划分享
+              - generic [ref=e374]:
+                - generic [ref=e375]: 定稿
+                - generic [ref=e376]: 04/17 15:56
+              - generic [ref=e377]:
+                - generic [ref=e378]: 处理中
+                - generic [ref=e379]: →
+                - generic [ref=e380]: 定稿
+        - generic [ref=e381]:
+          - generic [ref=e382]:
+            - generic [ref=e383]:
+              - heading "风险提示" [level=2] [ref=e384]
+              - paragraph [ref=e385]: 优先处理会影响交接和归档的文档
+            - generic [ref=e386]: "0"
+          - generic [ref=e388]:
+            - paragraph [ref=e389]: 暂无风险文档
+            - paragraph [ref=e390]: 当前没有需要负责人立即处理的文档风险

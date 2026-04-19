@@ -1,0 +1,117 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: DG
+      - generic [ref=e7]:
+        - generic [ref=e8]: DigiDocs
+        - generic [ref=e9]: 文档资产平台
+    - navigation [ref=e10]:
+      - link "总览" [ref=e11] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e13]
+        - text: 总览
+      - link "文档" [ref=e17] [cursor=pointer]:
+        - /url: /documents
+        - img [ref=e19]
+        - text: 文档
+      - link "数据" [ref=e21] [cursor=pointer]:
+        - /url: /data
+        - img [ref=e23]
+        - text: 数据
+      - link "代码" [ref=e25] [cursor=pointer]:
+        - /url: /code
+        - img [ref=e27]
+        - text: 代码
+      - link "交接" [ref=e31] [cursor=pointer]:
+        - /url: /handovers
+        - img [ref=e33]
+        - text: 交接
+      - link "助手" [ref=e36] [cursor=pointer]:
+        - /url: /assistant
+        - img [ref=e38]
+        - text: 助手
+    - generic [ref=e41]:
+      - generic [ref=e42]: 快捷工作
+      - button "打开文档工作台 进入文档筛选与流转视图" [ref=e43] [cursor=pointer]:
+        - img [ref=e46]
+        - generic [ref=e48]:
+          - strong [ref=e49]: 打开文档工作台
+          - generic [ref=e50]: 进入文档筛选与流转视图
+        - img [ref=e52]
+      - button "推进交接任务 优先处理待确认交接单" [ref=e54] [cursor=pointer]:
+        - img [ref=e57]
+        - generic [ref=e60]:
+          - strong [ref=e61]: 推进交接任务
+          - generic [ref=e62]: 优先处理待确认交接单
+        - img [ref=e64]
+      - button "进入 OpenClaw 在受控范围内提问与整理" [ref=e66] [cursor=pointer]:
+        - img [ref=e69]
+        - generic [ref=e72]:
+          - strong [ref=e73]: 进入 OpenClaw
+          - generic [ref=e74]: 在受控范围内提问与整理
+        - img [ref=e76]
+    - link "系统管理" [ref=e80] [cursor=pointer]:
+      - /url: /admin
+      - img [ref=e82]
+      - text: 系统管理
+  - main [ref=e84]:
+    - generic [ref=e85]:
+      - generic [ref=e88]:
+        - generic [ref=e89]:
+          - link "工作台" [ref=e90] [cursor=pointer]:
+            - /url: /dashboard
+            - generic [ref=e91]: 工作台
+            - img [ref=e93]
+          - link "代码" [ref=e95] [cursor=pointer]:
+            - /url: /code
+            - generic [ref=e96]: 代码
+        - generic [ref=e97]: 代码资产库
+        - generic [ref=e98]: Git 推送与课题代码目录同步
+      - generic [ref=e99]:
+        - button "搜索 / 跳转 Ctrl K" [ref=e100] [cursor=pointer]:
+          - img [ref=e102]
+          - generic [ref=e104]: 搜索 / 跳转
+          - generic [ref=e105]: Ctrl K
+        - generic [ref=e106]:
+          - img [ref=e108]
+          - generic [ref=e112]: 工作流在线
+        - button "系 系统管理员 平台管理员" [ref=e114] [cursor=pointer]:
+          - generic [ref=e115]: 系
+          - generic [ref=e116]:
+            - generic [ref=e117]: 系统管理员
+            - generic [ref=e118]: 平台管理员
+          - img [ref=e120]
+    - generic [ref=e122]:
+      - generic [ref=e123]:
+        - generic [ref=e124]:
+          - generic [ref=e125]: 代码资产库
+          - heading "代码管理" [level=1] [ref=e126]
+          - paragraph [ref=e127]: 为课题配置受控 Git 远程仓库，成员提交后可推送到平台维护的代码目录，形成可追踪的代码资产记录。
+        - generic [ref=e128]:
+          - button "刷新" [ref=e129] [cursor=pointer]:
+            - generic [ref=e130]:
+              - img [ref=e132]
+              - text: 刷新
+          - button "新建代码仓库" [ref=e134] [cursor=pointer]:
+            - generic [ref=e135]:
+              - img [ref=e137]
+              - text: 新建代码仓库
+      - generic [ref=e139]:
+        - complementary [ref=e140]:
+          - generic [ref=e141]:
+            - img [ref=e143]
+            - text: 代码仓库
+          - generic [ref=e148]:
+            - img [ref=e151]
+            - textbox "搜索仓库" [ref=e153]
+          - generic [ref=e155] [cursor=pointer]:
+            - generic:
+              - combobox [ref=e157]
+              - generic [ref=e158]: 全部课题
+            - img [ref=e161]
+          - generic [ref=e163]: 共 0 个仓库
+        - main [ref=e165]:
+          - generic [ref=e166]:
+            - img [ref=e168]
+            - strong [ref=e172]: 还没有代码仓库
+            - generic [ref=e173]: 创建仓库后，页面会生成 remote 地址和推送命令。

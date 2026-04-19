@@ -1,0 +1,12 @@
+- generic [ref=e5]:
+  - generic [ref=e6]: 课题组文档资产平台
+  - generic [ref=e7]: 成员协作、交接沉淀、负责人总览、OpenClaw 助手
+  - generic [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]: 用户名
+      - textbox "用户名" [ref=e14]: admin
+    - generic [ref=e15]:
+      - generic [ref=e16]: 密码
+      - textbox "密码" [ref=e20]
+    - button "登录" [ref=e21] [cursor=pointer]:
+      - generic [ref=e22]: 登录

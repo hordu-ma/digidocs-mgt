@@ -1,0 +1,318 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: DG
+      - generic [ref=e7]:
+        - generic [ref=e8]: DigiDocs
+        - generic [ref=e9]: 文档资产平台
+    - navigation [ref=e10]:
+      - link "总览" [ref=e11] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e13]
+        - text: 总览
+      - link "文档" [ref=e17] [cursor=pointer]:
+        - /url: /documents
+        - img [ref=e19]
+        - text: 文档
+      - link "数据" [ref=e21] [cursor=pointer]:
+        - /url: /data
+        - img [ref=e23]
+        - text: 数据
+      - link "代码" [ref=e25] [cursor=pointer]:
+        - /url: /code
+        - img [ref=e27]
+        - text: 代码
+      - link "交接" [ref=e31] [cursor=pointer]:
+        - /url: /handovers
+        - img [ref=e33]
+        - text: 交接
+      - link "助手" [ref=e36] [cursor=pointer]:
+        - /url: /assistant
+        - img [ref=e38]
+        - text: 助手
+    - generic [ref=e41]:
+      - generic [ref=e42]: 快捷工作
+      - button "打开文档工作台 进入文档筛选与流转视图" [ref=e43] [cursor=pointer]:
+        - img [ref=e46]
+        - generic [ref=e48]:
+          - strong [ref=e49]: 打开文档工作台
+          - generic [ref=e50]: 进入文档筛选与流转视图
+        - img [ref=e52]
+      - button "推进交接任务 优先处理待确认交接单" [ref=e54] [cursor=pointer]:
+        - img [ref=e57]
+        - generic [ref=e60]:
+          - strong [ref=e61]: 推进交接任务
+          - generic [ref=e62]: 优先处理待确认交接单
+        - img [ref=e64]
+      - button "进入 OpenClaw 在受控范围内提问与整理" [ref=e66] [cursor=pointer]:
+        - img [ref=e69]
+        - generic [ref=e72]:
+          - strong [ref=e73]: 进入 OpenClaw
+          - generic [ref=e74]: 在受控范围内提问与整理
+        - img [ref=e76]
+    - link "系统管理" [ref=e80] [cursor=pointer]:
+      - /url: /admin
+      - img [ref=e82]
+      - text: 系统管理
+  - main [ref=e84]:
+    - generic [ref=e85]:
+      - generic [ref=e88]:
+        - generic [ref=e89]:
+          - link "工作台" [ref=e90] [cursor=pointer]:
+            - /url: /dashboard
+            - generic [ref=e91]: 工作台
+            - img [ref=e93]
+          - link "文档" [ref=e95] [cursor=pointer]:
+            - /url: /documents
+            - generic [ref=e96]: 文档
+        - generic [ref=e97]: 文档资产库
+        - generic [ref=e98]: 按课题沉淀团队文档
+      - generic [ref=e99]:
+        - button "搜索 / 跳转 Ctrl K" [ref=e100] [cursor=pointer]:
+          - img [ref=e102]
+          - generic [ref=e104]: 搜索 / 跳转
+          - generic [ref=e105]: Ctrl K
+        - generic [ref=e106]:
+          - img [ref=e108]
+          - generic [ref=e112]: 工作流在线
+        - button "系 系统管理员 平台管理员" [ref=e114] [cursor=pointer]:
+          - generic [ref=e115]: 系
+          - generic [ref=e116]:
+            - generic [ref=e117]: 系统管理员
+            - generic [ref=e118]: 平台管理员
+          - img [ref=e120]
+    - generic [ref=e122]:
+      - generic [ref=e123]:
+        - generic [ref=e124]:
+          - generic [ref=e125]: 文档资产库
+          - heading "文档管理" [level=1] [ref=e126]
+          - paragraph [ref=e127]: 按课题沉淀文档资产，快速查看责任人、版本和当前流转状态。
+        - button "新建文档" [ref=e128] [cursor=pointer]:
+          - generic [ref=e129]:
+            - img [ref=e131]
+            - text: 新建文档
+      - generic [ref=e133]:
+        - complementary [ref=e134]:
+          - generic [ref=e135]:
+            - img [ref=e137]
+            - text: 文档
+          - button "全部文档 13" [ref=e139] [cursor=pointer]:
+            - generic [ref=e140]: 全部文档
+            - strong [ref=e141]: "13"
+          - button "err-graph 0" [ref=e142] [cursor=pointer]:
+            - generic [ref=e143]: err-graph
+            - strong [ref=e144]: "0"
+          - button "wuhao-ai 13" [ref=e145] [cursor=pointer]:
+            - generic [ref=e146]: wuhao-ai
+            - strong [ref=e147]: "13"
+        - generic [ref=e148]:
+          - generic [ref=e149]:
+            - generic [ref=e150]:
+              - button "全部文档" [ref=e151] [cursor=pointer]
+              - button "我负责的" [ref=e152] [cursor=pointer]
+              - button "待交接" [ref=e153] [cursor=pointer]
+              - button "处理中" [ref=e154] [cursor=pointer]
+              - button "最近更新" [ref=e155] [cursor=pointer]
+            - generic [ref=e157] [cursor=pointer]:
+              - generic:
+                - combobox [ref=e159]
+                - generic [ref=e160]: 按最近更新
+              - img [ref=e163]
+          - generic [ref=e165]:
+            - generic [ref=e167]:
+              - img [ref=e170]
+              - textbox "搜索文档标题" [ref=e172]
+            - generic [ref=e173] [cursor=pointer]:
+              - generic [ref=e174]:
+                - switch "显示已归档"
+              - generic [ref=e177]: 显示已归档
+            - generic [ref=e178]: 当前显示 13 篇文档，共 2 个课题
+          - generic [ref=e179]:
+            - generic [ref=e180]:
+              - button "⌄ err-graph 0 篇" [ref=e181] [cursor=pointer]:
+                - generic [ref=e182]: ⌄
+                - generic [ref=e183]: err-graph
+                - generic [ref=e184]: 0 篇
+              - generic [ref=e185]: 该课题尚未沉淀文档资产
+            - generic [ref=e186]:
+              - button "⌄ wuhao-ai 13 篇" [ref=e187] [cursor=pointer]:
+                - generic [ref=e188]: ⌄
+                - generic [ref=e189]: wuhao-ai
+                - generic [ref=e190]: 13 篇
+              - generic [ref=e191]:
+                - generic [ref=e192]:
+                  - generic [ref=e193]: 类型
+                  - generic [ref=e194]: 文档信息
+                  - generic [ref=e195]: 责任人
+                  - generic [ref=e196]: 版本
+                  - generic [ref=e197]: 状态
+                  - generic [ref=e198]: 操作
+                - generic [ref=e199]:
+                  - button "DOC 寒假特训营日志 wuhao-ai · 04/18 · 最近 7 天更新 乔 乔安强 v4 处理中" [ref=e200] [cursor=pointer]:
+                    - generic [ref=e201]: DOC
+                    - generic [ref=e202]:
+                      - strong [ref=e203]: 寒假特训营日志
+                      - generic [ref=e204]: wuhao-ai · 04/18 · 最近 7 天更新
+                    - generic [ref=e205]:
+                      - generic [ref=e206]: 乔
+                      - text: 乔安强
+                    - generic [ref=e207]: v4
+                    - generic [ref=e208]: 处理中
+                  - button [ref=e211] [cursor=pointer]:
+                    - img [ref=e213]
+                - generic [ref=e215]:
+                  - button "DOC 公示内容_网信算备330110507206401240101号 wuhao-ai · 04/17 · 最近 7 天更新 乔 乔安强 v1 已交接" [ref=e216] [cursor=pointer]:
+                    - generic [ref=e217]: DOC
+                    - generic [ref=e218]:
+                      - strong [ref=e219]: 公示内容_网信算备330110507206401240101号
+                      - generic [ref=e220]: wuhao-ai · 04/17 · 最近 7 天更新
+                    - generic [ref=e221]:
+                      - generic [ref=e222]: 乔
+                      - text: 乔安强
+                    - generic [ref=e223]: v1
+                    - generic [ref=e224]: 已交接
+                  - button [ref=e227] [cursor=pointer]:
+                    - img [ref=e229]
+                - generic [ref=e231]:
+                  - button "DOC Wuhao-tutor_User_Manual wuhao-ai · 04/17 · 最近 7 天更新 马 马立国 v1 处理中" [ref=e232] [cursor=pointer]:
+                    - generic [ref=e233]: DOC
+                    - generic [ref=e234]:
+                      - strong [ref=e235]: Wuhao-tutor_User_Manual
+                      - generic [ref=e236]: wuhao-ai · 04/17 · 最近 7 天更新
+                    - generic [ref=e237]:
+                      - generic [ref=e238]: 马
+                      - text: 马立国
+                    - generic [ref=e239]: v1
+                    - generic [ref=e240]: 处理中
+                  - button [ref=e243] [cursor=pointer]:
+                    - img [ref=e245]
+                - generic [ref=e247]:
+                  - button "DOC 学情雷达系统建设路径 wuhao-ai · 04/17 · 最近 7 天更新 马 马立国 v1 处理中" [ref=e248] [cursor=pointer]:
+                    - generic [ref=e249]: DOC
+                    - generic [ref=e250]:
+                      - strong [ref=e251]: 学情雷达系统建设路径
+                      - generic [ref=e252]: wuhao-ai · 04/17 · 最近 7 天更新
+                    - generic [ref=e253]:
+                      - generic [ref=e254]: 马
+                      - text: 马立国
+                    - generic [ref=e255]: v1
+                    - generic [ref=e256]: 处理中
+                  - button [ref=e259] [cursor=pointer]:
+                    - img [ref=e261]
+                - generic [ref=e263]:
+                  - button "DOC 五好教育 wuhao-ai · 04/17 · 最近 7 天更新 马 马立国 v1 处理中" [ref=e264] [cursor=pointer]:
+                    - generic [ref=e265]: DOC
+                    - generic [ref=e266]:
+                      - strong [ref=e267]: 五好教育
+                      - generic [ref=e268]: wuhao-ai · 04/17 · 最近 7 天更新
+                    - generic [ref=e269]:
+                      - generic [ref=e270]: 马
+                      - text: 马立国
+                    - generic [ref=e271]: v1
+                    - generic [ref=e272]: 处理中
+                  - button [ref=e275] [cursor=pointer]:
+                    - img [ref=e277]
+                - generic [ref=e279]:
+                  - button "DOC 五好生涯报价体系 wuhao-ai · 04/17 · 最近 7 天更新 马 马立国 v1 处理中" [ref=e280] [cursor=pointer]:
+                    - generic [ref=e281]: DOC
+                    - generic [ref=e282]:
+                      - strong [ref=e283]: 五好生涯报价体系
+                      - generic [ref=e284]: wuhao-ai · 04/17 · 最近 7 天更新
+                    - generic [ref=e285]:
+                      - generic [ref=e286]: 马
+                      - text: 马立国
+                    - generic [ref=e287]: v1
+                    - generic [ref=e288]: 处理中
+                  - button [ref=e291] [cursor=pointer]:
+                    - img [ref=e293]
+                - generic [ref=e295]:
+                  - button "DOC MBTI职业性格测试(完整版) wuhao-ai · 04/17 · 最近 7 天更新 马 马立国 v1 处理中" [ref=e296] [cursor=pointer]:
+                    - generic [ref=e297]: DOC
+                    - generic [ref=e298]:
+                      - strong [ref=e299]: MBTI职业性格测试(完整版)
+                      - generic [ref=e300]: wuhao-ai · 04/17 · 最近 7 天更新
+                    - generic [ref=e301]:
+                      - generic [ref=e302]: 马
+                      - text: 马立国
+                    - generic [ref=e303]: v1
+                    - generic [ref=e304]: 处理中
+                  - button [ref=e307] [cursor=pointer]:
+                    - img [ref=e309]
+                - generic [ref=e311]:
+                  - button "DOC 山东省高考志愿填报调查(（家长版） wuhao-ai · 04/17 · 最近 7 天更新 马 马立国 v1 处理中" [ref=e312] [cursor=pointer]:
+                    - generic [ref=e313]: DOC
+                    - generic [ref=e314]:
+                      - strong [ref=e315]: 山东省高考志愿填报调查(（家长版）
+                      - generic [ref=e316]: wuhao-ai · 04/17 · 最近 7 天更新
+                    - generic [ref=e317]:
+                      - generic [ref=e318]: 马
+                      - text: 马立国
+                    - generic [ref=e319]: v1
+                    - generic [ref=e320]: 处理中
+                  - button [ref=e323] [cursor=pointer]:
+                    - img [ref=e325]
+                - generic [ref=e327]:
+                  - button "DOC 山东省高考志愿填报回顾性调查（学生版） wuhao-ai · 04/17 · 最近 7 天更新 马 马立国 v1 处理中" [ref=e328] [cursor=pointer]:
+                    - generic [ref=e329]: DOC
+                    - generic [ref=e330]:
+                      - strong [ref=e331]: 山东省高考志愿填报回顾性调查（学生版）
+                      - generic [ref=e332]: wuhao-ai · 04/17 · 最近 7 天更新
+                    - generic [ref=e333]:
+                      - generic [ref=e334]: 马
+                      - text: 马立国
+                    - generic [ref=e335]: v1
+                    - generic [ref=e336]: 处理中
+                  - button [ref=e339] [cursor=pointer]:
+                    - img [ref=e341]
+                - generic [ref=e343]:
+                  - button "DOC MBTI职业性格测评解析 wuhao-ai · 04/17 · 最近 7 天更新 马 马立国 v1 处理中" [ref=e344] [cursor=pointer]:
+                    - generic [ref=e345]: DOC
+                    - generic [ref=e346]:
+                      - strong [ref=e347]: MBTI职业性格测评解析
+                      - generic [ref=e348]: wuhao-ai · 04/17 · 最近 7 天更新
+                    - generic [ref=e349]:
+                      - generic [ref=e350]: 马
+                      - text: 马立国
+                    - generic [ref=e351]: v1
+                    - generic [ref=e352]: 处理中
+                  - button [ref=e355] [cursor=pointer]:
+                    - img [ref=e357]
+                - generic [ref=e359]:
+                  - button "DOC 五好教育 wuhao-ai · 04/17 · 最近 7 天更新 马 马立国 v1 处理中" [ref=e360] [cursor=pointer]:
+                    - generic [ref=e361]: DOC
+                    - generic [ref=e362]:
+                      - strong [ref=e363]: 五好教育
+                      - generic [ref=e364]: wuhao-ai · 04/17 · 最近 7 天更新
+                    - generic [ref=e365]:
+                      - generic [ref=e366]: 马
+                      - text: 马立国
+                    - generic [ref=e367]: v1
+                    - generic [ref=e368]: 处理中
+                  - button [ref=e371] [cursor=pointer]:
+                    - img [ref=e373]
+                - generic [ref=e375]:
+                  - button "DOC “五好教育”发展及规划 wuhao-ai · 04/17 · 最近 7 天更新 马 马立国 v1 处理中" [ref=e376] [cursor=pointer]:
+                    - generic [ref=e377]: DOC
+                    - generic [ref=e378]:
+                      - strong [ref=e379]: “五好教育”发展及规划
+                      - generic [ref=e380]: wuhao-ai · 04/17 · 最近 7 天更新
+                    - generic [ref=e381]:
+                      - generic [ref=e382]: 马
+                      - text: 马立国
+                    - generic [ref=e383]: v1
+                    - generic [ref=e384]: 处理中
+                  - button [ref=e387] [cursor=pointer]:
+                    - img [ref=e389]
+                - generic [ref=e391]:
+                  - button "DOC 通义千问大模型API接口合作证明 wuhao-ai · 04/17 · 最近 7 天更新 马 马立国 v1 处理中" [ref=e392] [cursor=pointer]:
+                    - generic [ref=e393]: DOC
+                    - generic [ref=e394]:
+                      - strong [ref=e395]: 通义千问大模型API接口合作证明
+                      - generic [ref=e396]: wuhao-ai · 04/17 · 最近 7 天更新
+                    - generic [ref=e397]:
+                      - generic [ref=e398]: 马
+                      - text: 马立国
+                    - generic [ref=e399]: v1
+                    - generic [ref=e400]: 处理中
+                  - button [ref=e403] [cursor=pointer]:
+                    - img [ref=e405]
