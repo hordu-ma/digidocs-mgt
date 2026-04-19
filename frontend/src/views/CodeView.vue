@@ -461,6 +461,7 @@ git push digidocs {{ selectedRepo.default_branch }}</code></pre>
   display: grid;
   gap: 12px;
   padding: 16px;
+  min-width: 0;
 }
 
 .rail-title,
@@ -519,10 +520,12 @@ git push digidocs {{ selectedRepo.default_branch }}</code></pre>
   display: grid;
   gap: 8px;
   min-height: 120px;
+  min-width: 0;
 }
 
 .repo-tab {
   width: 100%;
+  min-width: 0;
   border: 1px solid var(--dd-line);
   border-radius: 8px;
   background: #fff;
@@ -536,6 +539,9 @@ git push digidocs {{ selectedRepo.default_branch }}</code></pre>
 .repo-tab strong {
   color: var(--dd-ink);
   font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .repo-tab-head {
@@ -681,7 +687,10 @@ pre {
   border-radius: 8px;
   background: #111827;
   color: #e5e7eb;
-  overflow-x: auto;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   line-height: 1.7;
 }
 
@@ -792,15 +801,11 @@ pre {
   }
 
   .repo-list {
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(220px, 82vw);
-    overflow-x: auto;
-    padding-bottom: 4px;
-    margin: 0 -2px;
+    grid-template-columns: 1fr;
   }
 
   .repo-tab {
-    min-height: 110px;
+    min-height: 0;
   }
 
   .repo-tab-head {
