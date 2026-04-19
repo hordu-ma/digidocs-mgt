@@ -1,12 +1,16 @@
 package service
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -14,6 +18,7 @@ import (
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/repository"
+	"digidocs-mgt/backend-go/internal/storage"
 )
 
 type CodeRepositoryService struct {
@@ -21,6 +26,7 @@ type CodeRepositoryService struct {
 	writer      repository.CodeRepositoryWriter
 	permissions PermissionService
 	repoRoot    string
+	storage     storage.Provider
 }
 
 func NewCodeRepositoryService(
@@ -28,12 +34,14 @@ func NewCodeRepositoryService(
 	writer repository.CodeRepositoryWriter,
 	permissions PermissionService,
 	repoRoot string,
+	storageProvider storage.Provider,
 ) CodeRepositoryService {
 	return CodeRepositoryService{
 		reader:      reader,
 		writer:      writer,
 		permissions: permissions,
 		repoRoot:    repoRoot,
+		storage:     storageProvider,
 	}
 }
 
@@ -141,6 +149,9 @@ func (s CodeRepositoryService) RecordPush(ctx context.Context, repo *query.CodeR
 	if afterSHA == "" {
 		status = "failed"
 		errMsg = "default branch was not pushed"
+	} else if err := s.syncCommitToTarget(ctx, repo, afterSHA); err != nil {
+		status = "failed"
+		errMsg = err.Error()
 	}
 	event, err := s.writer.CreateCodePushEvent(ctx, command.CodePushEventCreateInput{
 		RepositoryID:  repo.ID,
@@ -155,11 +166,57 @@ func (s CodeRepositoryService) RecordPush(ctx context.Context, repo *query.CodeR
 		return nil, err
 	}
 	if afterSHA != "" {
-		if err := s.writer.UpdateCodeRepositoryAfterPush(ctx, repo.ID, afterSHA, "active"); err != nil {
+		repoStatus := "active"
+		if status == "failed" {
+			repoStatus = "failed"
+		}
+		if err := s.writer.UpdateCodeRepositoryAfterPush(ctx, repo.ID, afterSHA, repoStatus); err != nil {
 			return nil, err
 		}
 	}
 	return event, nil
+}
+
+func (s CodeRepositoryService) syncCommitToTarget(ctx context.Context, repo *query.CodeRepositoryDetail, commitSHA string) error {
+	if s.storage == nil {
+		return nil
+	}
+	cmd := exec.CommandContext(ctx, "git", "--git-dir", repo.RepoStoragePath, "archive", "--format=tar", commitSHA)
+	out, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("git archive failed: %w", err)
+	}
+	reader := tar.NewReader(bytes.NewReader(out))
+	targetRoot := strings.Trim(strings.TrimSpace(repo.TargetFolderPath), "/")
+	for {
+		header, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("read archive failed: %w", err)
+		}
+		if header.FileInfo().IsDir() {
+			continue
+		}
+		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeRegA {
+			continue
+		}
+		cleanName := path.Clean(header.Name)
+		if cleanName == "." || strings.HasPrefix(cleanName, "../") || strings.HasPrefix(cleanName, "/") {
+			continue
+		}
+		objectKey := path.Join(targetRoot, cleanName)
+		if _, err := s.storage.PutObject(ctx, storage.PutObjectInput{
+			ObjectKey:   objectKey,
+			Reader:      reader,
+			Overwrite:   true,
+			CreatePaths: true,
+		}); err != nil {
+			return fmt.Errorf("sync file %s failed: %w", cleanName, err)
+		}
+	}
+	return nil
 }
 
 func runGit(ctx context.Context, gitDir string, args ...string) error {

@@ -1486,13 +1486,13 @@ Body: `{ "items": [{ "data_asset_id": "uuid", "selected": true, "note": "..." }]
 
 ### 14.1 概述
 
-代码资产模块用于为课题创建受控 Git remote。成员在本地完成 `git add`、`git commit` 后，可以将默认分支 push 到平台维护的 bare repository。平台记录仓库配置、目标代码文件夹、最近提交和 push 事件。
+代码资产模块用于为课题创建受控 Git remote。成员在本地完成 `git add`、`git commit` 后，可以将默认分支 push 到平台维护的 bare repository。平台记录仓库配置、目标代码文件夹、最近提交和 push 事件，并将默认分支提交内容通过统一存储适配层写入目标代码文件夹。
 
 首期边界：
 
 - 不提供 GitHub/GitLab 式 PR、Issue、代码评审或 CI/CD；
 - Git 接收入口使用 Basic token；
-- 目标代码文件夹作为受控路径记录，后续可扩展为群晖目录树差量同步；
+- 目标代码文件夹作为受控路径，首期执行新增/覆盖同步；删除差量清理后续增强；
 - 创建和配置仓库：`admin`、项目 `owner/manager`；
 - push：仓库 token 校验通过后允许写入 Git 仓库，并记录事件。
 

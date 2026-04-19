@@ -191,7 +191,9 @@ async function submitCreate() {
     ElMessage.success("代码仓库已创建");
     showCreateDialog.value = false;
     await fetchRepositories();
-    await selectRepository(repo.id);
+    selectedRepoID.value = repo.id;
+    selectedRepo.value = repo;
+    pushEvents.value = [];
   } catch (err: any) {
     ElMessage.error(err.response?.data?.message ?? "创建失败");
   } finally {
