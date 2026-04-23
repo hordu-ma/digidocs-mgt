@@ -92,3 +92,12 @@ services:
 volumes:
   postgres_data:
   code_repos:
+
+networks:
+  default:
+    name: digidocs-mgt-app
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
+          gateway: 172.29.0.1

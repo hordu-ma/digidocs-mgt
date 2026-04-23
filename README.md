@@ -157,6 +157,7 @@ docker compose --profile app up -d backend-go backend-py-worker frontend
 说明：
 
 - 上述 `docker compose` 主要用于本地单机联调；
+- 仓库当前把 compose 应用网络固定为 `172.29.0.0/24`，避免重启或重建后漂移到新的 Docker bridge 子网并与 `tailscaled` 的 `table 52` 发生竞争；
 - 当前目标部署分层为：`DGX Spark / P14s` 承载应用层与 OpenClaw，`群晖 DS925+` 承载数据库层（`Container Manager` 中的 PostgreSQL 容器）和文件层（DSM / File Station 原生服务）。
 
 部署前配置模板：
@@ -186,7 +187,7 @@ make verify
 - `ops/codex/skills/index.yaml`：技能索引
 - `scripts/codex/install-project-skills.sh`：把项目技能安装到 `~/.codex/skills/`
 - `scripts/codex/install-hooks.sh`：启用仓库内 `pre-commit` / `pre-push` hooks
-- `scripts/codex/install-persistent-routing.sh`：为 Linux 宿主机安装 `tailscaled` 持久化路由修正
+- `scripts/codex/install-persistent-routing.sh`：为 Linux 宿主机安装 `tailscaled` 持久化路由修正，当前默认覆盖 `172.17.0.0/16`、`172.29.0.0/24`、`192.168.1.0/24`
 - `scripts/codex/doctor.sh`：环境与协作资产体检
 - `scripts/codex/check-doc-sync.sh`：检查 `README.md` / `TASKS.md` / `AGENTS.md` 的阶段与协作约束一致性
 - `scripts/codex/report.sh`：输出当前分支、阶段、技能安装与 hooks 状态
@@ -238,6 +239,7 @@ docker compose up -d postgres
 - 已完成 JWT 用户 ID 透传至所有审计事件写入（middleware → handlers → repositories）
 - 已完成前端四个页面接入真实后端 API（仪表盘、文档列表、文档详情、交接单）
 - 已修复宿主机 Docker 端口转发问题（Tailscale 路由表与 Docker 网桥冲突）
+- 已固定 compose 应用网络为 `172.29.0.0/24`，并把持久化路由修正口径同步到该固定子网，降低重启后再次被 `table 52` 抢路由的概率
 - 已完成前端商业化产品体验升级（二期）
   - 统一全局设计 token、Element Plus 皮肤与导航壳层
   - 新增全局搜索/跳转命令面板与快捷工作入口
