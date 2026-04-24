@@ -4,7 +4,7 @@ set -euo pipefail
 IP_BIN="${IP_BIN:-$(command -v ip)}"
 ATTEMPTS="${DIGIDOCS_ROUTE_FIX_ATTEMPTS:-8}"
 SLEEP_SECONDS="${DIGIDOCS_ROUTE_FIX_INTERVAL:-1}"
-ROUTE_FIX_CIDRS=(172.17.0.0/16 172.29.0.0/24 192.168.1.0/24)
+ROUTE_FIX_CIDRS=(172.17.0.0/16 172.18.0.0/16 172.29.0.0/24 192.168.1.0/24)
 
 if [[ -n "${DIGIDOCS_ROUTE_FIX_EXTRA_CIDRS:-}" ]]; then
   # Allow ops to append additional destinations that must bypass tailscale policy routing.

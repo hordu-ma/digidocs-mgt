@@ -187,7 +187,7 @@ make verify
 - `ops/codex/skills/index.yaml`：技能索引
 - `scripts/codex/install-project-skills.sh`：把项目技能安装到 `~/.codex/skills/`
 - `scripts/codex/install-hooks.sh`：启用仓库内 `pre-commit` / `pre-push` hooks
-- `scripts/codex/install-persistent-routing.sh`：为 Linux 宿主机安装 `tailscaled` 持久化路由修正，当前默认覆盖 `172.17.0.0/16`、`172.29.0.0/24`、`192.168.1.0/24`
+- `scripts/codex/install-persistent-routing.sh`：为 Linux 宿主机安装 `tailscaled` 持久化路由修正，当前默认覆盖 `172.17.0.0/16`、`172.18.0.0/16`、`172.29.0.0/24`、`192.168.1.0/24`
 - `scripts/codex/doctor.sh`：环境与协作资产体检
 - `scripts/codex/check-doc-sync.sh`：检查 `README.md` / `TASKS.md` / `AGENTS.md` 的阶段与协作约束一致性
 - `scripts/codex/report.sh`：输出当前分支、阶段、技能安装与 hooks 状态

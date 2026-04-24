@@ -71,7 +71,7 @@
   - 为后续导出 PDF 预留统一文档资产目录
 - 完成 Docker 固定子网与持久路由修正收口
   - `docker-compose.yml` 已将 compose 应用网络固定为 `172.29.0.0/24`
-  - `ops/systemd/digidocs-route-fix.sh` 与 `scripts/codex/install-persistent-routing.sh` 已同步改为覆盖 `172.17.0.0/16`、`172.29.0.0/24`、`192.168.1.0/24`
+  - `ops/systemd/digidocs-route-fix.sh` 与 `scripts/codex/install-persistent-routing.sh` 已同步改为覆盖 `172.17.0.0/16`、`172.18.0.0/16`、`172.29.0.0/24`、`192.168.1.0/24`
   - `docs/部署准备与运行说明.md`、`README.md` 已同步记录固定子网和 `table 52` 持久化修复口径
 - 完成 Go 后端核心业务服务层单元测试
   - `auth_service_test.go`：登录成功、用户不存在、密码错误、仓库层错误传播（4 用例）

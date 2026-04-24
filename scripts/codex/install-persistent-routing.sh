@@ -45,7 +45,7 @@ run_as_root "$BIN_TARGET"
 
 echo "verifying tailscaled drop-in..."
 systemctl show tailscaled --property=DropInPaths --no-pager
-ip route show table 52 | grep -E '^(throw 172\.17\.0\.0/16|throw 172\.29\.0\.0/24|throw 192\.168\.1\.0/24)'
+ip route show table 52 | grep -E '^(throw 172\.17\.0\.0/16|throw 172\.18\.0\.0/16|throw 172\.29\.0\.0/24|throw 192\.168\.1\.0/24)'
 
 echo "installed:"
 echo "  script:  $BIN_TARGET"
