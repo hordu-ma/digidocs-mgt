@@ -440,6 +440,12 @@
   - 移除顶部导航栏冗余"新建工作"按钮（`AppLayout.vue`），同步清理未使用的 `Plus` 图标导入
   - 已通过 `go build ./...`、`go test ./...`、`npm run build` 全量验证，容器已重建
 
+- 完成产品宣传手册交付版 PDF
+  - 基于 `docs/digidocs-mgt-customer-intro.md` 精简文案
+  - 使用本地系统截图、现有架构图和公共素材制作 9 页 A4 宣传册
+  - 输出文件：`docs/digidocs-mgt-product-brochure.pdf`
+  - 可复现源文件：`docs/digidocs-mgt-product-brochure.html`
+
 ## 待办
 
 - ~~跑通 Alembic 初始迁移~~ ✅ 已完成

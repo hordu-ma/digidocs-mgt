@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>DigiDocs Mgt 产品宣传手册</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 0;
+      }
+
+      :root {
+        --ink: #16233a;
+        --muted: #667085;
+        --line: rgba(22, 35, 58, 0.12);
+        --paper: #f6f2ea;
+        --cream: #fffaf1;
+        --navy: #0d2746;
+        --blue: #1f6feb;
+        --cyan: #23b6c8;
+        --green: #58b368;
+        --orange: #f08b3e;
+        --rose: #da5a72;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: #ddd;
+        font-family: "Noto Sans CJK SC", "Noto Sans", sans-serif;
+      }
+
+      .page {
+        position: relative;
+        width: 210mm;
+        height: 297mm;
+        overflow: hidden;
+        break-inside: avoid;
+        page-break-after: always;
+        background:
+          radial-gradient(circle at 13% 9%, rgba(35, 182, 200, 0.22), transparent 28%),
+          radial-gradient(circle at 88% 14%, rgba(240, 139, 62, 0.18), transparent 28%),
+          linear-gradient(145deg, #fffaf1 0%, #f7f2e8 52%, #edf4f1 100%);
+        padding: 18mm;
+      }
+
+      .page.dark {
+        color: #f7fbff;
+        background:
+          radial-gradient(circle at 78% 18%, rgba(35, 182, 200, 0.32), transparent 27%),
+          radial-gradient(circle at 16% 85%, rgba(240, 139, 62, 0.24), transparent 30%),
+          linear-gradient(145deg, #081829 0%, #0d2746 52%, #123a4c 100%);
+      }
+
+      .page.dark .muted,
+      .page.dark p,
+      .page.dark .caption {
+        color: rgba(247, 251, 255, 0.78);
+      }
+
+      .page.dark .card,
+      .page.dark .glass,
+      .page.dark .metric {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.18);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 900;
+        letter-spacing: 0.02em;
+      }
+
+      .mark {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        background: conic-gradient(from 220deg, var(--cyan), var(--blue), var(--orange), var(--cyan));
+        box-shadow: 0 10px 24px rgba(31, 111, 235, 0.28);
+      }
+
+      .kicker {
+        margin: 0 0 10px;
+        color: var(--blue);
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .dark .kicker {
+        color: #8ce2ef;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 130mm;
+        margin-top: 44mm;
+        font-size: 56px;
+        line-height: 1.08;
+        letter-spacing: -0.04em;
+      }
+
+      h2 {
+        max-width: 140mm;
+        font-size: 38px;
+        line-height: 1.15;
+        letter-spacing: -0.03em;
+      }
+
+      h3 {
+        font-size: 18px;
+        line-height: 1.35;
+      }
+
+      p {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.75;
+      }
+
+      .lead {
+        max-width: 118mm;
+        margin-top: 18px;
+        font-size: 18px;
+        line-height: 1.72;
+      }
+
+      .cover-grid {
+        position: absolute;
+        right: 14mm;
+        bottom: 20mm;
+        display: grid;
+        width: 102mm;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        transform: rotate(-4deg);
+      }
+
+      .shot,
+      .photo {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.58);
+        box-shadow: 0 18px 44px rgba(8, 24, 41, 0.2);
+      }
+
+      .cover-grid .shot {
+        height: 66mm;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 22px;
+      }
+
+      .pill {
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.62);
+        color: #334155;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .dark .pill {
+        color: #f7fbff;
+        border-color: rgba(255, 255, 255, 0.16);
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .footer {
+        position: absolute;
+        left: 18mm;
+        right: 18mm;
+        bottom: 12mm;
+        display: flex;
+        justify-content: space-between;
+        color: rgba(102, 112, 133, 0.78);
+        font-size: 10px;
+      }
+
+      .dark .footer {
+        color: rgba(247, 251, 255, 0.64);
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: 0.9fr 1.1fr;
+        gap: 16mm;
+        align-items: center;
+        margin-top: 18mm;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 11px;
+      }
+
+      .card,
+      .glass,
+      .metric {
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.68);
+        box-shadow: 0 16px 42px rgba(16, 32, 55, 0.08);
+      }
+
+      .card {
+        min-height: 42mm;
+        padding: 16px;
+      }
+
+      .card strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 17px;
+      }
+
+      .icon {
+        display: inline-grid;
+        width: 32px;
+        height: 32px;
+        margin-bottom: 12px;
+        place-items: center;
+        border-radius: 12px;
+        background: #102a43;
+        color: white;
+        font-weight: 900;
+      }
+
+      .icon.cyan {
+        background: var(--cyan);
+      }
+
+      .icon.green {
+        background: var(--green);
+      }
+
+      .icon.orange {
+        background: var(--orange);
+      }
+
+      .icon.rose {
+        background: var(--rose);
+      }
+
+      .screen-hero {
+        position: relative;
+        margin-top: 15mm;
+        padding: 12px;
+        border-radius: 28px;
+        background: linear-gradient(135deg, rgba(13, 39, 70, 0.92), rgba(24, 69, 91, 0.85));
+        box-shadow: 0 22px 54px rgba(13, 39, 70, 0.2);
+      }
+
+      .screen-hero img {
+        display: block;
+        width: 100%;
+        height: 145mm;
+        object-fit: cover;
+        object-position: top left;
+        border-radius: 20px;
+      }
+
+      .screen-hero img.contain {
+        object-fit: contain;
+        object-position: center;
+        background: #f8fbff;
+      }
+
+      .caption {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .gallery {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 16mm;
+      }
+
+      .gallery-item {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.74);
+        box-shadow: 0 14px 36px rgba(16, 32, 55, 0.09);
+      }
+
+      .gallery-item img {
+        display: block;
+        width: 100%;
+        height: 56mm;
+        object-fit: cover;
+        object-position: top left;
+      }
+
+      .gallery-item .txt {
+        padding: 12px 14px 14px;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-top: 18mm;
+      }
+
+      .step {
+        min-height: 52mm;
+        padding: 16px 14px;
+        border-radius: 24px;
+        background: #fff;
+        border: 1px solid var(--line);
+      }
+
+      .step .num {
+        color: var(--blue);
+        font-size: 28px;
+        font-weight: 900;
+      }
+
+      .split-gallery {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12mm;
+        margin-top: 16mm;
+        align-items: stretch;
+      }
+
+      .photo-card {
+        min-height: 85mm;
+        overflow: hidden;
+        border-radius: 28px;
+        background: #fff;
+        border: 1px solid var(--line);
+        box-shadow: 0 18px 44px rgba(16, 32, 55, 0.11);
+      }
+
+      .photo-card img {
+        display: block;
+        width: 100%;
+        height: 59mm;
+        object-fit: cover;
+      }
+
+      .photo-card .txt {
+        padding: 14px 16px 16px;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-top: 14mm;
+      }
+
+      .metric {
+        padding: 16px;
+      }
+
+      .metric strong {
+        display: block;
+        color: var(--blue);
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .dark .metric strong {
+        color: #8ce2ef;
+      }
+
+      .quote {
+        margin-top: 18mm;
+        padding: 18px 22px;
+        border-left: 6px solid var(--orange);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.62);
+        font-size: 24px;
+        line-height: 1.55;
+        font-weight: 900;
+      }
+
+      .dark .quote {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+    </style>
+  </head>
+  <body>
+    <section class="page dark">
+      <div class="brand"><span class="mark"></span><span>DigiDocs Mgt</span></div>
+      <h1>课题组文档资产管理与智能助理平台</h1>
+      <p class="lead">把文档、数据、代码、交接和 AI 辅助统一到一套可追踪、可交付、可沉淀的团队资产系统。</p>
+      <div class="pill-row">
+        <span class="pill">文件级版本</span>
+        <span class="pill">显式流转</span>
+        <span class="pill">毕业交接</span>
+        <span class="pill">OpenClaw 助手</span>
+        <span class="pill">群晖存储</span>
+      </div>
+      <div class="cover-grid">
+        <img class="shot" src="assets/product-brochure/dashboard.png" alt="负责人总览截图" />
+        <img class="shot" src="assets/product-brochure/documents.png" alt="文档资产库截图" />
+        <img class="shot" src="assets/product-brochure/assistant.png" alt="AI 助手截图" />
+        <img class="shot" src="assets/product-brochure/web/dgx-spark.jpg" alt="NVIDIA DGX Spark 小型 AI 计算主机" />
+      </div>
+      <div class="footer"><span>产品宣传手册</span><span>2026-04-24</span></div>
+    </section>
+
+    <section class="page">
+      <p class="kicker">Why it matters</p>
+      <h2>课题组缺的不是网盘，而是可管理的资料闭环</h2>
+      <div class="two-col">
+        <div>
+          <p class="lead">DigiDocs Mgt 面向负责人和团队成员，解决“文件在哪、谁负责、哪版最新、怎么交接、历史材料如何复用”的连续问题。</p>
+          <div class="quote">从个人附件，变成团队可追踪资产。</div>
+        </div>
+        <div class="cards">
+          <div class="card"><span class="icon">1</span><strong>版本混乱</strong><p>不再靠“最终版2”识别文件关系，每次提交形成明确版本。</p></div>
+          <div class="card"><span class="icon cyan">2</span><strong>责任不清</strong><p>文档当前责任人、状态和流转记录都能直接追踪。</p></div>
+          <div class="card"><span class="icon orange">3</span><strong>交接断档</strong><p>离组、毕业、换题时形成清单、确认和完成记录。</p></div>
+          <div class="card"><span class="icon green">4</span><strong>知识难用</strong><p>OpenClaw 基于受控材料做摘要、问答和风险提示。</p></div>
+        </div>
+      </div>
+      <div class="footer"><span>DigiDocs Mgt</span><span>01</span></div>
+    </section>
+
+    <section class="page">
+      <p class="kicker">Product snapshot</p>
+      <h2>负责人视角：一屏看清课题资料状态</h2>
+      <div class="screen-hero">
+        <img src="assets/product-brochure/dashboard.png" alt="负责人总览界面" />
+      </div>
+      <div class="metrics">
+        <div class="metric"><strong>统一</strong><p>团队空间、课题、目录三层结构。</p></div>
+        <div class="metric"><strong>可查</strong><p>版本、流转、审计和交接记录。</p></div>
+        <div class="metric"><strong>可问</strong><p>AI 围绕真实材料回答。</p></div>
+      </div>
+      <p class="caption">系统实拍：负责人总览页展示文档状态、近期流转和管理入口。</p>
+      <div class="footer"><span>负责人总览</span><span>02</span></div>
+    </section>
+
+    <section class="page">
+      <p class="kicker">Asset workbench</p>
+      <h2>文档、数据、代码分账管理，但统一归属课题</h2>
+      <div class="gallery">
+        <div class="gallery-item"><img src="assets/product-brochure/documents.png" alt="文档资产库" /><div class="txt"><h3>文档资产库</h3><p>管理 docx、xlsx、pptx、pdf 等正式材料。</p></div></div>
+        <div class="gallery-item"><img src="assets/product-brochure/data.png" alt="数据资产库" /><div class="txt"><h3>数据资产库</h3><p>承载图片、视频、模型、数据集等大文件。</p></div></div>
+        <div class="gallery-item"><img src="assets/product-brochure/code.png" alt="代码资产库" /><div class="txt"><h3>代码资产库</h3><p>通过受控 Git remote 记录 push 和同步目标。</p></div></div>
+        <div class="gallery-item"><img src="assets/product-brochure/admin.png" alt="管理后台" /><div class="txt"><h3>管理后台</h3><p>维护团队空间、课题、用户和项目成员关系。</p></div></div>
+      </div>
+      <div class="footer"><span>资产工作台</span><span>03</span></div>
+    </section>
+
+    <section class="page">
+      <p class="kicker">Workflow</p>
+      <h2>用轻量流程替代反复口头确认</h2>
+      <div class="flow">
+        <div class="step"><div class="num">01</div><h3>挂接课题</h3><p>材料必须进入团队空间、课题和目录。</p></div>
+        <div class="step"><div class="num">02</div><h3>提交版本</h3><p>每次更新保留版本说明、提交人和时间。</p></div>
+        <div class="step"><div class="num">03</div><h3>显式流转</h3><p>责任人变化通过操作记录，而不是聊天消息。</p></div>
+        <div class="step"><div class="num">04</div><h3>审计留痕</h3><p>下载、上传、归档、恢复等动作可复盘。</p></div>
+      </div>
+      <div class="split-gallery">
+        <div class="photo-card"><img src="assets/product-brochure/handovers.png" alt="毕业交接界面" /><div class="txt"><h3>毕业交接</h3><p>清单、确认、完成、取消形成正式流程。</p></div></div>
+        <div class="photo-card"><img src="assets/product-brochure/web/laptop-desk.png" alt="公共办公素材" /><div class="txt"><h3>接力友好</h3><p>新成员可从课题资产和上下文快速接手。</p></div></div>
+      </div>
+      <div class="footer"><span>协作流程</span><span>04</span></div>
+    </section>
+
+    <section class="page dark">
+      <p class="kicker">OpenClaw assistant</p>
+      <h2>AI 是受控助手，不是主业务账本</h2>
+      <div class="two-col">
+        <div>
+          <p class="lead">OpenClaw 从 Go 主后端读取受控上下文，围绕项目、文档、版本、流转和交接单生成摘要、回答和建议。</p>
+          <div class="pill-row">
+            <span class="pill">上下文受控</span>
+            <span class="pill">结果可追踪</span>
+            <span class="pill">建议需确认</span>
+            <span class="pill">业务事实分离</span>
+          </div>
+        </div>
+        <div class="screen-hero">
+          <img src="assets/product-brochure/assistant.png" alt="OpenClaw 助手界面" />
+        </div>
+      </div>
+      <div class="footer"><span>智能助理</span><span>05</span></div>
+    </section>
+
+    <section class="page">
+      <p class="kicker">Deployment</p>
+      <h2>DGX Spark 负责应用与 AI，群晖负责文件与数据库底座</h2>
+      <div class="screen-hero">
+        <img class="contain" src="assets/customer-intro/system-architecture.svg" alt="系统架构图" />
+      </div>
+      <div class="cards" style="margin-top: 12mm;">
+        <div class="card"><span class="icon">A</span><strong>应用与智能处理</strong><p>前端、Go API、Python Worker 与 OpenClaw 运行在 DGX Spark / P14s 侧。</p></div>
+        <div class="card"><span class="icon cyan">B</span><strong>正式资产底座</strong><p>群晖 DS925+ 承载文件资产、数据库和可备份存储空间。</p></div>
+      </div>
+      <div class="footer"><span>部署结构</span><span>06</span></div>
+    </section>
+
+    <section class="page">
+      <p class="kicker">Customer value</p>
+      <h2>给负责人的是管理确定性，给团队的是可延续资产</h2>
+      <div class="split-gallery">
+        <div class="photo-card"><img src="assets/product-brochure/web/ds925plus.jpg" alt="Synology DS925+ 网络存储设备" /><div class="txt"><h3>资料长期沉淀</h3><p>文档、数据、代码从个人设备转入团队可控空间。</p></div></div>
+        <div class="photo-card"><img src="assets/product-brochure/login.png" alt="登录界面" /><div class="txt"><h3>低门槛使用</h3><p>成员继续使用熟悉的 Office 和 Git，平台负责版本、责任和流程。</p></div></div>
+      </div>
+      <div class="metrics">
+        <div class="metric"><strong>少找</strong><p>少翻聊天记录和本地附件。</p></div>
+        <div class="metric"><strong>早控</strong><p>关键节点前提前识别风险。</p></div>
+        <div class="metric"><strong>能接</strong><p>人员变化后资料不断档。</p></div>
+      </div>
+      <div class="footer"><span>客户价值</span><span>07</span></div>
+    </section>
+
+    <section class="page dark">
+      <p class="kicker">Close</p>
+      <h2>一套面向课题组的文档资产操作系统</h2>
+      <p class="lead">DigiDocs Mgt 不替代 Office、不替代 Git、不让 AI 绕开流程；它把正式材料、责任状态、交接动作和智能辅助组织到同一个可管理闭环中。</p>
+      <div class="pill-row">
+        <span class="pill">适合课题组日常管理</span>
+        <span class="pill">适合毕业交接</span>
+        <span class="pill">适合历史材料复用</span>
+        <span class="pill">适合本地化部署</span>
+      </div>
+      <div class="footer"><span>DigiDocs Mgt</span><span>08</span></div>
+    </section>
+  </body>
+</html>
