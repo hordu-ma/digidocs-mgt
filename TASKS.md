@@ -443,7 +443,8 @@
 - 完成产品宣传手册交付版 PDF
   - 基于 `docs/digidocs-mgt-customer-intro.md` 精简文案
   - 使用本地系统截图、现有架构图和公共素材制作 9 页 A4 宣传册
-  - 输出文件：`docs/digidocs-mgt-product-brochure.pdf`
+  - 2026-04-26 优化封面网络素材、移动端助手截图和公司尾页信息
+  - 输出文件：`docs/digidocs-mgt-product-brochure.pdf`、`output/pdf/digidocs-mgt-product-brochure.pdf`
   - 可复现源文件：`docs/digidocs-mgt-product-brochure.html`
 - 完成测试部署组网改造（P14s + 群晖同局域网）
   - 新增 `docker-compose.p14s.yml`，固化 `backend-py-worker` 使用 host network

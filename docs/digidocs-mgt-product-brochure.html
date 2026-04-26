@@ -149,6 +149,33 @@
         transform: rotate(-4deg);
       }
 
+      .cover-tile {
+        position: relative;
+        overflow: hidden;
+        height: 66mm;
+        border-radius: 18px;
+        box-shadow: 0 18px 44px rgba(8, 24, 41, 0.2);
+      }
+
+      .cover-tile .shot {
+        height: 100%;
+        border-radius: 18px;
+        box-shadow: none;
+      }
+
+      .cover-tile span {
+        position: absolute;
+        left: 12px;
+        bottom: 10px;
+        padding: 6px 9px;
+        border-radius: 999px;
+        background: rgba(8, 24, 41, 0.72);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+      }
+
       .shot,
       .photo {
         width: 100%;
@@ -287,6 +314,48 @@
         background: #f8fbff;
       }
 
+      .assistant-showcase {
+        display: grid;
+        grid-template-columns: 0.86fr 1.14fr;
+        gap: 14mm;
+        align-items: center;
+        margin-top: 14mm;
+      }
+
+      .phone-frame {
+        position: relative;
+        width: 72mm;
+        height: 154mm;
+        margin-left: auto;
+        padding: 4mm;
+        border-radius: 28px;
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(207, 226, 242, 0.82));
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.28);
+      }
+
+      .phone-frame::before {
+        content: "";
+        position: absolute;
+        top: 2mm;
+        left: 50%;
+        width: 18mm;
+        height: 3mm;
+        border-radius: 99px;
+        background: rgba(8, 24, 41, 0.18);
+        transform: translateX(-50%);
+        z-index: 2;
+      }
+
+      .phone-frame img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: top center;
+        border-radius: 22px;
+        border: 1px solid rgba(13, 39, 70, 0.12);
+      }
+
       .caption {
         margin-top: 8px;
         color: var(--muted);
@@ -406,6 +475,82 @@
         background: rgba(255, 255, 255, 0.1);
       }
 
+      .close-page {
+        isolation: isolate;
+      }
+
+      .ghost-words {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        overflow: hidden;
+        color: rgba(255, 255, 255, 0.055);
+        font-size: 68px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .ghost-words span {
+        position: absolute;
+        white-space: nowrap;
+      }
+
+      .ghost-words span:nth-child(1) {
+        top: 38mm;
+        left: -8mm;
+        transform: rotate(-8deg);
+      }
+
+      .ghost-words span:nth-child(2) {
+        top: 132mm;
+        right: -38mm;
+        transform: rotate(8deg);
+      }
+
+      .ghost-words span:nth-child(3) {
+        bottom: 34mm;
+        left: 8mm;
+        transform: rotate(-5deg);
+      }
+
+      .company-block {
+        margin-top: 26mm;
+        padding-top: 12mm;
+        border-top: 1px solid rgba(255, 255, 255, 0.18);
+      }
+
+      .company-name {
+        max-width: 132mm;
+        color: #fff;
+        font-size: 30px;
+        line-height: 1.25;
+        font-weight: 900;
+      }
+
+      .service-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-top: 14mm;
+      }
+
+      .service-item {
+        min-height: 38mm;
+        padding: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .service-item strong {
+        display: block;
+        margin-bottom: 8px;
+        color: #fff;
+        font-size: 16px;
+        line-height: 1.35;
+      }
+
     </style>
   </head>
   <body>
@@ -421,12 +566,12 @@
         <span class="pill">群晖存储</span>
       </div>
       <div class="cover-grid">
-        <img class="shot" src="assets/product-brochure/dashboard.png" alt="负责人总览截图" />
-        <img class="shot" src="assets/product-brochure/documents.png" alt="文档资产库截图" />
-        <img class="shot" src="assets/product-brochure/assistant.png" alt="AI 助手截图" />
-        <img class="shot" src="assets/product-brochure/web/dgx-spark.jpg" alt="NVIDIA DGX Spark 小型 AI 计算主机" />
+        <div class="cover-tile"><img class="shot" src="assets/product-brochure/web/research-lab.jpg" alt="科研实验协作场景" /><span>Research</span></div>
+        <div class="cover-tile"><img class="shot" src="assets/product-brochure/web/education-library.jpg" alt="教育资料学习场景" /><span>Education</span></div>
+        <div class="cover-tile"><img class="shot" src="assets/product-brochure/web/industry-tablet.jpg" alt="工业现场智能协作场景" /><span>Industry</span></div>
+        <div class="cover-tile"><img class="shot" src="assets/product-brochure/web/server-rack.jpg" alt="智能基础设施机柜" /><span>Infrastructure</span></div>
       </div>
-      <div class="footer"><span>产品宣传手册</span><span>2026-04-24</span></div>
+      <div class="footer"><span>产品宣传手册</span><span>2026-04-26</span></div>
     </section>
 
     <section class="page">
@@ -493,7 +638,7 @@
     <section class="page dark">
       <p class="kicker">OpenClaw assistant</p>
       <h2>AI 是受控助手，不是主业务账本</h2>
-      <div class="two-col">
+      <div class="assistant-showcase">
         <div>
           <p class="lead">OpenClaw 从 Go 主后端读取受控上下文，围绕项目、文档、版本、流转和交接单生成摘要、回答和建议。</p>
           <div class="pill-row">
@@ -503,8 +648,8 @@
             <span class="pill">业务事实分离</span>
           </div>
         </div>
-        <div class="screen-hero">
-          <img src="assets/product-brochure/assistant.png" alt="OpenClaw 助手界面" />
+        <div class="phone-frame">
+          <img src="assets/product-brochure/assistant-mobile.png" alt="OpenClaw 助手移动端界面" />
         </div>
       </div>
       <div class="footer"><span>智能助理</span><span>05</span></div>
@@ -538,7 +683,8 @@
       <div class="footer"><span>客户价值</span><span>07</span></div>
     </section>
 
-    <section class="page dark">
+    <section class="page dark close-page">
+      <div class="ghost-words"><span>Research</span><span>Education</span><span>Industry</span></div>
       <p class="kicker">Close</p>
       <h2>一套面向课题组的文档资产操作系统</h2>
       <p class="lead">DigiDocs Mgt 不替代 Office、不替代 Git、不让 AI 绕开流程；它把正式材料、责任状态、交接动作和智能辅助组织到同一个可管理闭环中。</p>
@@ -547,6 +693,14 @@
         <span class="pill">适合毕业交接</span>
         <span class="pill">适合历史材料复用</span>
         <span class="pill">适合本地化部署</span>
+      </div>
+      <div class="company-block">
+        <div class="company-name">山东新工智造科技发展有限公司</div>
+        <div class="service-grid">
+          <div class="service-item"><strong>大模型应用开发</strong><p>面向业务场景构建可落地、可审计、可持续迭代的 AI 应用。</p></div>
+          <div class="service-item"><strong>科研效能提升</strong><p>围绕资料、流程、知识复用和协作交接提升团队产出效率。</p></div>
+          <div class="service-item"><strong>基础设施智能运维</strong><p>把应用、模型、存储与网络运行状态纳入可观测和可恢复体系。</p></div>
+        </div>
       </div>
       <div class="footer"><span>DigiDocs Mgt</span><span>08</span></div>
     </section>

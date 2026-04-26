@@ -262,7 +262,7 @@ docker compose up -d postgres
   - `CodeView` 已补齐仓库摘要卡、单列指标区与 push 记录卡片化，并收口手机端横向滚动；代码模块现在可在手机端完成仓库切换和推送历史查看且页面不再左右滑动
   - 当前预览已同步到运行中的 `digidocs-frontend` 容器，可直接通过 `18080` 查看效果
 - 已完善客户介绍文档展示素材，补充系统架构图与系统截图，便于客户侧方案说明与 PDF 输出准备
-- 已完成产品宣传手册交付版 PDF：`docs/digidocs-mgt-product-brochure.pdf`，配套 HTML 源文件与截图素材位于 `docs/digidocs-mgt-product-brochure.html`、`docs/assets/product-brochure/`
+- 已完成产品宣传手册交付版 PDF，并于 2026-04-26 完成封面素材、移动端助手截图与公司尾页优化：`docs/digidocs-mgt-product-brochure.pdf`、`output/pdf/digidocs-mgt-product-brochure.pdf`，配套 HTML 源文件与素材位于 `docs/digidocs-mgt-product-brochure.html`、`docs/assets/product-brochure/`
 - 已通过宿主机验证所有 API 端点：login、auth/me、documents、dashboard、versions、flows、handovers
 - 已完成前后端联调验证（Vite proxy → backend-go → PostgreSQL 全链路通过）
 - 已修复 `DocumentDetail` API 返回 `current_owner` 含 display_name（与 `DocumentListItem` 对齐）
