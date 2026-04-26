@@ -328,6 +328,13 @@
 
 ## 进行中
 
+- 测试部署组网改造（P14s + 群晖同局域网）
+  - 目标：把测试环境从“业务主链路可能绕 Tailscale / Docker host-gateway”调整为“局域网主链路 + Tailscale 仅远程运维”
+  - P0：新增 P14s 本机部署 compose override，固化 `backend-py-worker` 使用 host network，Worker 通过 `127.0.0.1:18789` 访问宿主机 OpenClaw，通过 `127.0.0.1:18081` 访问 Go 后端回调 / 轮询入口
+  - P0：文档明确测试环境中群晖 File Station / PostgreSQL 推荐使用群晖局域网 IP，避免在同 LAN 场景下把业务链路绕到 Tailscale IP
+  - P1：更新 README / 部署说明 / TASKS，使测试部署、正式部署、远程运维三类网络职责清晰分层
+  - 验证：执行 `docker compose config`、`make verify`、`STRICT_SMOKE=1 ASSISTANT_SMOKE_POLL_ATTEMPTS=45 ASSISTANT_SMOKE_POLL_INTERVAL=2 make smoke`
+
 - 部署验收收口（2026-04-12）
   - 已确认 p14s 当前容器形态可运行：`backend-go / frontend / backend-py-worker / postgres` 存活
   - 已确认核心业务链路通过：`healthz / auth/login / documents / dashboard/overview / handovers / audit-events / audit-events/summary`
