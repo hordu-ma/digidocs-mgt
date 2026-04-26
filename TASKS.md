@@ -328,13 +328,6 @@
 
 ## 进行中
 
-- 测试部署组网改造（P14s + 群晖同局域网）
-  - 目标：把测试环境从“业务主链路可能绕 Tailscale / Docker host-gateway”调整为“局域网主链路 + Tailscale 仅远程运维”
-  - P0：新增 P14s 本机部署 compose override，固化 `backend-py-worker` 使用 host network，Worker 通过 `127.0.0.1:18789` 访问宿主机 OpenClaw，通过 `127.0.0.1:18081` 访问 Go 后端回调 / 轮询入口
-  - P0：文档明确测试环境中群晖 File Station / PostgreSQL 推荐使用群晖局域网 IP，避免在同 LAN 场景下把业务链路绕到 Tailscale IP
-  - P1：更新 README / 部署说明 / TASKS，使测试部署、正式部署、远程运维三类网络职责清晰分层
-  - 验证：执行 `docker compose config`、`make verify`、`STRICT_SMOKE=1 ASSISTANT_SMOKE_POLL_ATTEMPTS=45 ASSISTANT_SMOKE_POLL_INTERVAL=2 make smoke`
-
 - 部署验收收口（2026-04-12）
   - 已确认 p14s 当前容器形态可运行：`backend-go / frontend / backend-py-worker / postgres` 存活
   - 已确认核心业务链路通过：`healthz / auth/login / documents / dashboard/overview / handovers / audit-events / audit-events/summary`
@@ -343,7 +336,7 @@
   - 已修复 `POST /api/v1/assistant/ask` 的 PostgreSQL enum 过滤报错；当前 `assistant.ask` 可正常返回 `request_id`，`GET /api/v1/assistant/requests/{id}` 返回 200/pending
   - 已修复 `scripts/codex/smoke-local.sh`：命令行环境变量优先于 `.env`，Synology preflight 固定走宿主机直连，`true/false` 布尔值可直接识别
   - 已确认 `RUN_SYNOLOGY_PREFLIGHT=1 make smoke` 的 DSM 前置验收通过：登录、建目录、上传、列目录、分享链接、下载、清理均通过
-  - 已用 sudo 修正宿主机 `ip route show table 52`：`172.17.0.0/16`、`172.18.0.0/16`、`192.168.1.0/24` 已改为 `throw`，容器到 `host.docker.internal` 与群晖 Tailscale 地址的主机级回流恢复
+  - 已用 sudo 修正宿主机 `ip route show table 52`：`172.17.0.0/16`、`172.18.0.0/16`、`172.29.0.0/24`、`192.168.1.0/24` 已改为 `throw`，容器到群晖 Tailscale 地址的主机级回流恢复
   - 已重建 `backend-go / backend-py-worker` 容器，使运行时环境与仓库 `.env` 对齐；`backend-go` 不再误连 `host.docker.internal:15001`
   - 已确认 Assistant 闭环恢复：`STRICT_SMOKE=1 RUN_SYNOLOGY_PREFLIGHT=1 make smoke` 中 `assistant.ask -> completed` 已通过
   - 已修复 Synology provider：目录已存在时不再因 `SYNO.FileStation.CreateFolder` 返回 400 而中断版本上传
@@ -452,6 +445,14 @@
   - 使用本地系统截图、现有架构图和公共素材制作 9 页 A4 宣传册
   - 输出文件：`docs/digidocs-mgt-product-brochure.pdf`
   - 可复现源文件：`docs/digidocs-mgt-product-brochure.html`
+- 完成测试部署组网改造（P14s + 群晖同局域网）
+  - 新增 `docker-compose.p14s.yml`，固化 `backend-py-worker` 使用 host network
+  - Worker 通过 `127.0.0.1:18789` 访问宿主机 OpenClaw，通过 `127.0.0.1:18081` 访问 Go 后端回调 / 轮询入口，避免 Docker bridge 到宿主机端口被防火墙或 Tailscale policy routing 影响
+  - `.env.example` / `.env.production.example` 新增 `P14S_OPENCLAW_BASE_URL`、`P14S_CALLBACK_BASE_URL`，并明确群晖同 LAN 场景优先使用群晖局域网 IP
+  - `README.md` / `docs/部署准备与运行说明.md` 已同步“局域网主链路 + Tailscale 远程运维”测试部署口径
+  - 已通过 `docker compose -f docker-compose.yml -f docker-compose.p14s.yml --profile app config`
+  - 已通过 `make verify`
+  - 已通过 `STRICT_SMOKE=1 ASSISTANT_SMOKE_POLL_ATTEMPTS=45 ASSISTANT_SMOKE_POLL_INTERVAL=2 make smoke`
 
 ## 待办
 

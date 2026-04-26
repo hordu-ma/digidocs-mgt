@@ -33,6 +33,7 @@
 ├── backend-go/
 ├── backend-py-worker/
 ├── docker-compose.yml
+├── docker-compose.p14s.yml # P14s + 群晖同局域网测试部署 override
 ├── frontend/
 ├── ops/
 └── scripts/
@@ -154,9 +155,17 @@ docker compose up -d postgres
 docker compose --profile app up -d backend-go backend-py-worker frontend
 ```
 
+P14s + 群晖同局域网测试部署路径：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.p14s.yml --profile app up -d --build --remove-orphans
+```
+
 说明：
 
 - 上述 `docker compose` 主要用于本地单机联调；
+- `docker-compose.p14s.yml` 用于 OpenClaw Gateway 运行在 P14s 宿主机、Worker 运行在 Docker 的测试环境：Worker 使用 host network，通过 `127.0.0.1:18789` 访问 OpenClaw，通过 `127.0.0.1:18081` 访问 Go 后端；
+- P14s 与群晖在同一局域网时，群晖 File Station / PostgreSQL 主链路优先使用群晖局域网 IP，Tailscale 仅用于远程运维或应急排障；
 - 仓库当前把 compose 应用网络固定为 `172.29.0.0/24`，避免重启或重建后漂移到新的 Docker bridge 子网并与 `tailscaled` 的 `table 52` 发生竞争；
 - 当前目标部署分层为：`DGX Spark / P14s` 承载应用层与 OpenClaw，`群晖 DS925+` 承载数据库层（`Container Manager` 中的 PostgreSQL 容器）和文件层（DSM / File Station 原生服务）。
 
@@ -185,6 +194,7 @@ make verify
 
 - `ops/codex/skills/`：可执行 skill 包
 - `ops/codex/skills/index.yaml`：技能索引
+- `docker-compose.p14s.yml`：P14s + 群晖同局域网测试部署 override，固化 Worker host network 与本机 OpenClaw / Go 后端访问路径
 - `scripts/codex/install-project-skills.sh`：把项目技能安装到 `~/.codex/skills/`
 - `scripts/codex/install-hooks.sh`：启用仓库内 `pre-commit` / `pre-push` hooks
 - `scripts/codex/install-persistent-routing.sh`：为 Linux 宿主机安装 `tailscaled` 持久化路由修正，当前默认覆盖 `172.17.0.0/16`、`172.18.0.0/16`、`172.29.0.0/24`、`192.168.1.0/24`
@@ -240,6 +250,7 @@ docker compose up -d postgres
 - 已完成前端四个页面接入真实后端 API（仪表盘、文档列表、文档详情、交接单）
 - 已修复宿主机 Docker 端口转发问题（Tailscale 路由表与 Docker 网桥冲突）
 - 已固定 compose 应用网络为 `172.29.0.0/24`，并把持久化路由修正口径同步到该固定子网，降低重启后再次被 `table 52` 抢路由的概率
+- 已新增 P14s + 群晖同局域网测试部署 override：`backend-py-worker` 可使用 host network 直连宿主机 OpenClaw 与 Go 后端，群晖主链路推荐走局域网 IP，Tailscale 仅作为远程运维通道；已通过 compose config、`make verify` 与严格 smoke（含 Assistant completed）
 - 已完成前端商业化产品体验升级（二期）
   - 统一全局设计 token、Element Plus 皮肤与导航壳层
   - 新增全局搜索/跳转命令面板与快捷工作入口
@@ -279,7 +290,7 @@ docker compose up -d postgres
 - 已新增 `docs/backend-go核心源码学习导读.md`，面向 Go 初学者解释 backend-go 核心文件中的典型函数与关键代码块
 - 已完成前端 P0/P1 产品化体验改版首轮：统一视觉 token、应用外壳、状态/文件徽标，并重构负责人总览、文档资产库和文档档案页
 - 已完成前端 P2/P3 产品化体验改版首轮：毕业交接改为任务卡与流程工作台，OpenClaw 助手改为成熟对话工作区，并通过路由懒加载消除前端构建 chunk 过大提示
-- 已完成 p14s/Linux compose 首轮部署适配（Worker 宿主机 OpenClaw 访问改用 `host-gateway`）
+- 已完成 p14s/Linux compose 首轮部署适配（标准路径支持 `host-gateway`；当前 P14s 同 LAN 测试路径已补 `docker-compose.p14s.yml` 作为 host network override）
 - 已修复 `backend-go` 运行镜像未携带 `migrations/` 导致容器内自动迁移失效的问题
 - 已完成 Assistant 问答历史列表 / 筛选与 Markdown 结果展示首轮接线
 - 已完成 PDF 正文抽取与 AI 可观测性首轮补强（模型、上游响应 ID、耗时、Worker 日志）

@@ -1,0 +1,11 @@
+# P14s + Synology LAN-first test deployment override.
+#
+# Use this when OpenClaw Gateway runs as a host process on the P14s and
+# the Python Worker runs in Docker. It avoids Docker bridge -> host-gateway
+# connectivity issues by putting the Worker in the host network namespace.
+services:
+  backend-py-worker:
+    network_mode: host
+    environment:
+      OPENCLAW_BASE_URL: ${P14S_OPENCLAW_BASE_URL:-http://127.0.0.1:18789}
+      CALLBACK_BASE_URL: ${P14S_CALLBACK_BASE_URL:-http://127.0.0.1:18081}
