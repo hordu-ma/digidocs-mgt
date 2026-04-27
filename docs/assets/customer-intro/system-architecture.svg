@@ -1,81 +1,99 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
-  <title id="title">DigiDocs Mgt system architecture</title>
-  <desc id="desc">Architecture showing DigiDocs Mgt on DGX Spark connected to Synology DS925 Plus for storage and database, with OpenClaw for AI assistance.</desc>
+  <title id="title">智研云枢系统架构图</title>
+  <desc id="desc">展示智研云枢在 DGX Spark 与群晖 DS925+ 上的部署分工，以及浏览器、应用层、AI 能力和资产底座之间的关系。</desc>
   <defs>
     <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
-      <path d="M 0 0 L 12 6 L 0 12 z" fill="#4b5563"/>
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#475569"/>
     </marker>
     <style>
-      .title { font: 700 28px Arial, sans-serif; fill: #0f172a; }
-      .subtitle { font: 600 18px Arial, sans-serif; fill: #1e293b; }
-      .label { font: 600 16px Arial, sans-serif; fill: #0f172a; }
-      .small { font: 400 14px Arial, sans-serif; fill: #334155; }
-      .note { font: 600 15px Arial, sans-serif; fill: #0f172a; }
+      .title { font: 700 28px Arial, "Noto Sans CJK SC", sans-serif; fill: #0f172a; }
+      .subtitle { font: 600 18px Arial, "Noto Sans CJK SC", sans-serif; fill: #1e293b; }
+      .label { font: 700 17px Arial, "Noto Sans CJK SC", sans-serif; fill: #0f172a; }
+      .small { font: 400 14px Arial, "Noto Sans CJK SC", sans-serif; fill: #475569; }
+      .note { font: 600 15px Arial, "Noto Sans CJK SC", sans-serif; fill: #0f172a; }
       .frame { stroke: #cbd5e1; stroke-width: 2; }
       .box { stroke: #94a3b8; stroke-width: 2; }
-      .line { stroke: #4b5563; stroke-width: 3; fill: none; marker-end: url(#arrow); }
-      .dash { stroke-dasharray: 8 6; }
+      .line {
+        stroke: #475569;
+        stroke-width: 3;
+        fill: none;
+        marker-end: url(#arrow);
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .pill-box { fill: rgba(255, 255, 255, 0.94); stroke: #d7e0ea; stroke-width: 1.5; }
+      .pill-text { font: 600 13px Arial, "Noto Sans CJK SC", sans-serif; fill: #334155; }
     </style>
   </defs>
 
   <rect width="1200" height="760" fill="#f8fafc"/>
-  <text x="600" y="46" text-anchor="middle" class="title">DigiDocs Mgt Solution Architecture</text>
-  <text x="600" y="76" text-anchor="middle" class="small">DGX Spark runs the app and AI workflow. Synology DS925+ provides the storage and database foundation.</text>
+  <text x="600" y="46" text-anchor="middle" class="title">智研云枢系统部署架构</text>
+  <text x="600" y="76" text-anchor="middle" class="small">DGX Spark 承载应用与 AI 能力，群晖 DS925+ 承载文件和数据库底座。</text>
 
-  <rect x="445" y="110" rx="16" ry="16" width="310" height="92" fill="#dbeafe" class="frame"/>
-  <text x="600" y="148" text-anchor="middle" class="subtitle">User Browser</text>
-  <text x="600" y="174" text-anchor="middle" class="small">PI / project lead / team member</text>
+  <rect x="430" y="100" rx="18" ry="18" width="340" height="92" fill="#dbeafe" class="frame"/>
+  <text x="600" y="138" text-anchor="middle" class="subtitle">使用终端</text>
+  <text x="600" y="166" text-anchor="middle" class="small">负责人 / 团队成员 / 管理员浏览器访问</text>
 
-  <rect x="70" y="245" rx="22" ry="22" width="520" height="410" fill="#eff6ff" class="frame"/>
-  <text x="100" y="286" class="subtitle">NVIDIA DGX Spark</text>
-  <text x="100" y="312" class="small">Application layer and AI processing</text>
+  <rect x="70" y="220" rx="24" ry="24" width="500" height="430" fill="#eff6ff" class="frame"/>
+  <text x="100" y="262" class="subtitle">DGX Spark</text>
+  <text x="100" y="288" class="small">业务应用与智能能力</text>
 
-  <rect x="112" y="340" rx="16" ry="16" width="180" height="92" fill="#ffffff" class="box"/>
-  <text x="202" y="375" text-anchor="middle" class="label">Web Frontend</text>
-  <text x="202" y="400" text-anchor="middle" class="small">Vue / dashboard / forms</text>
+  <rect x="120" y="330" rx="18" ry="18" width="180" height="104" fill="#ffffff" class="box"/>
+  <text x="210" y="370" text-anchor="middle" class="label">前端界面</text>
+  <text x="210" y="398" text-anchor="middle" class="small">Vue 页面 / 工作台 / 表单</text>
 
-  <rect x="330" y="340" rx="16" ry="16" width="220" height="92" fill="#ffffff" class="box"/>
-  <text x="440" y="375" text-anchor="middle" class="label">Go API Service</text>
-  <text x="440" y="400" text-anchor="middle" class="small">auth / workflow / audit</text>
+  <rect x="350" y="330" rx="18" ry="18" width="180" height="104" fill="#ffffff" class="box"/>
+  <text x="440" y="370" text-anchor="middle" class="label">业务服务</text>
+  <text x="440" y="398" text-anchor="middle" class="small">认证 / 流程 / 审计 / 接口</text>
 
-  <rect x="112" y="476" rx="16" ry="16" width="180" height="92" fill="#ffffff" class="box"/>
-  <text x="202" y="511" text-anchor="middle" class="label">Python Worker</text>
-  <text x="202" y="536" text-anchor="middle" class="small">OCR / summarize / jobs</text>
+  <rect x="120" y="482" rx="18" ry="18" width="180" height="104" fill="#ffffff" class="box"/>
+  <text x="210" y="522" text-anchor="middle" class="label">任务处理</text>
+  <text x="210" y="550" text-anchor="middle" class="small">OCR / 摘要 / 异步任务</text>
 
-  <rect x="330" y="476" rx="16" ry="16" width="220" height="92" fill="#ffffff" class="box"/>
-  <text x="440" y="511" text-anchor="middle" class="label">OpenClaw Gateway</text>
-  <text x="440" y="536" text-anchor="middle" class="small">AI chat / summary / suggestion</text>
+  <rect x="350" y="482" rx="18" ry="18" width="180" height="104" fill="#ffffff" class="box"/>
+  <text x="440" y="522" text-anchor="middle" class="label">OpenClaw</text>
+  <text x="440" y="550" text-anchor="middle" class="small">问答 / 摘要 / 建议生成</text>
 
-  <rect x="112" y="596" rx="16" ry="16" width="438" height="34" fill="#dbeafe" class="box"/>
-  <text x="331" y="619" text-anchor="middle" class="note">AI suggestions stay separate from official business state.</text>
+  <rect x="120" y="610" rx="18" ry="18" width="410" height="54" fill="#dbeafe" class="box"/>
+  <text x="325" y="643" text-anchor="middle" class="note">AI 建议单独留存，不直接改写正式业务状态。</text>
 
-  <rect x="660" y="245" rx="22" ry="22" width="470" height="410" fill="#f0fdf4" class="frame"/>
-  <text x="690" y="286" class="subtitle">Synology DS925+</text>
-  <text x="690" y="312" class="small">File and data foundation</text>
+  <rect x="630" y="220" rx="24" ry="24" width="500" height="430" fill="#f0fdf4" class="frame"/>
+  <text x="660" y="262" class="subtitle">群晖 DS925+</text>
+  <text x="660" y="288" class="small">文件与数据底座</text>
 
-  <rect x="710" y="340" rx="16" ry="16" width="170" height="98" fill="#ffffff" class="box"/>
-  <text x="795" y="375" text-anchor="middle" class="label">PostgreSQL</text>
-  <text x="795" y="400" text-anchor="middle" class="small">metadata / audit / state</text>
+  <rect x="690" y="330" rx="18" ry="18" width="170" height="104" fill="#ffffff" class="box"/>
+  <text x="775" y="370" text-anchor="middle" class="label">PostgreSQL</text>
+  <text x="775" y="398" text-anchor="middle" class="small">元数据 / 审计 / 状态</text>
 
-  <rect x="910" y="340" rx="16" ry="16" width="170" height="98" fill="#ffffff" class="box"/>
-  <text x="995" y="375" text-anchor="middle" class="label">DSM / File Station</text>
-  <text x="995" y="400" text-anchor="middle" class="small">document storage</text>
+  <rect x="910" y="330" rx="18" ry="18" width="170" height="104" fill="#ffffff" class="box"/>
+  <text x="995" y="370" text-anchor="middle" class="label">DSM / File Station</text>
+  <text x="995" y="398" text-anchor="middle" class="small">正式文件存储</text>
 
-  <rect x="710" y="476" rx="16" ry="16" width="370" height="92" fill="#ffffff" class="box"/>
-  <text x="895" y="511" text-anchor="middle" class="label">Retention and handover foundation</text>
-  <text x="895" y="536" text-anchor="middle" class="small">team assets remain with the lab, not with personal laptops</text>
+  <rect x="690" y="482" rx="18" ry="18" width="390" height="104" fill="#ffffff" class="box"/>
+  <text x="885" y="522" text-anchor="middle" class="label">资料留存与交接底座</text>
+  <text x="885" y="550" text-anchor="middle" class="small">团队资产持续沉淀，不再依赖个人电脑保存</text>
 
-  <line x1="600" y1="202" x2="202" y2="340" class="line"/>
-  <line x1="202" y1="432" x2="330" y2="386" class="line"/>
-  <line x1="440" y1="432" x2="440" y2="476" class="line"/>
-  <line x1="292" y1="522" x2="330" y2="522" class="line"/>
-  <line x1="550" y1="386" x2="710" y2="386" class="line"/>
-  <line x1="550" y1="420" x2="910" y2="420" class="line"/>
-  <path d="M 550 522 C 650 522, 650 522, 710 522" class="line"/>
-  <path d="M 795 438 C 795 460, 795 470, 795 476" class="line dash"/>
+  <path d="M 600 192 L 600 280 L 210 280 L 210 330" class="line"/>
+  <rect x="495" y="238" rx="14" ry="14" width="110" height="28" class="pill-box"/>
+  <text x="550" y="257" text-anchor="middle" class="pill-text">浏览器访问</text>
 
-  <text x="253" y="300" class="small">HTTPS</text>
-  <text x="575" y="376" class="small">REST API</text>
-  <text x="578" y="414" class="small">file upload / download</text>
-  <text x="582" y="512" class="small">async jobs / callback</text>
+  <path d="M 300 356 L 324 356 L 324 314 L 440 314 L 440 330" class="line"/>
+  <rect x="306" y="282" rx="14" ry="14" width="108" height="28" class="pill-box"/>
+  <text x="360" y="301" text-anchor="middle" class="pill-text">页面 / API 请求</text>
+
+  <path d="M 300 508 L 324 508 L 324 466 L 440 466 L 440 482" class="line"/>
+  <rect x="308" y="434" rx="14" ry="14" width="104" height="28" class="pill-box"/>
+  <text x="360" y="453" text-anchor="middle" class="pill-text">AI 任务处理</text>
+
+  <path d="M 530 356 L 610 356 L 610 300 L 775 300 L 775 330" class="line"/>
+  <rect x="630" y="268" rx="14" ry="14" width="122" height="28" class="pill-box"/>
+  <text x="691" y="287" text-anchor="middle" class="pill-text">元数据 / 审计</text>
+
+  <path d="M 530 388 L 610 388 L 610 286 L 995 286 L 995 330" class="line"/>
+  <rect x="792" y="254" rx="14" ry="14" width="112" height="28" class="pill-box"/>
+  <text x="848" y="273" text-anchor="middle" class="pill-text">上传 / 下载</text>
+
+  <path d="M 530 420 L 610 420 L 610 474 L 885 474 L 885 482" class="line"/>
+  <rect x="664" y="442" rx="14" ry="14" width="116" height="28" class="pill-box"/>
+  <text x="722" y="461" text-anchor="middle" class="pill-text">交接与长期留存</text>
 </svg>

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <title>DigiDocs Mgt 产品宣传手册</title>
+    <title>智研云枢 产品宣传手册</title>
     <style>
       @page {
         size: A4;
@@ -72,9 +72,31 @@
       .brand {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
         font-weight: 900;
         letter-spacing: 0.02em;
+      }
+
+      .brand-lockup {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand-en {
+        font-size: 22px;
+      }
+
+      .brand-cn {
+        padding: 7px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 999px;
+        background: linear-gradient(135deg, rgba(140, 226, 239, 0.2), rgba(255, 255, 255, 0.08));
+        color: #fef3c7;
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        box-shadow: 0 12px 28px rgba(8, 24, 41, 0.16);
       }
 
       .mark {
@@ -551,11 +573,54 @@
         line-height: 1.35;
       }
 
+      .contact-placeholder {
+        position: absolute;
+        right: 18mm;
+        bottom: 24mm;
+        width: 63mm;
+        padding: 11px 12px 12px;
+        border: 1px dashed rgba(255, 255, 255, 0.24);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .contact-placeholder strong {
+        display: block;
+        color: #fff;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+      }
+
+      .contact-placeholder p {
+        margin-top: 4px;
+        color: rgba(247, 251, 255, 0.68);
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .contact-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+        color: rgba(247, 251, 255, 0.82);
+        font-size: 11px;
+      }
+
+      .contact-line .fill {
+        flex: 1;
+        height: 10px;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.3);
+      }
+
     </style>
   </head>
   <body>
     <section class="page dark">
-      <div class="brand"><span class="mark"></span><span>DigiDocs Mgt</span></div>
+      <div class="brand">
+        <span class="mark"></span>
+        <span class="brand-lockup"><span class="brand-en">DigiDocs Mgt</span><span class="brand-cn">智研云枢</span></span>
+      </div>
       <h1>课题组文档资产管理与智能助理平台</h1>
       <p class="lead">把文档、数据、代码、交接和 AI 辅助统一到一套可追踪、可交付、可沉淀的团队资产系统。</p>
       <div class="pill-row">
@@ -571,7 +636,7 @@
         <div class="cover-tile"><img class="shot" src="assets/product-brochure/web/industry-tablet.jpg" alt="工业现场智能协作场景" /><span>Industry</span></div>
         <div class="cover-tile"><img class="shot" src="assets/product-brochure/web/server-rack.jpg" alt="智能基础设施机柜" /><span>Infrastructure</span></div>
       </div>
-      <div class="footer"><span>产品宣传手册</span><span>2026-04-26</span></div>
+      <div class="footer"><span>产品宣传手册</span><span>2026-04-27</span></div>
     </section>
 
     <section class="page">
@@ -579,7 +644,7 @@
       <h2>课题组缺的不是网盘，而是可管理的资料闭环</h2>
       <div class="two-col">
         <div>
-          <p class="lead">DigiDocs Mgt 面向负责人和团队成员，解决“文件在哪、谁负责、哪版最新、怎么交接、历史材料如何复用”的连续问题。</p>
+          <p class="lead">智研云枢系统面向负责人和团队成员，解决“文件在哪、谁负责、哪版最新、怎么交接、历史材料如何复用”的连续问题。</p>
           <div class="quote">从个人附件，变成团队可追踪资产。</div>
         </div>
         <div class="cards">
@@ -589,7 +654,7 @@
           <div class="card"><span class="icon green">4</span><strong>知识难用</strong><p>OpenClaw 基于受控材料做摘要、问答和风险提示。</p></div>
         </div>
       </div>
-      <div class="footer"><span>DigiDocs Mgt</span><span>01</span></div>
+      <div class="footer"><span>智研云枢系统</span><span>01</span></div>
     </section>
 
     <section class="page">
@@ -640,7 +705,7 @@
       <h2>AI 是受控助手，不是主业务账本</h2>
       <div class="assistant-showcase">
         <div>
-          <p class="lead">OpenClaw 从 Go 主后端读取受控上下文，围绕项目、文档、版本、流转和交接单生成摘要、回答和建议。</p>
+          <p class="lead">OpenClaw 在权限控制下读取项目、文档、版本、流转和交接信息，围绕真实资料生成摘要、回答和建议。</p>
           <div class="pill-row">
             <span class="pill">上下文受控</span>
             <span class="pill">结果可追踪</span>
@@ -661,10 +726,10 @@
       <div class="screen-hero">
         <img class="contain" src="assets/customer-intro/system-architecture.svg" alt="系统架构图" />
       </div>
-      <div class="cards" style="margin-top: 12mm;">
-        <div class="card"><span class="icon">A</span><strong>应用与智能处理</strong><p>前端、Go API、Python Worker 与 OpenClaw 运行在 DGX Spark / P14s 侧。</p></div>
-        <div class="card"><span class="icon cyan">B</span><strong>正式资产底座</strong><p>群晖 DS925+ 承载文件资产、数据库和可备份存储空间。</p></div>
-      </div>
+        <div class="cards" style="margin-top: 12mm;">
+          <div class="card"><span class="icon">A</span><strong>业务应用与智能助手</strong><p>系统界面、资料流程和智能问答能力统一运行在 DGX Spark，老师和成员通过浏览器即可使用。</p></div>
+          <div class="card"><span class="icon cyan">B</span><strong>正式资产底座</strong><p>群晖 DS925+ 承载文件资产、数据库和可备份存储空间。</p></div>
+        </div>
       <div class="footer"><span>部署结构</span><span>06</span></div>
     </section>
 
@@ -687,7 +752,7 @@
       <div class="ghost-words"><span>Research</span><span>Education</span><span>Industry</span></div>
       <p class="kicker">Close</p>
       <h2>一套面向课题组的文档资产操作系统</h2>
-      <p class="lead">DigiDocs Mgt 不替代 Office、不替代 Git、不让 AI 绕开流程；它把正式材料、责任状态、交接动作和智能辅助组织到同一个可管理闭环中。</p>
+      <p class="lead">智研云枢不替代 Office、不替代 Git、不让 AI 绕开流程；它把正式材料、责任状态、交接动作和智能辅助组织到同一个可管理闭环中。</p>
       <div class="pill-row">
         <span class="pill">适合课题组日常管理</span>
         <span class="pill">适合毕业交接</span>
@@ -702,7 +767,14 @@
           <div class="service-item"><strong>基础设施智能运维</strong><p>把应用、模型、存储与网络运行状态纳入可观测和可恢复体系。</p></div>
         </div>
       </div>
-      <div class="footer"><span>DigiDocs Mgt</span><span>08</span></div>
+      <div class="contact-placeholder">
+        <strong>如有需求，敬请联系</strong>
+        <p>可手写补充联系人信息，便于现场沟通或后续跟进。</p>
+        <div class="contact-line"><span>联系人</span><span class="fill"></span></div>
+        <div class="contact-line"><span>电话/微信</span><span class="fill"></span></div>
+        <div class="contact-line"><span>备注</span><span class="fill"></span></div>
+      </div>
+      <div class="footer"><span>智研云枢</span><span>08</span></div>
     </section>
   </body>
 </html>

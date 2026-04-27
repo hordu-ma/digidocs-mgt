@@ -444,6 +444,7 @@
   - 基于 `docs/digidocs-mgt-customer-intro.md` 精简文案
   - 使用本地系统截图、现有架构图和公共素材制作 9 页 A4 宣传册
   - 2026-04-26 优化封面网络素材、移动端助手截图和公司尾页信息
+  - 2026-04-27 按新品牌“智研云枢”完成二次修订：封面新增中文品牌名、第二页改为“智研云枢系统”、第 6 页 AI 文案去技术化、第 7 页架构图重绘优化、尾页新增可手写联系占位块
   - 输出文件：`docs/digidocs-mgt-product-brochure.pdf`、`output/pdf/digidocs-mgt-product-brochure.pdf`
   - 可复现源文件：`docs/digidocs-mgt-product-brochure.html`
 - 完成测试部署组网改造（P14s + 群晖同局域网）

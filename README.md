@@ -263,6 +263,7 @@ docker compose up -d postgres
   - 当前预览已同步到运行中的 `digidocs-frontend` 容器，可直接通过 `18080` 查看效果
 - 已完善客户介绍文档展示素材，补充系统架构图与系统截图，便于客户侧方案说明与 PDF 输出准备
 - 已完成产品宣传手册交付版 PDF，并于 2026-04-26 完成封面素材、移动端助手截图与公司尾页优化：`docs/digidocs-mgt-product-brochure.pdf`、`output/pdf/digidocs-mgt-product-brochure.pdf`，配套 HTML 源文件与素材位于 `docs/digidocs-mgt-product-brochure.html`、`docs/assets/product-brochure/`
+- 已按新品牌“智研云枢”完成宣传手册二次修订：封面新增中英文并列品牌名、第二页改为“智研云枢系统”、第 6 页 AI 文案去技术化、第 7 页系统架构图重绘优化、尾页新增可手写联系占位块，并已重新输出 PDF
 - 已通过宿主机验证所有 API 端点：login、auth/me、documents、dashboard、versions、flows、handovers
 - 已完成前后端联调验证（Vite proxy → backend-go → PostgreSQL 全链路通过）
 - 已修复 `DocumentDetail` API 返回 `current_owner` 含 display_name（与 `DocumentListItem` 对齐）
