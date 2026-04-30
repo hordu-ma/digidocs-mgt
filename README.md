@@ -185,6 +185,7 @@ docker compose -f docker-compose.yml -f docker-compose.p14s.yml --profile app up
 make status
 make smoke
 make verify
+make coverage-go
 ./scripts/codex/install-hooks.sh
 ./scripts/codex/install-persistent-routing.sh
 ./scripts/codex/install-project-skills.sh
@@ -203,6 +204,7 @@ make verify
 - `scripts/codex/report.sh`：输出当前分支、阶段、技能安装与 hooks 状态
 - `scripts/codex/smoke-local.sh`：本地容器联调烟测骨架
 - `Makefile`：统一 `make doctor`、`make verify`、`make check-doc-sync`
+- `make coverage-go`：生成 Go 后端跨包覆盖率报告，统计口径详见 [测试覆盖率说明](docs/测试覆盖率说明.md)
 - `.githooks/`：本地提交前和推送前门禁
 - `.github/INDEX.md`：GitHub 协作资产入口
 - `.github/workflows/verify.yml`：远端 GitHub Actions 验证门禁
@@ -346,5 +348,9 @@ docker compose up -d postgres
   - DocumentDetailView 按钮顺序调整：流转 → 档案编辑 → 下载当前版本 → 上传新版本；"编辑信息"更名为"档案编辑"
   - 修复归档后文档消失问题：DocumentsView 新增"显示已归档"开关，关闭时隐藏归档文档，开启后归档文档以灰色半透明 + 删除线标注
   - 修复管理交接弹窗加载失败：`HandoversView.loadProjectDataAssets` 响应解析从 `res.data?.data` 修正为 `res.data?.data?.items`，消除 `TypeError: assets.map is not a function`
+- 已完成 Go 后端覆盖率首轮加固：
+  - 新增 `make coverage-go` 跨包覆盖率入口与 [测试覆盖率说明](docs/测试覆盖率说明.md)
+  - 补齐 config / bootstrap / app / queue / memory storage / shared upload / middleware / response / token / memory repository 等基础层测试
+  - Go 后端默认包内覆盖率从 `14.4%` 提升到 `27.1%`，跨包总覆盖率从 `30.2%` 提升到 `38.8%`
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

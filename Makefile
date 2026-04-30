@@ -1,4 +1,4 @@
-.PHONY: doctor verify verify-go verify-worker verify-frontend check-doc-sync install-project-skills install-hooks install-persistent-routing smoke status
+.PHONY: doctor verify verify-go coverage-go verify-worker verify-frontend check-doc-sync install-project-skills install-hooks install-persistent-routing smoke status
 
 doctor:
 	./scripts/codex/doctor.sh
@@ -16,6 +16,10 @@ verify: doctor check-doc-sync verify-go verify-worker verify-frontend
 
 verify-go:
 	cd backend-go && go test ./...
+
+coverage-go:
+	cd backend-go && go test ./... -coverpkg=./... -coverprofile=coverage.out -covermode=atomic
+	cd backend-go && go tool cover -func=coverage.out | tail -n 1
 
 verify-worker:
 	cd backend-py-worker && uv run pytest -q

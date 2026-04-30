@@ -432,6 +432,13 @@
   - 根因：`HandoversView.loadProjectDataAssets` 解析响应用 `res.data?.data`，但 `/data-assets` 返回格式为 `{ data: { items, total } }`，导致 `buildEditableDataItems` 对非数组调 `.map()` 抛 TypeError
   - 修复：改为 `res.data?.data?.items ?? []`，对齐实际响应结构
 
+- 完成 Go 后端覆盖率首轮加固
+  - 新增 `make coverage-go`，统一使用 `cd backend-go && go test ./... -coverpkg=./... -coverprofile=coverage.out -covermode=atomic` 统计 Go 后端跨包覆盖率
+  - 新增 `docs/测试覆盖率说明.md`，记录当前覆盖率口径、已修复缺口和剩余问题清单
+  - 新增基础层测试：config、bootstrap、app、queue、memory storage、shared upload、HTTP middleware、response、TokenService、memory repository
+  - 当前验证结果：默认包内覆盖率 `27.1%`；跨包总覆盖率 `38.8%`
+  - 已确认距离 100% 的剩余主要问题：main/db/postgres queue/postgres repository/assistant memory/service/handler/router 仍需专项测试矩阵
+
 - 完成交付前安全与可靠性加固
   - HTTP 服务器新增 `WriteTimeout: 5min`、`IdleTimeout: 2min`，防止慢速客户端占用连接
   - PostgreSQL 连接池配置：`MaxOpenConns=25`、`MaxIdleConns=10`、`ConnMaxLifetime=5min`
@@ -479,6 +486,10 @@
 - ~~增加更细粒度的 smoke test 和分层验证矩阵~~ ✅ 已完成（smoke-local.sh 已覆盖业务端点）
 - ~~将 smoke 验证进一步细化到关键业务闭环接口~~ ✅ 已完成
 - ~~前端 Element Plus 改为按需引入~~ ✅ 已完成（JS bundle 从 1,041 KB 降至 470 KB）
+- Go 后端覆盖率下一步
+  - 补齐 `internal/repository/memory/assistant_repository.go` 与 `internal/service/assistant_*` 测试
+  - 为 `internal/repository/postgres` 与 `internal/queue/postgres` 引入 SQL mock 或测试 PostgreSQL 夹具
+  - 扩展 handler/router httptest 矩阵，把 admin、assistant、data asset、code repository、internal worker/context 路由纳入覆盖率
 
 ## 更新规则
 

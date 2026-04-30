@@ -17,6 +17,7 @@
 | [backend-py-worker代码说明.md](backend-py-worker代码说明.md) | backend-py-worker 目录逐文件职责说明与 Worker 链路说明 |
 | [frontend代码说明.md](frontend代码说明.md) | frontend 目录逐文件职责说明与前端页面协作链路说明 |
 | [项目端到端总览.md](项目端到端总览.md) | 从前端、Go、Worker、群晖、数据库到 OpenClaw 的整体业务与实现链路总览 |
+| [测试覆盖率说明.md](测试覆盖率说明.md) | Go 后端覆盖率统计口径、当前结果、已补测试与剩余问题清单 |
 | [digidocs-mgt-customer-intro.md](digidocs-mgt-customer-intro.md) | 面向课题组负责人的产品介绍、部署清单与基础预算口径 |
 | [用户使用说明.md](用户使用说明.md) | 面向团队负责人和成员的平台功能使用说明（按模块逐一说明） |
 
