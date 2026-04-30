@@ -13,6 +13,7 @@ import (
 	"digidocs-mgt/backend-go/internal/bootstrap"
 	"digidocs-mgt/backend-go/internal/config"
 	"digidocs-mgt/backend-go/internal/domain/auth"
+	"digidocs-mgt/backend-go/internal/service"
 	"digidocs-mgt/backend-go/internal/transport/http/router"
 )
 
@@ -25,6 +26,7 @@ func testServer(t *testing.T) (http.Handler, string) {
 		DataBackend:         "memory",
 		JWTSecret:           "test-secret-key-for-handler-tests",
 		WorkerCallbackToken: "worker-test-token",
+		CodeRepoRoot:        t.TempDir(),
 	}
 
 	container, err := bootstrap.BuildContainer(cfg)
@@ -55,6 +57,20 @@ func authedRequest(method, path string, body io.Reader, token string) *http.Requ
 		req.Header.Set("Content-Type", "application/json")
 	}
 	return req
+}
+
+func tokenForRole(t *testing.T, role string) string {
+	t.Helper()
+	token, err := service.NewTokenService("test-secret-key-for-handler-tests").Generate(auth.Claims{
+		UserID:      "00000000-0000-0000-0000-000000000099",
+		Username:    "role-user",
+		DisplayName: "Role User",
+		Role:        role,
+	})
+	if err != nil {
+		t.Fatalf("failed to generate role token: %v", err)
+	}
+	return token
 }
 
 func workerRequest(method, path string, body io.Reader) *http.Request {
@@ -88,6 +104,22 @@ func TestHealthz(t *testing.T) {
 	handler.ServeHTTP(rec, httptest.NewRequest("GET", "/healthz", nil))
 	if rec.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestRouter_NotFoundAndProtectedRoute(t *testing.T) {
+	handler, token := testServer(t)
+
+	notFound := httptest.NewRecorder()
+	handler.ServeHTTP(notFound, authedRequest("GET", "/api/v1/not-found", nil, token))
+	if notFound.Code != http.StatusNotFound {
+		t.Fatalf("not found status = %d, want 404; body = %s", notFound.Code, notFound.Body.String())
+	}
+
+	protected := httptest.NewRecorder()
+	handler.ServeHTTP(protected, httptest.NewRequest("GET", "/api/v1/auth/me", nil))
+	if protected.Code != http.StatusUnauthorized {
+		t.Fatalf("protected status = %d, want 401; body = %s", protected.Code, protected.Body.String())
 	}
 }
 
@@ -344,6 +376,31 @@ func TestInternalAssistantContext_Project_Unauthorized(t *testing.T) {
 	handler.ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/internal/assistant-context/projects/p-1", nil))
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestInternalWorker_TokenAndErrorBranches(t *testing.T) {
+	handler, _ := testServer(t)
+
+	unauthorizedPoll := httptest.NewRecorder()
+	handler.ServeHTTP(unauthorizedPoll, httptest.NewRequest("GET", "/api/v1/internal/poll-tasks", nil))
+	if unauthorizedPoll.Code != http.StatusUnauthorized {
+		t.Fatalf("poll status = %d, want 401; body = %s", unauthorizedPoll.Code, unauthorizedPoll.Body.String())
+	}
+
+	badJSON := httptest.NewRecorder()
+	handler.ServeHTTP(badJSON, workerRequest("POST", "/api/v1/internal/worker-results", strings.NewReader("{")))
+	if badJSON.Code != http.StatusBadRequest {
+		t.Fatalf("bad json status = %d, want 400; body = %s", badJSON.Code, badJSON.Body.String())
+	}
+
+	missing := httptest.NewRecorder()
+	handler.ServeHTTP(missing, workerRequest("POST", "/api/v1/internal/worker-results", jsonBody(map[string]any{
+		"request_id": "missing-request",
+		"status":     "completed",
+	})))
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("missing callback status = %d, want 404; body = %s", missing.Code, missing.Body.String())
 	}
 }
 
@@ -622,6 +679,82 @@ func TestAssistant_AskConversationFlow_PersistsMessages(t *testing.T) {
 	}
 }
 
+func TestAssistant_ConversationArchiveRestoreAndDismiss(t *testing.T) {
+	handler, token := testServer(t)
+
+	createRec := httptest.NewRecorder()
+	handler.ServeHTTP(createRec, authedRequest("POST", "/api/v1/assistant/conversations", jsonBody(map[string]any{
+		"title":      "会话标题",
+		"project_id": "project-1",
+	}), token))
+	if createRec.Code != http.StatusOK {
+		t.Fatalf("create status = %d, want 200; body = %s", createRec.Code, createRec.Body.String())
+	}
+	createResult := parseResponse(t, createRec)
+	data, _ := createResult["data"].(map[string]any)
+	conversationID, _ := data["id"].(string)
+	if conversationID == "" {
+		t.Fatalf("expected conversation id, got %#v", data)
+	}
+
+	archiveRec := httptest.NewRecorder()
+	handler.ServeHTTP(archiveRec, authedRequest("PATCH", "/api/v1/assistant/conversations/"+conversationID+"/archive", jsonBody(map[string]bool{
+		"archive": true,
+	}), token))
+	if archiveRec.Code != http.StatusOK {
+		t.Fatalf("archive status = %d, want 200; body = %s", archiveRec.Code, archiveRec.Body.String())
+	}
+
+	hiddenRec := httptest.NewRecorder()
+	handler.ServeHTTP(hiddenRec, authedRequest("GET", "/api/v1/assistant/conversations?project_id=project-1", nil, token))
+	hiddenResult := parseResponse(t, hiddenRec)
+	hiddenItems, _ := hiddenResult["data"].([]any)
+	if len(hiddenItems) != 0 {
+		t.Fatalf("expected archived conversation hidden, got %#v", hiddenResult["data"])
+	}
+
+	restoreRec := httptest.NewRecorder()
+	handler.ServeHTTP(restoreRec, authedRequest("PATCH", "/api/v1/assistant/conversations/"+conversationID+"/archive", jsonBody(map[string]bool{
+		"archive": false,
+	}), token))
+	if restoreRec.Code != http.StatusOK {
+		t.Fatalf("restore status = %d, want 200; body = %s", restoreRec.Code, restoreRec.Body.String())
+	}
+
+	badCreate := httptest.NewRecorder()
+	handler.ServeHTTP(badCreate, authedRequest("POST", "/api/v1/assistant/conversations", jsonBody(map[string]any{"title": "no scope"}), token))
+	if badCreate.Code != http.StatusBadRequest {
+		t.Fatalf("bad create status = %d, want 400; body = %s", badCreate.Code, badCreate.Body.String())
+	}
+
+	queueRec := httptest.NewRecorder()
+	handler.ServeHTTP(queueRec, authedRequest("POST", "/api/v1/assistant/documents/doc-1/summarize", jsonBody(map[string]string{}), token))
+	queueResult := parseResponse(t, queueRec)
+	queueData, _ := queueResult["data"].(map[string]any)
+	requestID, _ := queueData["request_id"].(string)
+
+	callbackRec := httptest.NewRecorder()
+	handler.ServeHTTP(callbackRec, workerRequest("POST", "/api/v1/internal/worker-results", jsonBody(map[string]any{
+		"request_id": requestID,
+		"status":     "completed",
+		"output":     map[string]any{"summary_text": "摘要"},
+	})))
+
+	dismissRec := httptest.NewRecorder()
+	handler.ServeHTTP(dismissRec, authedRequest("POST", "/api/v1/assistant/suggestions/"+requestID+"-summary/dismiss", jsonBody(map[string]string{
+		"reason": "暂不采纳",
+	}), token))
+	if dismissRec.Code != http.StatusOK {
+		t.Fatalf("dismiss status = %d, want 200; body = %s", dismissRec.Code, dismissRec.Body.String())
+	}
+
+	missingDismiss := httptest.NewRecorder()
+	handler.ServeHTTP(missingDismiss, authedRequest("POST", "/api/v1/assistant/suggestions/missing/dismiss", jsonBody(map[string]string{}), token))
+	if missingDismiss.Code != http.StatusNotFound {
+		t.Fatalf("missing dismiss status = %d, want 404; body = %s", missingDismiss.Code, missingDismiss.Body.String())
+	}
+}
+
 func TestAssistant_AskConversationFollowup_EmbedsMemory(t *testing.T) {
 	handler, token := testServer(t)
 
@@ -722,6 +855,221 @@ func TestHandovers_Create_MissingFields(t *testing.T) {
 	handler.ServeHTTP(rec, authedRequest("POST", "/api/v1/handovers", body, token))
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+// --- Admin ---
+
+func TestAdminRoutes_RequireAdminAndReachHandler(t *testing.T) {
+	handler, adminToken := testServer(t)
+	memberToken := tokenForRole(t, "member")
+
+	forbidden := httptest.NewRecorder()
+	handler.ServeHTTP(forbidden, authedRequest("GET", "/api/v1/admin/users", nil, memberToken))
+	if forbidden.Code != http.StatusForbidden {
+		t.Fatalf("member admin status = %d, want 403; body = %s", forbidden.Code, forbidden.Body.String())
+	}
+
+	badBody := httptest.NewRecorder()
+	handler.ServeHTTP(badBody, authedRequest("POST", "/api/v1/admin/team-spaces", strings.NewReader("{"), adminToken))
+	if badBody.Code != http.StatusBadRequest {
+		t.Fatalf("admin bad body status = %d, want 400; body = %s", badBody.Code, badBody.Body.String())
+	}
+}
+
+// --- Data Assets ---
+
+func TestDataAssets_CRUDFoldersDownloadAndHandoverItems(t *testing.T) {
+	handler, token := testServer(t)
+
+	badFolder := httptest.NewRecorder()
+	handler.ServeHTTP(badFolder, authedRequest("POST", "/api/v1/data-folders", jsonBody(map[string]string{"project_id": "project-1"}), token))
+	if badFolder.Code != http.StatusBadRequest {
+		t.Fatalf("bad folder status = %d, want 400; body = %s", badFolder.Code, badFolder.Body.String())
+	}
+
+	folderRec := httptest.NewRecorder()
+	handler.ServeHTTP(folderRec, authedRequest("POST", "/api/v1/data-folders", jsonBody(map[string]string{
+		"project_id": "project-1",
+		"name":       "数据文件夹",
+	}), token))
+	if folderRec.Code != http.StatusCreated {
+		t.Fatalf("folder status = %d, want 201; body = %s", folderRec.Code, folderRec.Body.String())
+	}
+	folderResult := parseResponse(t, folderRec)
+	folderData, _ := folderResult["data"].(map[string]any)
+	folderID, _ := folderData["id"].(string)
+
+	listFolders := httptest.NewRecorder()
+	handler.ServeHTTP(listFolders, authedRequest("GET", "/api/v1/projects/project-1/data-folders", nil, token))
+	if listFolders.Code != http.StatusOK {
+		t.Fatalf("list folders status = %d, want 200; body = %s", listFolders.Code, listFolders.Body.String())
+	}
+
+	var uploadBuf bytes.Buffer
+	uploadWriter := multipart.NewWriter(&uploadBuf)
+	uploadWriter.WriteField("team_space_id", "team-1")
+	uploadWriter.WriteField("project_id", "project-1")
+	uploadWriter.WriteField("folder_id", folderID)
+	uploadWriter.WriteField("display_name", "数据资产")
+	part, _ := uploadWriter.CreateFormFile("file", "dataset.bin")
+	_, _ = part.Write([]byte("dataset body"))
+	uploadWriter.Close()
+
+	uploadReq := httptest.NewRequest("POST", "/api/v1/data-assets", &uploadBuf)
+	uploadReq.Header.Set("Authorization", "Bearer "+token)
+	uploadReq.Header.Set("Content-Type", uploadWriter.FormDataContentType())
+	uploadRec := httptest.NewRecorder()
+	handler.ServeHTTP(uploadRec, uploadReq)
+	if uploadRec.Code != http.StatusCreated {
+		t.Fatalf("upload status = %d, want 201; body = %s", uploadRec.Code, uploadRec.Body.String())
+	}
+	uploadResult := parseResponse(t, uploadRec)
+	uploadData, _ := uploadResult["data"].(map[string]any)
+	assetID, _ := uploadData["id"].(string)
+	if assetID == "" {
+		t.Fatalf("expected asset id, got %#v", uploadData)
+	}
+
+	listAssets := httptest.NewRecorder()
+	handler.ServeHTTP(listAssets, authedRequest("GET", "/api/v1/data-assets?project_id=project-1&page=1&page_size=10", nil, token))
+	if listAssets.Code != http.StatusOK {
+		t.Fatalf("list assets status = %d, want 200; body = %s", listAssets.Code, listAssets.Body.String())
+	}
+
+	getAsset := httptest.NewRecorder()
+	handler.ServeHTTP(getAsset, authedRequest("GET", "/api/v1/data-assets/"+assetID, nil, token))
+	if getAsset.Code != http.StatusOK {
+		t.Fatalf("get asset status = %d, want 200; body = %s", getAsset.Code, getAsset.Body.String())
+	}
+
+	updateAsset := httptest.NewRecorder()
+	handler.ServeHTTP(updateAsset, authedRequest("PUT", "/api/v1/data-assets/"+assetID, jsonBody(map[string]string{
+		"display_name": "更新后的数据资产",
+	}), token))
+	if updateAsset.Code != http.StatusOK {
+		t.Fatalf("update asset status = %d, want 200; body = %s", updateAsset.Code, updateAsset.Body.String())
+	}
+
+	downloadAsset := httptest.NewRecorder()
+	handler.ServeHTTP(downloadAsset, authedRequest("GET", "/api/v1/data-assets/"+assetID+"/download", nil, token))
+	if downloadAsset.Code != http.StatusOK {
+		t.Fatalf("download asset status = %d, want 200; body = %s", downloadAsset.Code, downloadAsset.Body.String())
+	}
+	if body := downloadAsset.Body.String(); body != "dataset body" {
+		t.Fatalf("download body = %q, want dataset body", body)
+	}
+
+	updateItems := httptest.NewRecorder()
+	handler.ServeHTTP(updateItems, authedRequest("PUT", "/api/v1/handovers/handover-1/data-items", jsonBody(map[string]any{
+		"items": []map[string]any{{"data_asset_id": assetID, "selected": true, "note": "移交"}},
+	}), token))
+	if updateItems.Code != http.StatusOK {
+		t.Fatalf("update handover data items status = %d, want 200; body = %s", updateItems.Code, updateItems.Body.String())
+	}
+
+	listItems := httptest.NewRecorder()
+	handler.ServeHTTP(listItems, authedRequest("GET", "/api/v1/handovers/handover-1/data-items", nil, token))
+	if listItems.Code != http.StatusOK {
+		t.Fatalf("list handover data items status = %d, want 200; body = %s", listItems.Code, listItems.Body.String())
+	}
+
+	deleteAsset := httptest.NewRecorder()
+	handler.ServeHTTP(deleteAsset, authedRequest("DELETE", "/api/v1/data-assets/"+assetID, nil, token))
+	if deleteAsset.Code != http.StatusOK {
+		t.Fatalf("delete asset status = %d, want 200; body = %s", deleteAsset.Code, deleteAsset.Body.String())
+	}
+
+	missingAsset := httptest.NewRecorder()
+	handler.ServeHTTP(missingAsset, authedRequest("GET", "/api/v1/data-assets/"+assetID, nil, token))
+	if missingAsset.Code != http.StatusNotFound {
+		t.Fatalf("missing asset status = %d, want 404; body = %s", missingAsset.Code, missingAsset.Body.String())
+	}
+}
+
+func TestDataAssets_UploadRequiresFile(t *testing.T) {
+	handler, token := testServer(t)
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	writer.WriteField("project_id", "project-1")
+	writer.Close()
+
+	req := httptest.NewRequest("POST", "/api/v1/data-assets", &buf)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+// --- Code Repositories ---
+
+func TestCodeRepositories_CRUDAndPushEvents(t *testing.T) {
+	handler, token := testServer(t)
+
+	badCreate := httptest.NewRecorder()
+	handler.ServeHTTP(badCreate, authedRequest("POST", "/api/v1/code-repositories", jsonBody(map[string]string{
+		"team_space_id":      "team-1",
+		"project_id":         "project-1",
+		"name":               "Bad Repo",
+		"target_folder_path": "../bad",
+	}), token))
+	if badCreate.Code != http.StatusBadRequest {
+		t.Fatalf("bad create status = %d, want 400; body = %s", badCreate.Code, badCreate.Body.String())
+	}
+
+	createRec := httptest.NewRecorder()
+	handler.ServeHTTP(createRec, authedRequest("POST", "/api/v1/code-repositories", jsonBody(map[string]string{
+		"team_space_id":      "team-1",
+		"project_id":         "project-1",
+		"name":               "Analysis Repo",
+		"description":        "repo",
+		"default_branch":     "main",
+		"target_folder_path": "/code/analysis",
+	}), token))
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("create status = %d, want 201; body = %s", createRec.Code, createRec.Body.String())
+	}
+	createResult := parseResponse(t, createRec)
+	createData, _ := createResult["data"].(map[string]any)
+	repoID, _ := createData["id"].(string)
+	if repoID == "" || createData["remote_url"] == "" {
+		t.Fatalf("expected repo id and remote url, got %#v", createData)
+	}
+
+	listRec := httptest.NewRecorder()
+	handler.ServeHTTP(listRec, authedRequest("GET", "/api/v1/code-repositories?project_id=project-1&keyword=analysis", nil, token))
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("list status = %d, want 200; body = %s", listRec.Code, listRec.Body.String())
+	}
+
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, authedRequest("GET", "/api/v1/code-repositories/"+repoID, nil, token))
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get status = %d, want 200; body = %s", getRec.Code, getRec.Body.String())
+	}
+
+	updateRec := httptest.NewRecorder()
+	handler.ServeHTTP(updateRec, authedRequest("PATCH", "/api/v1/code-repositories/"+repoID, jsonBody(map[string]string{
+		"name":               "Updated Repo",
+		"target_folder_path": "/code/updated",
+	}), token))
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("update status = %d, want 200; body = %s", updateRec.Code, updateRec.Body.String())
+	}
+
+	eventsRec := httptest.NewRecorder()
+	handler.ServeHTTP(eventsRec, authedRequest("GET", "/api/v1/code-repositories/"+repoID+"/push-events", nil, token))
+	if eventsRec.Code != http.StatusOK {
+		t.Fatalf("events status = %d, want 200; body = %s", eventsRec.Code, eventsRec.Body.String())
+	}
+
+	missingRec := httptest.NewRecorder()
+	handler.ServeHTTP(missingRec, authedRequest("GET", "/api/v1/code-repositories/missing", nil, token))
+	if missingRec.Code != http.StatusNotFound {
+		t.Fatalf("missing status = %d, want 404; body = %s", missingRec.Code, missingRec.Body.String())
 	}
 }
 

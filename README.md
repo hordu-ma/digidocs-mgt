@@ -356,5 +356,8 @@ docker compose up -d postgres
   - 补齐 memory Assistant 仓储的会话、请求、完成回写、建议生成、确认/忽略、正文抽取结果读取等测试
   - 补齐 AssistantService 的新会话提问、既有会话提问、scope mismatch、显式记忆快照、任务排队和结果回写测试
   - Go 后端默认包内覆盖率提升到 `36.3%`，跨包总覆盖率提升到 `40.9%`
+- 已完成 Go 后端 API 边界补测：
+  - 扩展 `handlers_test.go`，覆盖完整 router 装配下的公开路由、受保护路由、admin 鉴权门禁、internal worker token 分支、Assistant 会话归档/恢复/建议忽略、数据资产、代码仓库和 push event 查询
+  - Go 后端默认包内覆盖率提升到 `40.0%`，跨包总覆盖率提升到 `46.9%`
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

@@ -446,6 +446,12 @@
   - 覆盖 AssistantService：新会话提问、既有会话提问、scope mismatch、显式记忆快照、任务排队、结果回写、建议查询/确认/忽略委托
   - 当前验证结果：默认包内覆盖率 `36.3%`；跨包总覆盖率 `40.9%`
 
+- 完成 Go 后端 API 边界补测
+  - 扩展 `backend-go/internal/transport/http/handlers/handlers_test.go`
+  - 覆盖完整 router 装配下的公开路由、受保护路由、admin 鉴权门禁、internal worker token 分支
+  - 覆盖 Assistant 会话归档/恢复、建议忽略、数据资产文件夹/上传/下载/交接清单、代码仓库创建/查询/更新/删除与 push event 查询
+  - 当前验证结果：默认包内覆盖率 `40.0%`；跨包总覆盖率 `46.9%`
+
 - 完成交付前安全与可靠性加固
   - HTTP 服务器新增 `WriteTimeout: 5min`、`IdleTimeout: 2min`，防止慢速客户端占用连接
   - PostgreSQL 连接池配置：`MaxOpenConns=25`、`MaxIdleConns=10`、`ConnMaxLifetime=5min`
@@ -494,9 +500,10 @@
 - ~~将 smoke 验证进一步细化到关键业务闭环接口~~ ✅ 已完成
 - ~~前端 Element Plus 改为按需引入~~ ✅ 已完成（JS bundle 从 1,041 KB 降至 470 KB）
 - Go 后端覆盖率下一步
-  - 继续补齐 `internal/repository/memory/assistant_repository.go` 边界分支和 `internal/service/assistant_*` 异常分支
+  - 继续补齐 `internal/service` 中 AdminService、CodeRepositoryService、DataAssetService、AuditQueryService 等业务服务的输入校验与错误传播
+  - 继续补齐 `internal/repository/memory/assistant_repository.go` 边界分支和 handler 剩余 4xx/5xx 分支
   - 为 `internal/repository/postgres` 与 `internal/queue/postgres` 引入 SQL mock 或测试 PostgreSQL 夹具
-  - 扩展 handler/router httptest 矩阵，把 admin、assistant、data asset、code repository、internal worker/context 路由纳入覆盖率
+  - 如仍需要提升默认包内覆盖率，再新增 `internal/transport/http/router` 包内测试；跨包口径下 router 已由 handler 集成测试间接触达
 
 ## 更新规则
 
