@@ -1,0 +1,11 @@
+[Unit]
+Description=Run DigiDocs table 52 route repair periodically
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=2min
+AccuracySec=15s
+Unit=digidocs-route-fix.service
+
+[Install]
+WantedBy=timers.target

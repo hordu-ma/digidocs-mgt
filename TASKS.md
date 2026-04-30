@@ -73,6 +73,7 @@
   - `docker-compose.yml` 已将 compose 应用网络固定为 `172.29.0.0/24`
   - `ops/systemd/digidocs-route-fix.sh` 与 `scripts/codex/install-persistent-routing.sh` 已同步改为覆盖 `172.17.0.0/16`、`172.18.0.0/16`、`172.29.0.0/24`、`192.168.1.0/24`
   - `docs/部署准备与运行说明.md`、`README.md` 已同步记录固定子网和 `table 52` 持久化修复口径
+  - 2026-04-30 复发排查确认 `tailscaled` 运行期可能再次覆盖 `172.17.0.0/16`、`172.29.0.0/24`、`192.168.1.0/24`；已新增 `digidocs-route-fix.service` / `digidocs-route-fix.timer`，安装后每 2 分钟兜底回写 `throw` 路由，并继续覆盖 `8.152.204.76`
 - 完成 Go 后端核心业务服务层单元测试
   - `auth_service_test.go`：登录成功、用户不存在、密码错误、仓库层错误传播（4 用例）
   - `action_service_test.go`：ApplyFlow/CreateHandover/UpdateHandoverItems/ApplyHandover 委托验证与错误传播（5 用例）
@@ -345,6 +346,7 @@
   - 已在 `docs/部署准备与运行说明.md` 记录最终 TLS / 反向代理 / 防火墙部署口径
   - 已新增并安装持久化运维资产：`ops/systemd/digidocs-route-fix.sh`、`ops/systemd/tailscaled-digidocs-routing.conf`、`scripts/codex/install-persistent-routing.sh`
   - 已在当前机器验证 `systemctl restart tailscaled` 后 `table 52` 仍保持 `throw 172.17.0.0/16`、`throw 172.18.0.0/16`、`throw 192.168.1.0/24`
+  - 2026-04-30 复发排查：`tailscaled` 运行期刷新后，`172.17.0.0/16`、`172.29.0.0/24`、`192.168.1.0/24` 再次指向 `tailscale0`，导致 `127.0.0.1:18080/18081` 与 `8.152.204.76` 访问挂起；重启 `tailscaled` 触发 drop-in 后已恢复，仓库已补 systemd timer 做运行期兜底
   - 已补充 RustDesk / 本机浏览器访问 `18080/18081` 超时的排查、临时修复与复发处理说明
   - 已补充同一局域网用户访问方式：联调阶段使用宿主机局域网 IP 加 `18080` 访问前端
   - 已补充登录后个人信息维护能力：`GET/PATCH /api/v1/auth/me` 支持当前用户读取和更新显示姓名、手机号、微信号和邮箱

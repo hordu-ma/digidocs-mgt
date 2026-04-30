@@ -197,7 +197,7 @@ make verify
 - `docker-compose.p14s.yml`：P14s + 群晖同局域网测试部署 override，固化 Worker host network 与本机 OpenClaw / Go 后端访问路径
 - `scripts/codex/install-project-skills.sh`：把项目技能安装到 `~/.codex/skills/`
 - `scripts/codex/install-hooks.sh`：启用仓库内 `pre-commit` / `pre-push` hooks
-- `scripts/codex/install-persistent-routing.sh`：为 Linux 宿主机安装 `tailscaled` 持久化路由修正，当前默认覆盖 `172.17.0.0/16`、`172.18.0.0/16`、`172.29.0.0/24`、`192.168.1.0/24`
+- `scripts/codex/install-persistent-routing.sh`：为 Linux 宿主机安装 `tailscaled` 持久化路由修正和定时兜底，当前默认覆盖 `8.152.204.76`、`172.17.0.0/16`、`172.18.0.0/16`、`172.29.0.0/24`、`192.168.1.0/24`
 - `scripts/codex/doctor.sh`：环境与协作资产体检
 - `scripts/codex/check-doc-sync.sh`：检查 `README.md` / `TASKS.md` / `AGENTS.md` 的阶段与协作约束一致性
 - `scripts/codex/report.sh`：输出当前分支、阶段、技能安装与 hooks 状态
@@ -249,7 +249,7 @@ docker compose up -d postgres
 - 已完成 JWT 用户 ID 透传至所有审计事件写入（middleware → handlers → repositories）
 - 已完成前端四个页面接入真实后端 API（仪表盘、文档列表、文档详情、交接单）
 - 已修复宿主机 Docker 端口转发问题（Tailscale 路由表与 Docker 网桥冲突）
-- 已固定 compose 应用网络为 `172.29.0.0/24`，并把持久化路由修正口径同步到该固定子网，降低重启后再次被 `table 52` 抢路由的概率
+- 已固定 compose 应用网络为 `172.29.0.0/24`，并把持久化路由修正口径同步到该固定子网；当前方案同时包含 `tailscaled` 重启后修复和 `digidocs-route-fix.timer` 运行期兜底，降低再次被 `table 52` 抢路由的概率
 - 已新增 P14s + 群晖同局域网测试部署 override：`backend-py-worker` 可使用 host network 直连宿主机 OpenClaw 与 Go 后端，群晖主链路推荐走局域网 IP，Tailscale 仅作为远程运维通道；已通过 compose config、`make verify` 与严格 smoke（含 Assistant completed）
 - 已完成前端商业化产品体验升级（二期）
   - 统一全局设计 token、Element Plus 皮肤与导航壳层
@@ -313,7 +313,7 @@ docker compose up -d postgres
 - 已修复 `make smoke` 的 `healthz` 误报逻辑，宿主机直连成功时不再重复报 unreachable
 - 已重建 `frontend` 运行容器到当前仓库版本，并完成一轮前端无头联调：已覆盖总览、文档列表、文档详情、交接页、助手页与问答提交主路径
 - 已记录最终部署口径：TLS 终止在应用层反向代理，前端/后端容器仅走内网转发；群晖 `5001/5432` 仅对应用层主机放通
-- 已完成宿主机持久化运维配置安装与验证：`install-persistent-routing.sh`、`digidocs-route-fix.sh` 与 `tailscaled` drop-in 已在当前机器落地，`systemctl restart tailscaled` 后 `table 52` 仍保持 `throw 172.17/172.18/192.168.1`
+- 已完成宿主机持久化运维配置安装与验证：`install-persistent-routing.sh`、`digidocs-route-fix.sh` 与 `tailscaled` drop-in 已在当前机器落地，`systemctl restart tailscaled` 后 `table 52` 仍保持 `throw 172.17/172.18/192.168.1`；2026-04-30 复发排查确认 `tailscaled` 运行期也可能覆盖 `172.17/172.29/192.168.1`，仓库已补 `digidocs-route-fix.timer` 作为定时兜底
 - 已补充 RustDesk / 本机浏览器访问 `18080/18081` 超时的排查与临时修复说明，复用现有 `digidocs-route-fix.sh` 路由修正脚本
 - 已补充登录后个人信息维护能力：当前用户可自助更新显示姓名、手机号、微信号和邮箱，账号、角色、状态与权限保持只读
 - 已完成 Assistant 助手页面产品化改造：范围选择改为项目/文档下拉选择器，会话列表显示人类可读范围标签，消息流隐藏技术字段并折叠技术详情，记忆来源改为中文友好文案，时间戳改为相对时间

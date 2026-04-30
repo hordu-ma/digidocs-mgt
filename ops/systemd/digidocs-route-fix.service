@@ -1,0 +1,8 @@
+[Unit]
+Description=DigiDocs table 52 route repair
+After=tailscaled.service
+
+[Service]
+Type=oneshot
+Environment="DIGIDOCS_ROUTE_FIX_EXTRA_CIDRS=8.152.204.76"
+ExecStart=/usr/local/bin/digidocs-route-fix.sh
