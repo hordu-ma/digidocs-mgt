@@ -352,5 +352,9 @@ docker compose up -d postgres
   - 新增 `make coverage-go` 跨包覆盖率入口与 [测试覆盖率说明](docs/测试覆盖率说明.md)
   - 补齐 config / bootstrap / app / queue / memory storage / shared upload / middleware / response / token / memory repository 等基础层测试
   - Go 后端默认包内覆盖率从 `14.4%` 提升到 `27.1%`，跨包总覆盖率从 `30.2%` 提升到 `38.8%`
+- 已完成 Go 后端 Assistant 主链路补测：
+  - 补齐 memory Assistant 仓储的会话、请求、完成回写、建议生成、确认/忽略、正文抽取结果读取等测试
+  - 补齐 AssistantService 的新会话提问、既有会话提问、scope mismatch、显式记忆快照、任务排队和结果回写测试
+  - Go 后端默认包内覆盖率提升到 `36.3%`，跨包总覆盖率提升到 `40.9%`
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。
