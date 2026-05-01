@@ -460,6 +460,12 @@
   - 新增 `internal/db` 迁移版本解析测试与 `internal/transport/http/router` 包内路由装配测试
   - 当前验证结果：默认包内覆盖率 `52.9%`；跨包总覆盖率 `54.6%`
 
+- 完成 Go 后端短期覆盖率目标（65%+）
+  - 引入 `github.com/DATA-DOG/go-sqlmock` 作为 Go 后端测试依赖，并同步 `vendor/`
+  - 新增 postgres queue SQL mock 测试，覆盖 pending 领取、默认 limit、空队列与 payload decode 失败
+  - 新增 postgres repository SQL mock 测试，覆盖 admin/auth/user query/team-space/project/folder-tree/flow/handover/document/version/dashboard/audit/code/data-folder/permission 主要路径
+  - 当前验证结果：默认包内覆盖率 `65.3%`；跨包总覆盖率 `66.7%`
+
 - 完成交付前安全与可靠性加固
   - HTTP 服务器新增 `WriteTimeout: 5min`、`IdleTimeout: 2min`，防止慢速客户端占用连接
   - PostgreSQL 连接池配置：`MaxOpenConns=25`、`MaxIdleConns=10`、`ConnMaxLifetime=5min`
@@ -509,8 +515,8 @@
 - ~~前端 Element Plus 改为按需引入~~ ✅ 已完成（JS bundle 从 1,041 KB 降至 470 KB）
 - Go 后端覆盖率下一步
   - 继续补齐 `internal/repository/memory/assistant_repository.go` 边界分支和 handler 剩余 4xx/5xx 分支
-  - 为 `internal/repository/postgres` 与 `internal/queue/postgres` 引入 SQL mock 或测试 PostgreSQL 夹具
-  - 若继续大幅提升总覆盖率，优先从真实 PostgreSQL 仓储、postgres queue 与 main 启动胶水拆分入手
+  - 继续补齐 `internal/repository/postgres` 中 Assistant、data asset 文件元数据、版本事务 workflow、action transaction 等复杂 SQL 写链
+  - 若继续大幅提升总覆盖率，优先引入临时 PostgreSQL/testcontainer 覆盖真实迁移 schema，并拆分 `cmd/api/main.go` 启动胶水
 
 ## 更新规则
 

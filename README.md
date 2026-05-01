@@ -364,5 +364,9 @@ docker compose up -d postgres
   - 补齐 postgres flow/handover 状态机与 Assistant payload/suggestion/scanner helper 等无数据库纯函数测试
   - 补齐迁移版本解析和 router 包内公开/受保护路由装配测试
   - Go 后端默认包内覆盖率提升到 `52.9%`，跨包总覆盖率提升到 `54.6%`
+- 已完成 Go 后端短期覆盖率目标（65%+）：
+  - 引入 `go-sqlmock` 测试依赖并补齐 postgres queue 与主要 postgres repository SQL mock 测试
+  - 覆盖 admin/auth/user/team-space/project/folder/flow/handover/document/version/dashboard/audit/code/data-folder/permission 等主要 SQL 路径
+  - Go 后端默认包内覆盖率提升到 `65.3%`，跨包总覆盖率提升到 `66.7%`
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。
