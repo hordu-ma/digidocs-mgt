@@ -452,6 +452,14 @@
   - 覆盖 Assistant 会话归档/恢复、建议忽略、数据资产文件夹/上传/下载/交接清单、代码仓库创建/查询/更新/删除与 push event 查询
   - 当前验证结果：默认包内覆盖率 `40.0%`；跨包总覆盖率 `46.9%`
 
+- 完成 Go 后端服务层 / postgres 纯函数 / router 覆盖率加固
+  - 新增 `AdminService` 测试：团队空间、项目、用户、成员管理的输入校验、bcrypt 哈希、字段 trim、委托和错误分支
+  - 新增 `CodeRepositoryService` 测试：裸仓初始化、slug / token / target folder 校验、查询更新、push 鉴权、空默认分支失败记录、默认分支同步到存储
+  - 新增 `DataAssetService`、`TaskService`、`AuditService`、`QueryService`、`PermissionService` 测试，覆盖薄服务委托、权限允许/拒绝、上传/下载/交接数据项和发布错误传播
+  - 新增 postgres 纯函数测试：flow / handover 状态机、审计 action 映射、actor / UUID helper、Assistant suggestion / scope / scanner helper
+  - 新增 `internal/db` 迁移版本解析测试与 `internal/transport/http/router` 包内路由装配测试
+  - 当前验证结果：默认包内覆盖率 `52.9%`；跨包总覆盖率 `54.6%`
+
 - 完成交付前安全与可靠性加固
   - HTTP 服务器新增 `WriteTimeout: 5min`、`IdleTimeout: 2min`，防止慢速客户端占用连接
   - PostgreSQL 连接池配置：`MaxOpenConns=25`、`MaxIdleConns=10`、`ConnMaxLifetime=5min`
@@ -500,10 +508,9 @@
 - ~~将 smoke 验证进一步细化到关键业务闭环接口~~ ✅ 已完成
 - ~~前端 Element Plus 改为按需引入~~ ✅ 已完成（JS bundle 从 1,041 KB 降至 470 KB）
 - Go 后端覆盖率下一步
-  - 继续补齐 `internal/service` 中 AdminService、CodeRepositoryService、DataAssetService、AuditQueryService 等业务服务的输入校验与错误传播
   - 继续补齐 `internal/repository/memory/assistant_repository.go` 边界分支和 handler 剩余 4xx/5xx 分支
   - 为 `internal/repository/postgres` 与 `internal/queue/postgres` 引入 SQL mock 或测试 PostgreSQL 夹具
-  - 如仍需要提升默认包内覆盖率，再新增 `internal/transport/http/router` 包内测试；跨包口径下 router 已由 handler 集成测试间接触达
+  - 若继续大幅提升总覆盖率，优先从真实 PostgreSQL 仓储、postgres queue 与 main 启动胶水拆分入手
 
 ## 更新规则
 

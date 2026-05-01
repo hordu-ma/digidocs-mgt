@@ -359,5 +359,10 @@ docker compose up -d postgres
 - 已完成 Go 后端 API 边界补测：
   - 扩展 `handlers_test.go`，覆盖完整 router 装配下的公开路由、受保护路由、admin 鉴权门禁、internal worker token 分支、Assistant 会话归档/恢复/建议忽略、数据资产、代码仓库和 push event 查询
   - Go 后端默认包内覆盖率提升到 `40.0%`，跨包总覆盖率提升到 `46.9%`
+- 已完成 Go 后端服务层 / postgres 纯函数 / router 覆盖率加固：
+  - 补齐 AdminService、CodeRepositoryService、DataAssetService、TaskService、AuditService、QueryService、PermissionService 主路径与关键校验
+  - 补齐 postgres flow/handover 状态机与 Assistant payload/suggestion/scanner helper 等无数据库纯函数测试
+  - 补齐迁移版本解析和 router 包内公开/受保护路由装配测试
+  - Go 后端默认包内覆盖率提升到 `52.9%`，跨包总覆盖率提升到 `54.6%`
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。
