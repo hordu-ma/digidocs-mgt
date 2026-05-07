@@ -123,6 +123,53 @@ func TestRouter_NotFoundAndProtectedRoute(t *testing.T) {
 	}
 }
 
+func TestAuth_LoginLogoutAndErrorBranches(t *testing.T) {
+	handler, token := testServer(t)
+
+	login := httptest.NewRecorder()
+	handler.ServeHTTP(login, httptest.NewRequest("POST", "/api/v1/auth/login", jsonBody(map[string]string{
+		"username": "admin",
+		"password": "admin123",
+	})))
+	if login.Code != http.StatusOK {
+		t.Fatalf("login status = %d, want 200; body = %s", login.Code, login.Body.String())
+	}
+	loginResult := parseResponse(t, login)
+	loginData, _ := loginResult["data"].(map[string]any)
+	if loginData["access_token"] == "" {
+		t.Fatalf("expected access_token in login response, got %#v", loginData)
+	}
+
+	missing := httptest.NewRecorder()
+	handler.ServeHTTP(missing, httptest.NewRequest("POST", "/api/v1/auth/login", jsonBody(map[string]string{
+		"username": "admin",
+	})))
+	if missing.Code != http.StatusBadRequest {
+		t.Fatalf("missing password status = %d, want 400; body = %s", missing.Code, missing.Body.String())
+	}
+
+	invalid := httptest.NewRecorder()
+	handler.ServeHTTP(invalid, httptest.NewRequest("POST", "/api/v1/auth/login", jsonBody(map[string]string{
+		"username": "admin",
+		"password": "wrong",
+	})))
+	if invalid.Code != http.StatusUnauthorized {
+		t.Fatalf("invalid password status = %d, want 401; body = %s", invalid.Code, invalid.Body.String())
+	}
+
+	badJSON := httptest.NewRecorder()
+	handler.ServeHTTP(badJSON, httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader("{")))
+	if badJSON.Code != http.StatusBadRequest {
+		t.Fatalf("bad login JSON status = %d, want 400; body = %s", badJSON.Code, badJSON.Body.String())
+	}
+
+	logout := httptest.NewRecorder()
+	handler.ServeHTTP(logout, authedRequest("POST", "/api/v1/auth/logout", nil, token))
+	if logout.Code != http.StatusOK {
+		t.Fatalf("logout status = %d, want 200; body = %s", logout.Code, logout.Body.String())
+	}
+}
+
 // --- Document CRUD ---
 
 func TestDocuments_List(t *testing.T) {
@@ -855,6 +902,73 @@ func TestHandovers_Create_MissingFields(t *testing.T) {
 	handler.ServeHTTP(rec, authedRequest("POST", "/api/v1/handovers", body, token))
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestFlows_ActionsAndList(t *testing.T) {
+	handler, token := testServer(t)
+	actions := []struct {
+		path string
+		body map[string]string
+	}{
+		{path: "/api/v1/documents/some-id/flow/mark-in-progress", body: map[string]string{"note": "开始处理"}},
+		{path: "/api/v1/documents/some-id/flow/transfer", body: map[string]string{"to_user_id": "00000000-0000-0000-0000-000000000002", "note": "转交"}},
+		{path: "/api/v1/documents/some-id/flow/accept-transfer", body: map[string]string{"note": "接收"}},
+		{path: "/api/v1/documents/some-id/flow/finalize", body: map[string]string{"note": "定稿"}},
+		{path: "/api/v1/documents/some-id/flow/archive", body: map[string]string{"note": "归档"}},
+		{path: "/api/v1/documents/some-id/flow/unarchive", body: map[string]string{"note": "取消归档"}},
+	}
+
+	for _, tc := range actions {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, authedRequest("POST", tc.path, jsonBody(tc.body), token))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s status = %d, want 200; body = %s", tc.path, rec.Code, rec.Body.String())
+		}
+	}
+
+	list := httptest.NewRecorder()
+	handler.ServeHTTP(list, authedRequest("GET", "/api/v1/documents/some-id/flows", nil, token))
+	if list.Code != http.StatusOK {
+		t.Fatalf("flow list status = %d, want 200; body = %s", list.Code, list.Body.String())
+	}
+	result := parseResponse(t, list)
+	meta, _ := result["meta"].(map[string]any)
+	if meta["document_id"] != "some-id" {
+		t.Fatalf("flow list meta = %#v, want document_id", meta)
+	}
+}
+
+func TestHandovers_DetailItemsAndActions(t *testing.T) {
+	handler, token := testServer(t)
+
+	get := httptest.NewRecorder()
+	handler.ServeHTTP(get, authedRequest("GET", "/api/v1/handovers/handover-1", nil, token))
+	if get.Code != http.StatusOK {
+		t.Fatalf("handover get status = %d, want 200; body = %s", get.Code, get.Body.String())
+	}
+
+	updateItems := httptest.NewRecorder()
+	handler.ServeHTTP(updateItems, authedRequest("PATCH", "/api/v1/handovers/handover-1/items", jsonBody(map[string]any{
+		"items": []map[string]any{
+			{"document_id": "doc-1", "selected": true, "note": "保留"},
+			{"selected": true, "note": "缺少 document_id 会被忽略为默认值"},
+		},
+	}), token))
+	if updateItems.Code != http.StatusOK {
+		t.Fatalf("handover update items status = %d, want 200; body = %s", updateItems.Code, updateItems.Body.String())
+	}
+
+	for _, path := range []string{
+		"/api/v1/handovers/handover-1/confirm",
+		"/api/v1/handovers/handover-1/complete",
+		"/api/v1/handovers/handover-1/cancel",
+	} {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, authedRequest("POST", path, jsonBody(map[string]string{"note": "处理", "reason": "测试"}), token))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s status = %d, want 200; body = %s", path, rec.Code, rec.Body.String())
+		}
 	}
 }
 

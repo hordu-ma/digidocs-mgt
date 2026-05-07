@@ -287,6 +287,7 @@ docker compose up -d postgres
 - 已完成版本文件链路强化验证：`make smoke` 已覆盖现有文档的版本上传、下载与预览闭环
 - 已修正 smoke 对 `assistant.ask` 的默认轮询容忍度，避免 OpenClaw 正常但响应稍慢时被误判失败
 - 已补 Synology provider 分层契约测试与 memory 存储版本仓储联动，上传后再查询/下载/预览不再依赖静态占位返回
+- 已完成 Go 后端覆盖率二轮加固，新增 action 事务写链、版本上传 workflow、flow / handover / auth handler 测试，Go 跨包覆盖率提升到 `70.2%`
 - 已完成 P1 AI 持久化闭环首轮修复（`assistant_requests` 落库、Worker 回调幂等更新、`assistant_suggestions` 查询/确认/忽略真实接线）
 - 已完成 P2 持久化任务消费与 AI 结果展示首轮修复（PostgreSQL 任务轮询、摘要结果回写、文档详情页 AI 建议展示）
 - 已补 `.github/INDEX.md` 与 GitHub 协作资产入口校验

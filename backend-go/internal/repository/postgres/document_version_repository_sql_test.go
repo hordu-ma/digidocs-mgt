@@ -149,3 +149,44 @@ func TestVersionRepositoryGetNotFound(t *testing.T) {
 	}
 	assertExpectations(t, mock)
 }
+
+func TestVersionWorkflowCreateUploadedVersionCommitsDocumentAndAudit(t *testing.T) {
+	ctx := context.Background()
+	db, mock := newMockDB(t)
+	workflow := NewVersionWorkflow(db)
+
+	mock.ExpectBegin()
+	mock.ExpectExec("SELECT id\\s+FROM documents").
+		WithArgs("doc-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery("SELECT COALESCE\\(MAX\\(version_no\\), 0\\) \\+ 1").
+		WithArgs("doc-1").
+		WillReturnRows(sqlmock.NewRows([]string{"version_no"}).AddRow(4))
+	mock.ExpectExec("INSERT INTO document_versions").
+		WithArgs(sqlmock.AnyArg(), "doc-1", 4, "final.pdf", int64(512), "memory", "objects/final.pdf", "定稿版本", "actor-1", sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE documents").
+		WithArgs("doc-1", sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO audit_events").
+		WithArgs(sqlmock.AnyArg(), "doc-1", sqlmock.AnyArg(), "actor-1", sqlmock.AnyArg(), sqlmock.AnyArg(), "").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	got, err := workflow.CreateUploadedVersion(ctx, command.VersionCreateInput{
+		DocumentID:       "doc-1",
+		FileName:         "final.pdf",
+		FileSize:         512,
+		StorageProvider:  "memory",
+		StorageObjectKey: "objects/final.pdf",
+		CommitMessage:    "定稿版本",
+		ActorID:          "actor-1",
+	})
+	if err != nil {
+		t.Fatalf("CreateUploadedVersion unexpected error: %v", err)
+	}
+	if got["version_no"] != 4 || got["current_status"] != "in_progress" {
+		t.Fatalf("CreateUploadedVersion got %#v", got)
+	}
+	assertExpectations(t, mock)
+}

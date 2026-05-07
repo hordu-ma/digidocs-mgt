@@ -473,6 +473,12 @@
   - `Makefile` 新增 `coverage-worker` / `coverage-frontend`，并把 `npm run test:run` 纳入 `verify-frontend`
   - 前端生产依赖已执行 `npm audit fix`，`npm audit --omit=dev` 当前为 0 漏洞
 
+- 完成 Go 后端覆盖率二轮加固
+  - 新增 `action_repository` SQL mock 测试，覆盖 flow / handover 事务提交、非法状态回滚、交接数据项更新、交接完成同步 documents 与审计写入
+  - 新增 `VersionWorkflow.CreateUploadedVersion` SQL mock 测试，覆盖上传版本写入、当前版本回写和 `replace_version` 审计事件
+  - 扩展 HTTP handler 集成测试，覆盖 auth 登录 / 登出、登录错误分支、flow actions / 列表、handover detail / items / confirm / complete / cancel
+  - 当前 Go 后端跨包覆盖率提升到 `70.2%`
+
 - 完成交付前安全与可靠性加固
   - HTTP 服务器新增 `WriteTimeout: 5min`、`IdleTimeout: 2min`，防止慢速客户端占用连接
   - PostgreSQL 连接池配置：`MaxOpenConns=25`、`MaxIdleConns=10`、`ConnMaxLifetime=5min`
