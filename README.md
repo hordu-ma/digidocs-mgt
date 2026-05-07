@@ -368,5 +368,11 @@ docker compose up -d postgres
   - 引入 `go-sqlmock` 测试依赖并补齐 postgres queue 与主要 postgres repository SQL mock 测试
   - 覆盖 admin/auth/user/team-space/project/folder/flow/handover/document/version/dashboard/audit/code/data-folder/permission 等主要 SQL 路径
   - Go 后端默认包内覆盖率提升到 `65.3%`，跨包总覆盖率提升到 `66.7%`
+- 已完成全栈测试覆盖率加固：
+  - Go 侧补充 `document_repository` SQL mock 边界，跨包总覆盖率提升到 `66.8%`
+  - Python Worker 新增 `pytest-cov` 与客户端 / dispatcher / OpenClaw / skill registry 边界测试，`app` 覆盖率达到 `83%`
+  - 前端引入 Vitest + jsdom + V8 coverage，覆盖认证 store 与路由鉴权守卫，关键 TS 单元覆盖率达到 `97.87%`
+  - `make verify` 已纳入前端单元测试；新增 `make coverage-worker`、`make coverage-frontend`
+  - 前端生产依赖 `npm audit --omit=dev` 当前为 0 漏洞
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

@@ -28,14 +28,21 @@ const router = createRouter({
   ],
 });
 
-router.beforeEach((to) => {
-  const token = localStorage.getItem("access_token");
-  if (to.meta.requiresAuth && !token) {
+export function resolveAuthRedirect(
+  meta: { requiresAuth?: unknown; requiresAdmin?: unknown },
+  storage: Pick<Storage, "getItem"> = localStorage,
+) {
+  const token = storage.getItem("access_token");
+  if (meta.requiresAuth && !token) {
     return { name: "login" };
   }
-  if (to.meta.requiresAdmin && localStorage.getItem("role") !== "admin") {
+  if (meta.requiresAdmin && storage.getItem("role") !== "admin") {
     return { name: "dashboard" };
   }
+}
+
+router.beforeEach((to) => {
+  return resolveAuthRedirect(to.meta);
 });
 
 export default router;

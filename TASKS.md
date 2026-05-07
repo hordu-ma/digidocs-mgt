@@ -466,6 +466,13 @@
   - 新增 postgres repository SQL mock 测试，覆盖 admin/auth/user query/team-space/project/folder-tree/flow/handover/document/version/dashboard/audit/code/data-folder/permission 主要路径
   - 当前验证结果：默认包内覆盖率 `65.3%`；跨包总覆盖率 `66.7%`
 
+- 完成全栈测试覆盖率加固
+  - Go：新增 `document_repository` SQL mock 测试，覆盖默认分页、扫描、创建、not found、删除/恢复 0 rows 边界；当前跨包总覆盖率 `66.8%`
+  - Python Worker：新增 `pytest-cov`，补齐 BackendContextClient、CallbackClient、TaskPollerClient、OpenClaw 协议边界、Dispatcher 正文抽取、SkillRegistry / SkillAdapter 安全边界；当前 `app` 覆盖率 `83%`
+  - 前端：引入 Vitest + jsdom + V8 coverage，覆盖认证 store 持久化与路由鉴权 / admin 门禁；当前关键 TS 单元覆盖率 `97.87%`
+  - `Makefile` 新增 `coverage-worker` / `coverage-frontend`，并把 `npm run test:run` 纳入 `verify-frontend`
+  - 前端生产依赖已执行 `npm audit fix`，`npm audit --omit=dev` 当前为 0 漏洞
+
 - 完成交付前安全与可靠性加固
   - HTTP 服务器新增 `WriteTimeout: 5min`、`IdleTimeout: 2min`，防止慢速客户端占用连接
   - PostgreSQL 连接池配置：`MaxOpenConns=25`、`MaxIdleConns=10`、`ConnMaxLifetime=5min`

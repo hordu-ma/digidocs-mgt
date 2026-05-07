@@ -107,3 +107,42 @@ def test_skill_adapter_bubbles_openclaw_errors() -> None:
         assert str(exc) == "boom"
     else:
         raise AssertionError("expected OpenClawClientError")
+
+
+def test_skill_adapter_scope_precedence_and_memory_source_filtering() -> None:
+    class _FakeClient:
+        def ask(self, *, question, scope, context):
+            return {
+                "answer": "ok",
+                "suggestions": [{"title": "建议", "content": "补正文"}],
+            }
+
+    adapter = WorkerSkillAdapter(openclaw_client=_FakeClient())  # type: ignore[arg-type]
+    task = WorkerTask(
+        request_id="req-precedence",
+        task_type="assistant.ask",
+        related_type="project",
+        related_id="project-context",
+        payload={
+            "question": "测试",
+            "scope": {"project_id": "project-payload"},
+            "memory_sources": [
+                {"type": "conversation_messages", "count": 2},
+                "invalid",
+                {"type": "confirmed_suggestions", "count": 1},
+            ],
+        },
+    )
+
+    output = adapter.run(
+        task,
+        {"project_context": {"scope": {"project_id": "project-context"}}},
+        {"project_id": "project-explicit"},
+    )
+
+    assert output["source_scope"] == {"project_id": "project-context"}
+    assert output["suggestions"][0]["source_scope"] == '{"project_id": "project-context"}'
+    assert output["memory_sources"] == [
+        {"type": "conversation_messages", "count": 2},
+        {"type": "confirmed_suggestions", "count": 1},
+    ]

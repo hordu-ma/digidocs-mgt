@@ -172,3 +172,103 @@ def test_handle_document_extract_text_task(monkeypatch: MonkeyPatch) -> None:
 
     assert result.status == "completed"
     assert result.output["extracted_text"] == "第一行\n第二行"
+
+
+def test_resolve_document_text_falls_back_to_latest_context_version(monkeypatch: MonkeyPatch) -> None:
+    dispatcher = WorkerDispatcher()
+    downloaded: dict[str, str] = {}
+
+    def fake_download(version_id: str):
+        downloaded["version_id"] = version_id
+        return (
+            {"content_disposition": 'attachment; filename="latest.txt"'},
+            "最新版本正文".encode(),
+        )
+
+    monkeypatch.setattr(dispatcher.context_client, "download_version_file", fake_download)
+
+    text = dispatcher._resolve_document_text(
+        WorkerTask(
+            request_id="req-latest",
+            task_type="document.extract_text",
+            related_type="document",
+            related_id="doc-1",
+            payload={},
+        ),
+        {
+            "document_context": {
+                "versions": [
+                    {"id": "ver-old", "version_no": 1},
+                    {"id": "ver-latest", "version_no": 2},
+                ]
+            }
+        },
+    )
+
+    assert downloaded["version_id"] == "ver-latest"
+    assert text == "最新版本正文"
+
+
+def test_document_extract_text_reports_empty_extraction(monkeypatch: MonkeyPatch) -> None:
+    dispatcher = WorkerDispatcher()
+    monkeypatch.setattr(
+        dispatcher.context_client,
+        "download_version_file",
+        lambda version_id: ({"content_disposition": 'attachment; filename="empty.txt"'}, b""),
+    )
+
+    result = dispatcher.handle_task(
+        WorkerTask(
+            request_id="req-empty",
+            task_type="document.extract_text",
+            related_type="document",
+            related_id="doc-1",
+            payload={"version_id": "ver-empty"},
+        )
+    )
+
+    assert result.status == "failed"
+    assert "未提取到有效正文内容" in (result.error_message or "")
+
+
+def test_assistant_ask_inline_extraction_updates_context(monkeypatch: MonkeyPatch) -> None:
+    dispatcher = WorkerDispatcher()
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        dispatcher.context_client,
+        "get_document_context",
+        lambda document_id: {
+            "scope": {"document_id": document_id},
+            "extracted_text": "",
+            "versions": [{"id": "ver-1", "version_no": 1}],
+        },
+    )
+    monkeypatch.setattr(
+        dispatcher.context_client,
+        "download_version_file",
+        lambda version_id: (
+            {"content_disposition": 'attachment; filename="doc.txt"'},
+            "内联正文".encode(),
+        ),
+    )
+
+    def fake_run(task: WorkerTask, context: ObjectDict, scope: ObjectDict | None = None) -> ObjectDict:
+        captured["context"] = context
+        return {"answer": "ok"}
+
+    monkeypatch.setattr(dispatcher.skill_adapter, "run", fake_run)
+
+    result = dispatcher.handle_task(
+        WorkerTask(
+            request_id="req-inline",
+            task_type="assistant.ask",
+            payload={"question": "总结", "scope": {"document_id": "doc-1"}},
+        )
+    )
+
+    context = cast(ObjectDict, captured["context"])
+    doc_context = cast(ObjectDict, context["document_context"])
+    assert result.status == "completed"
+    assert context["document_text"] == "内联正文"
+    assert doc_context["extracted_text"] == "内联正文"

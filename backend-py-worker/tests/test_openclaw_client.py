@@ -111,3 +111,68 @@ def test_generate_suggestion_raises_on_http_error(monkeypatch) -> None:
         )
 
     assert "HTTP 401" in str(exc_info.value)
+
+
+def test_ask_concatenates_openai_text_parts(monkeypatch) -> None:
+    client = OpenClawClient()
+
+    monkeypatch.setattr(
+        client,
+        "_post",
+        lambda path, payload: {
+            "id": "resp-parts",
+            "model": "openclaw/default",
+            "choices": [
+                {
+                    "message": {
+                        "content": [
+                            {"type": "text", "text": "第一段"},
+                            {"type": "image_url", "image_url": {"url": "ignored"}},
+                            {"type": "text", "text": "第二段"},
+                        ]
+                    }
+                }
+            ],
+        },
+    )
+
+    result = client.ask("问题", {"project_id": "p-1"}, {})
+
+    assert result["answer"] == "第一段\n第二段"
+
+
+def test_post_rejects_non_object_json(monkeypatch) -> None:
+    client = OpenClawClient()
+
+    class _ListResponse:
+        def read(self) -> bytes:
+            return b"[]"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda request, timeout: _ListResponse())
+
+    with pytest.raises(OpenClawClientError) as exc_info:
+        client._post("/v1/chat/completions", {"model": "test"})
+
+    assert "结构不是对象" in str(exc_info.value)
+
+
+def test_structured_chat_rejects_top_level_array(monkeypatch) -> None:
+    client = OpenClawClient()
+    monkeypatch.setattr(
+        client,
+        "_post",
+        lambda path, payload: {
+            "choices": [{"message": {"content": "[1, 2, 3]"}}],
+        },
+    )
+
+    with pytest.raises(OpenClawClientError) as exc_info:
+        client.summarize_handover("req-1", {}, {})
+
+    assert "非 JSON 结构化结果" in str(exc_info.value)

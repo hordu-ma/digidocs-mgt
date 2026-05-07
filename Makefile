@@ -1,4 +1,4 @@
-.PHONY: doctor verify verify-go coverage-go verify-worker verify-frontend check-doc-sync install-project-skills install-hooks install-persistent-routing smoke status
+.PHONY: doctor verify verify-go coverage-go verify-worker coverage-worker verify-frontend coverage-frontend check-doc-sync install-project-skills install-hooks install-persistent-routing smoke status
 
 doctor:
 	./scripts/codex/doctor.sh
@@ -24,8 +24,15 @@ coverage-go:
 verify-worker:
 	cd backend-py-worker && uv run pytest -q
 
+coverage-worker:
+	cd backend-py-worker && uv run pytest --cov=app --cov-report=term-missing -q
+
 verify-frontend:
+	cd frontend && npm run test:run
 	cd frontend && npm run build
+
+coverage-frontend:
+	cd frontend && npm run test:coverage
 
 install-project-skills:
 	./scripts/codex/install-project-skills.sh
