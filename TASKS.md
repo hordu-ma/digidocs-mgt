@@ -487,6 +487,14 @@
   - 中优先级：抽出 `cmd/api.run` 启动胶水并补 server 构建失败与 listen 错误传播测试
   - 当前 Go 后端跨包覆盖率提升到 `75.3%`
 
+- 完成风险驱动端到端 smoke 与 PostgreSQL 集成测试入口
+  - 新增 `make smoke-e2e` / `scripts/codex/smoke-e2e.sh`，自动拉起 compose、等待 Go 后端、加载 `backend-go/sql/seed.sql`、检查前端入口并执行核心 API smoke
+  - `smoke-local.sh` 新增 `RUN_ASSISTANT_SMOKE=0` 开关，允许在没有 OpenClaw / Worker 的环境先验证核心业务端到端链路；默认仍保留 Assistant smoke
+  - 新增 `make integration-postgres` / `scripts/codex/postgres-integration.sh`，使用临时 PostgreSQL 17 容器运行真实迁移与仓储集成测试
+  - 新增 `postgres_integration_test.go`，覆盖真实 PostgreSQL schema 下的迁移、文档创建、版本上传、版本查询、数据文件夹与数据资产创建/查询链路
+  - 集成测试发现并修复审计写入 SQL 与当前 schema 不一致的问题：`audit_events.action_type` 当前为 `VARCHAR(32)`，写入侧不再强制转换为不存在的 `audit_action_type`
+  - 已通过 `make integration-postgres` 与 `make smoke-e2e`
+
 - 完成交付前安全与可靠性加固
   - HTTP 服务器新增 `WriteTimeout: 5min`、`IdleTimeout: 2min`，防止慢速客户端占用连接
   - PostgreSQL 连接池配置：`MaxOpenConns=25`、`MaxIdleConns=10`、`ConnMaxLifetime=5min`

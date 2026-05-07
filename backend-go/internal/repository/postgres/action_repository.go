@@ -442,7 +442,7 @@ func insertAuditEvent(
 			NULLIF($2, '')::uuid,
 			NULLIF($3, '')::uuid,
 			$4::uuid,
-			$5::audit_action_type,
+			$5,
 			NULLIF($8, ''),
 			'backend-go',
 			$6::jsonb,

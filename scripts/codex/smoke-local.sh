@@ -24,6 +24,7 @@ docker_network_name=""
 assistant_poll_interval="${ASSISTANT_SMOKE_POLL_INTERVAL:-2}"
 assistant_poll_attempts="${ASSISTANT_SMOKE_POLL_ATTEMPTS:-20}"
 version_smoke_timeout="${VERSION_SMOKE_TIMEOUT:-20}"
+run_assistant_smoke="${RUN_ASSISTANT_SMOKE:-1}"
 
 is_truthy() {
   case "${1:-}" in
@@ -131,13 +132,22 @@ for container in digidocs-postgres; do
   fi
 done
 
-for container in digidocs-backend-go digidocs-backend-py-worker; do
+for container in digidocs-backend-go; do
   if container_running "$container"; then
     echo "[OK] $container running"
   else
-    require_or_skip "$container is not running; start with docker compose --profile app up -d backend-go backend-py-worker"
+    require_or_skip "$container is not running; start with docker compose --profile app up -d backend-go"
   fi
 done
+if is_truthy "$run_assistant_smoke"; then
+  if container_running "digidocs-backend-py-worker"; then
+    echo "[OK] digidocs-backend-py-worker running"
+  else
+    require_or_skip "digidocs-backend-py-worker is not running; start with docker compose --profile app up -d backend-py-worker"
+  fi
+else
+  echo "[SKIP] assistant worker container check disabled by RUN_ASSISTANT_SMOKE=$run_assistant_smoke"
+fi
 
 echo '== backend healthz =='
 if smoke_curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
@@ -258,33 +268,37 @@ if [[ "$backend_ready" == "1" ]]; then
       require_or_skip "document lookup failed; cannot run version smoke"
     fi
 
-    # POST /assistant/ask + poll /assistant/requests/{id}
-    ask_resp=$(smoke_curl -sS --max-time 10 -X POST "$backend_url/api/v1/assistant/ask" \
-      -H "$auth_header" \
-      -H 'Content-Type: application/json' \
-      -d "{\"question\":\"请用一句话确认 smoke 已打通 AI 链路\",\"scope\":{\"document_id\":\"$document_id\"}}" 2>/dev/null || true)
-    request_id=$(echo "$ask_resp" | extract_json_string request_id)
+    if is_truthy "$run_assistant_smoke"; then
+      # POST /assistant/ask + poll /assistant/requests/{id}
+      ask_resp=$(smoke_curl -sS --max-time 10 -X POST "$backend_url/api/v1/assistant/ask" \
+        -H "$auth_header" \
+        -H 'Content-Type: application/json' \
+        -d "{\"question\":\"请用一句话确认 smoke 已打通 AI 链路\",\"scope\":{\"document_id\":\"$document_id\"}}" 2>/dev/null || true)
+      request_id=$(echo "$ask_resp" | extract_json_string request_id)
 
-    if [[ -n "$request_id" ]]; then
-      echo "[OK] POST /assistant/ask queued request_id=$request_id"
-      final_status=""
-      final_body=""
-      for ((poll_index=1; poll_index<=assistant_poll_attempts; poll_index++)); do
-        final_body=$(smoke_curl -sS --max-time 10 -H "$auth_header" "$backend_url/api/v1/assistant/requests/$request_id" 2>/dev/null || true)
-        final_status=$(echo "$final_body" | extract_json_string status)
-        if [[ "$final_status" == "completed" || "$final_status" == "failed" ]]; then
-          break
+      if [[ -n "$request_id" ]]; then
+        echo "[OK] POST /assistant/ask queued request_id=$request_id"
+        final_status=""
+        final_body=""
+        for ((poll_index=1; poll_index<=assistant_poll_attempts; poll_index++)); do
+          final_body=$(smoke_curl -sS --max-time 10 -H "$auth_header" "$backend_url/api/v1/assistant/requests/$request_id" 2>/dev/null || true)
+          final_status=$(echo "$final_body" | extract_json_string status)
+          if [[ "$final_status" == "completed" || "$final_status" == "failed" ]]; then
+            break
+          fi
+          sleep "$assistant_poll_interval"
+        done
+
+        if [[ "$final_status" == "completed" ]]; then
+          echo "[OK] GET /assistant/requests/$request_id -> completed"
+        else
+          require_or_skip "GET /assistant/requests/$request_id -> ${final_status:-unknown} after ${assistant_poll_attempts} polls x ${assistant_poll_interval}s; body=$final_body"
         fi
-        sleep "$assistant_poll_interval"
-      done
-
-      if [[ "$final_status" == "completed" ]]; then
-        echo "[OK] GET /assistant/requests/$request_id -> completed"
       else
-        require_or_skip "GET /assistant/requests/$request_id -> ${final_status:-unknown} after ${assistant_poll_attempts} polls x ${assistant_poll_interval}s; body=$final_body"
+        require_or_skip "POST /assistant/ask did not return request_id"
       fi
     else
-      require_or_skip "POST /assistant/ask did not return request_id"
+      echo "[SKIP] assistant ask smoke disabled by RUN_ASSISTANT_SMOKE=$run_assistant_smoke"
     fi
   else
     require_or_skip "auth/login did not return a token (seed data may not be loaded)"

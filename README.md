@@ -184,8 +184,10 @@ docker compose -f docker-compose.yml -f docker-compose.p14s.yml --profile app up
 ./scripts/codex/check-doc-sync.sh
 make status
 make smoke
+make smoke-e2e
 make verify
 make coverage-go
+make integration-postgres
 ./scripts/codex/install-hooks.sh
 ./scripts/codex/install-persistent-routing.sh
 ./scripts/codex/install-project-skills.sh
@@ -203,6 +205,8 @@ make coverage-go
 - `scripts/codex/check-doc-sync.sh`：检查 `README.md` / `TASKS.md` / `AGENTS.md` 的阶段与协作约束一致性
 - `scripts/codex/report.sh`：输出当前分支、阶段、技能安装与 hooks 状态
 - `scripts/codex/smoke-local.sh`：本地容器联调烟测骨架
+- `scripts/codex/smoke-e2e.sh`：自动拉起 compose、加载种子数据并执行核心端到端 smoke
+- `scripts/codex/postgres-integration.sh`：启动临时 PostgreSQL 容器并运行真实迁移 / 仓储集成测试
 - `Makefile`：统一 `make doctor`、`make verify`、`make check-doc-sync`
 - `make coverage-go`：生成 Go 后端跨包覆盖率报告，统计口径详见 [测试覆盖率说明](docs/测试覆盖率说明.md)
 - `.githooks/`：本地提交前和推送前门禁
@@ -289,6 +293,8 @@ docker compose up -d postgres
 - 已补 Synology provider 分层契约测试与 memory 存储版本仓储联动，上传后再查询/下载/预览不再依赖静态占位返回
 - 已完成 Go 后端覆盖率二轮加固，新增 action 事务写链、版本上传 workflow、flow / handover / auth handler 测试，Go 跨包覆盖率提升到 `70.2%`
 - 已完成 Go 后端覆盖率三轮加固，覆盖 postgres Assistant/data asset、handler 错误分支、db 迁移 runner、postgres queue 失败分支和 cmd/api 启动胶水，Go 跨包覆盖率提升到 `75.3%`
+- 已新增风险驱动验证入口：`make smoke-e2e` 可自动拉起 compose、加载种子数据并跑核心端到端 smoke；`make integration-postgres` 可用临时 PostgreSQL 容器验证真实迁移与仓储链路
+- PostgreSQL 集成测试发现并修复审计写入 SQL 与当前 schema 不一致的问题：`audit_events.action_type` 当前为 `VARCHAR(32)`，写入侧不再强制转换为不存在的 `audit_action_type`
 - 已完成 P1 AI 持久化闭环首轮修复（`assistant_requests` 落库、Worker 回调幂等更新、`assistant_suggestions` 查询/确认/忽略真实接线）
 - 已完成 P2 持久化任务消费与 AI 结果展示首轮修复（PostgreSQL 任务轮询、摘要结果回写、文档详情页 AI 建议展示）
 - 已补 `.github/INDEX.md` 与 GitHub 协作资产入口校验

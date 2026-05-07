@@ -75,7 +75,7 @@ func (w VersionWorkflow) CreateUploadedVersion(ctx context.Context, input comman
 			extra_data,
 			created_at
 		)
-		VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'replace_version'::audit_action_type, NULLIF($7, ''), 'backend-go', $5::jsonb, $6)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'replace_version', NULLIF($7, ''), 'backend-go', $5::jsonb, $6)
 		`,
 		newID(),
 		input.DocumentID,

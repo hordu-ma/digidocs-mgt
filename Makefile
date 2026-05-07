@@ -1,4 +1,4 @@
-.PHONY: doctor verify verify-go coverage-go verify-worker coverage-worker verify-frontend coverage-frontend check-doc-sync install-project-skills install-hooks install-persistent-routing smoke status
+.PHONY: doctor verify verify-go coverage-go verify-worker coverage-worker verify-frontend coverage-frontend integration-postgres check-doc-sync install-project-skills install-hooks install-persistent-routing smoke smoke-e2e status
 
 doctor:
 	./scripts/codex/doctor.sh
@@ -11,6 +11,12 @@ status:
 
 smoke:
 	./scripts/codex/smoke-local.sh
+
+smoke-e2e:
+	./scripts/codex/smoke-e2e.sh
+
+integration-postgres:
+	./scripts/codex/postgres-integration.sh
 
 verify: doctor check-doc-sync verify-go verify-worker verify-frontend
 
