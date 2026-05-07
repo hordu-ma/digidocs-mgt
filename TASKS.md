@@ -479,6 +479,14 @@
   - 扩展 HTTP handler 集成测试，覆盖 auth 登录 / 登出、登录错误分支、flow actions / 列表、handover detail / items / confirm / complete / cancel
   - 当前 Go 后端跨包覆盖率提升到 `70.2%`
 
+- 完成 Go 后端覆盖率三轮高/中优先级加固
+  - 高优先级：新增 postgres Assistant conversation / request / completion / suggestion / latest text SQL mock 测试；补 data asset 列表、详情、创建、更新、删除、交接数据项事务测试
+  - 高优先级：扩展 HTTP handler 错误分支，覆盖 auth/me 与 profile 更新错误、admin validation、data folder / handover data JSON 错误、版本列表和版本详情
+  - 中优先级：补 `RunMigrations` runner 测试，覆盖迁移表创建、已执行跳过、按版本执行和错误上下文；迁移记录继续由 SQL migration 文件写入 `schema_migrations`
+  - 中优先级：补 postgres queue Begin / Query / Mark running / Commit 失败分支测试
+  - 中优先级：抽出 `cmd/api.run` 启动胶水并补 server 构建失败与 listen 错误传播测试
+  - 当前 Go 后端跨包覆盖率提升到 `75.3%`
+
 - 完成交付前安全与可靠性加固
   - HTTP 服务器新增 `WriteTimeout: 5min`、`IdleTimeout: 2min`，防止慢速客户端占用连接
   - PostgreSQL 连接池配置：`MaxOpenConns=25`、`MaxIdleConns=10`、`ConnMaxLifetime=5min`

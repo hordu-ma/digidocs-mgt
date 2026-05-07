@@ -170,6 +170,31 @@ func TestAuth_LoginLogoutAndErrorBranches(t *testing.T) {
 	}
 }
 
+func TestAuth_MeAndUpdateErrorBranches(t *testing.T) {
+	handler, token := testServer(t)
+
+	missingToken := httptest.NewRecorder()
+	handler.ServeHTTP(missingToken, httptest.NewRequest("GET", "/api/v1/auth/me", nil))
+	if missingToken.Code != http.StatusUnauthorized {
+		t.Fatalf("missing token status = %d, want 401; body = %s", missingToken.Code, missingToken.Body.String())
+	}
+
+	badJSON := httptest.NewRecorder()
+	handler.ServeHTTP(badJSON, authedRequest("PATCH", "/api/v1/auth/me", strings.NewReader("{"), token))
+	if badJSON.Code != http.StatusBadRequest {
+		t.Fatalf("bad profile JSON status = %d, want 400; body = %s", badJSON.Code, badJSON.Body.String())
+	}
+
+	invalidProfile := httptest.NewRecorder()
+	handler.ServeHTTP(invalidProfile, authedRequest("PATCH", "/api/v1/auth/me", jsonBody(map[string]string{
+		"display_name": "测试管理员",
+		"email":        "not-an-email",
+	}), token))
+	if invalidProfile.Code != http.StatusBadRequest {
+		t.Fatalf("invalid profile status = %d, want 400; body = %s", invalidProfile.Code, invalidProfile.Body.String())
+	}
+}
+
 // --- Document CRUD ---
 
 func TestDocuments_List(t *testing.T) {
@@ -308,6 +333,23 @@ func TestVersions_UploadThenDownloadAndPreview(t *testing.T) {
 	versionID, _ := uploadData["id"].(string)
 	if versionID == "" {
 		t.Fatal("expected version id")
+	}
+
+	listRec := httptest.NewRecorder()
+	handler.ServeHTTP(listRec, authedRequest("GET", "/api/v1/documents/00000000-0000-0000-0000-000000000100/versions", nil, token))
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("version list status = %d, want 200; body = %s", listRec.Code, listRec.Body.String())
+	}
+	listResult := parseResponse(t, listRec)
+	meta, _ := listResult["meta"].(map[string]any)
+	if meta["document_id"] != "00000000-0000-0000-0000-000000000100" {
+		t.Fatalf("version list meta = %#v, want document_id", meta)
+	}
+
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, authedRequest("GET", "/api/v1/versions/"+versionID, nil, token))
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("version get status = %d, want 200; body = %s", getRec.Code, getRec.Body.String())
 	}
 
 	downloadRec := httptest.NewRecorder()
@@ -989,6 +1031,22 @@ func TestAdminRoutes_RequireAdminAndReachHandler(t *testing.T) {
 	if badBody.Code != http.StatusBadRequest {
 		t.Fatalf("admin bad body status = %d, want 400; body = %s", badBody.Code, badBody.Body.String())
 	}
+
+	badUser := httptest.NewRecorder()
+	handler.ServeHTTP(badUser, authedRequest("POST", "/api/v1/admin/users", jsonBody(map[string]string{
+		"username": "ab",
+	}), adminToken))
+	if badUser.Code != http.StatusBadRequest {
+		t.Fatalf("admin bad user status = %d, want 400; body = %s", badUser.Code, badUser.Body.String())
+	}
+
+	badProject := httptest.NewRecorder()
+	handler.ServeHTTP(badProject, authedRequest("POST", "/api/v1/admin/projects", jsonBody(map[string]string{
+		"team_space_id": "team-1",
+	}), adminToken))
+	if badProject.Code != http.StatusBadRequest {
+		t.Fatalf("admin bad project status = %d, want 400; body = %s", badProject.Code, badProject.Body.String())
+	}
 }
 
 // --- Data Assets ---
@@ -1115,6 +1173,28 @@ func TestDataAssets_UploadRequiresFile(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDataAssets_ErrorBranches(t *testing.T) {
+	handler, token := testServer(t)
+
+	badFolderJSON := httptest.NewRecorder()
+	handler.ServeHTTP(badFolderJSON, authedRequest("POST", "/api/v1/data-folders", strings.NewReader("{"), token))
+	if badFolderJSON.Code != http.StatusBadRequest {
+		t.Fatalf("bad folder JSON status = %d, want 400; body = %s", badFolderJSON.Code, badFolderJSON.Body.String())
+	}
+
+	deleteMissingFolder := httptest.NewRecorder()
+	handler.ServeHTTP(deleteMissingFolder, authedRequest("DELETE", "/api/v1/data-folders/missing", nil, token))
+	if deleteMissingFolder.Code != http.StatusNotFound {
+		t.Fatalf("delete missing folder status = %d, want 404; body = %s", deleteMissingFolder.Code, deleteMissingFolder.Body.String())
+	}
+
+	badHandoverDataJSON := httptest.NewRecorder()
+	handler.ServeHTTP(badHandoverDataJSON, authedRequest("PUT", "/api/v1/handovers/handover-1/data-items", strings.NewReader("{"), token))
+	if badHandoverDataJSON.Code != http.StatusBadRequest {
+		t.Fatalf("bad handover data JSON status = %d, want 400; body = %s", badHandoverDataJSON.Code, badHandoverDataJSON.Body.String())
 	}
 }
 

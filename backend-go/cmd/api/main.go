@@ -7,17 +7,27 @@ import (
 	"digidocs-mgt/backend-go/internal/config"
 )
 
-func main() {
-	cfg := config.Load()
+type httpServer interface {
+	ListenAndServe() error
+}
 
-	server, err := app.NewServer(cfg)
-	if err != nil {
+func main() {
+	if err := run(config.Load, func(cfg config.Config) (httpServer, error) {
+		return app.NewServer(cfg)
+	}); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func run(loadConfig func() config.Config, newServer func(config.Config) (httpServer, error)) error {
+	cfg := loadConfig()
+
+	server, err := newServer(cfg)
+	if err != nil {
+		return err
 	}
 
 	log.Printf("starting %s on %s", cfg.AppName, cfg.HTTPAddr)
 
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatal(err)
-	}
+	return server.ListenAndServe()
 }

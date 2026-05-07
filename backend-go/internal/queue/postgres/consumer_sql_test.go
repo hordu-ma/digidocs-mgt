@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -76,5 +77,75 @@ func TestConsumerPollReturnsNilOnDecodeError(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet sql expectations: %v", err)
+	}
+}
+
+func TestConsumerPollReturnsNilOnTransactionFailures(t *testing.T) {
+	cases := []struct {
+		name  string
+		setup func(sqlmock.Sqlmock)
+	}{
+		{
+			name: "begin",
+			setup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'pending'").WillReturnResult(sqlmock.NewResult(0, 0))
+				mock.ExpectBegin().WillReturnError(errors.New("begin failed"))
+			},
+		},
+		{
+			name: "query",
+			setup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'pending'").WillReturnResult(sqlmock.NewResult(0, 0))
+				mock.ExpectBegin()
+				mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
+					WithArgs(1).
+					WillReturnError(errors.New("query failed"))
+			},
+		},
+		{
+			name: "mark running",
+			setup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'pending'").WillReturnResult(sqlmock.NewResult(0, 0))
+				mock.ExpectBegin()
+				mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
+					WithArgs(1).
+					WillReturnRows(sqlmock.NewRows([]string{"id", "request_type", "related_type", "related_id", "payload"}).
+						AddRow("req-1", "assistant.ask", "document", "doc-1", `{}`))
+				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'running'").
+					WithArgs(sqlmock.AnyArg()).
+					WillReturnError(errors.New("update failed"))
+			},
+		},
+		{
+			name: "commit",
+			setup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'pending'").WillReturnResult(sqlmock.NewResult(0, 0))
+				mock.ExpectBegin()
+				mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
+					WithArgs(1).
+					WillReturnRows(sqlmock.NewRows([]string{"id", "request_type", "related_type", "related_id", "payload"}).
+						AddRow("req-1", "assistant.ask", "document", "doc-1", `{}`))
+				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'running'").
+					WithArgs(sqlmock.AnyArg()).
+					WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectCommit().WillReturnError(errors.New("commit failed"))
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db, mock := newQueueMockDB(t)
+			consumer := NewConsumer(db)
+			tc.setup(mock)
+
+			got := consumer.Poll(context.Background(), 1)
+			if got != nil {
+				t.Fatalf("messages = %#v, want nil on %s failure", got, tc.name)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatalf("unmet sql expectations: %v", err)
+			}
+		})
 	}
 }
