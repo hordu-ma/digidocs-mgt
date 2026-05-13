@@ -42,7 +42,7 @@
 | `frontend/tsconfig.node.json` | Node/Vite 配置文件所需的 TypeScript 配置。 |
 | `frontend/index.html` | Vite 应用入口 HTML。 |
 | `frontend/Dockerfile` | 前端生产镜像构建文件。 |
-| `frontend/nginx/default.conf` | 生产环境 Nginx 配置，把 `/api/` 转发到 `backend-go`，其余请求回退到 `index.html`。 |
+| `frontend/nginx/default.conf` | 生产环境 Nginx 配置：把 `/api/` 转发到 `backend-go`，把已知前端路由回退到 `index.html`，把未知扫描路径直接 `404`，避免公网随机路径查找持续制造 negative dentry / slab 增长。 |
 
 ## 4. src 目录文件说明
 
