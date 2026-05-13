@@ -95,7 +95,7 @@ const users = ref<any[]>([]);
 const userLoading = ref(false);
 const userDialogVisible = ref(false);
 const userEditMode = ref(false);
-const userForm = ref({ id: "", username: "", password: "", display_name: "", role: "member", email: "", phone: "" });
+const userForm = ref({ id: "", username: "", password: "", confirm_password: "", display_name: "", role: "member", email: "", phone: "" });
 const userSubmitting = ref(false);
 
 async function loadUsers() {
@@ -111,25 +111,31 @@ async function loadUsers() {
 
 function openCreateUser() {
   userEditMode.value = false;
-  userForm.value = { id: "", username: "", password: "", display_name: "", role: "member", email: "", phone: "" };
+  userForm.value = { id: "", username: "", password: "", confirm_password: "", display_name: "", role: "member", email: "", phone: "" };
   userDialogVisible.value = true;
 }
 
 function openEditUser(u: any) {
   userEditMode.value = true;
-  userForm.value = { id: u.id, username: u.username, password: "", display_name: u.display_name, role: u.role, email: u.email || "", phone: u.phone || "" };
+  userForm.value = { id: u.id, username: u.username, password: "", confirm_password: "", display_name: u.display_name, role: u.role, email: u.email || "", phone: u.phone || "" };
   userDialogVisible.value = true;
 }
 
 async function submitUser() {
   userSubmitting.value = true;
   try {
+    if (userForm.value.password !== userForm.value.confirm_password) {
+      ElMessage.error("两次输入的密码不一致");
+      return;
+    }
+
     if (userEditMode.value) {
       const body: any = {};
       if (userForm.value.display_name) body.display_name = userForm.value.display_name;
       if (userForm.value.role) body.role = userForm.value.role;
       if (userForm.value.email !== undefined) body.email = userForm.value.email;
       if (userForm.value.phone !== undefined) body.phone = userForm.value.phone;
+      if (userForm.value.password) body.password = userForm.value.password;
       const res = await fetch(`${API}/admin/users/${userForm.value.id}`, {
         method: "PATCH",
         headers: { ...headers.value, "Content-Type": "application/json" },
@@ -140,12 +146,19 @@ async function submitUser() {
         ElMessage.error(json.message || "更新失败");
         return;
       }
-      ElMessage.success("用户更新成功");
+      ElMessage.success(userForm.value.password ? "用户更新成功，密码已重置" : "用户更新成功");
     } else {
       const res = await fetch(`${API}/admin/users`, {
         method: "POST",
         headers: { ...headers.value, "Content-Type": "application/json" },
-        body: JSON.stringify(userForm.value),
+        body: JSON.stringify({
+          username: userForm.value.username,
+          password: userForm.value.password,
+          display_name: userForm.value.display_name,
+          role: userForm.value.role,
+          email: userForm.value.email,
+          phone: userForm.value.phone,
+        }),
       });
       if (!res.ok) {
         const json = await res.json();
@@ -354,8 +367,11 @@ onMounted(() => {
             <ElFormItem label="账号">
               <ElInput v-model="userForm.username" :disabled="userEditMode" placeholder="登录用的用户名" />
             </ElFormItem>
-            <ElFormItem v-if="!userEditMode" label="密码">
-              <ElInput v-model="userForm.password" type="password" show-password placeholder="初始密码" />
+            <ElFormItem :label="userEditMode ? '新密码' : '密码'">
+              <ElInput v-model="userForm.password" type="password" show-password :placeholder="userEditMode ? '留空表示不修改' : '初始密码'" />
+            </ElFormItem>
+            <ElFormItem :label="userEditMode ? '确认新密码' : '确认密码'">
+              <ElInput v-model="userForm.confirm_password" type="password" show-password :placeholder="userEditMode ? '再次输入新密码' : '再次输入初始密码'" />
             </ElFormItem>
             <ElFormItem label="姓名"><ElInput v-model="userForm.display_name" /></ElFormItem>
             <ElFormItem label="角色">

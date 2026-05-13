@@ -114,6 +114,7 @@ type UpdateUserInput struct {
 	Email       *string `json:"email,omitempty"`
 	Phone       *string `json:"phone,omitempty"`
 	Status      *string `json:"status,omitempty"`
+	Password    *string `json:"password,omitempty"`
 }
 
 func (s AdminService) UpdateUser(ctx context.Context, input UpdateUserInput) (*query.UserOption, error) {
@@ -146,6 +147,20 @@ func (s AdminService) UpdateUser(ctx context.Context, input UpdateUserInput) (*q
 			return nil, fmt.Errorf("%w: status must be active or inactive", ErrValidation)
 		}
 		fields["status"] = v
+	}
+	if input.Password != nil {
+		v := *input.Password
+		if v == "" {
+			return nil, fmt.Errorf("%w: password cannot be empty", ErrValidation)
+		}
+		if len(v) > 72 {
+			return nil, fmt.Errorf("%w: password exceeds max length", ErrValidation)
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(v), bcrypt.DefaultCost)
+		if err != nil {
+			return nil, fmt.Errorf("failed to hash password: %w", err)
+		}
+		fields["password_hash"] = string(hash)
 	}
 	if len(fields) == 0 {
 		return nil, fmt.Errorf("%w: no fields to update", ErrValidation)
