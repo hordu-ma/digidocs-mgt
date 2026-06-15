@@ -17,12 +17,8 @@ import { useRoute, useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
-
-type UserOption = {
-  id: string;
-  display_name: string;
-  role: string;
-};
+import { extractError } from "@/utils/error";
+import type { UserOption } from "@/types";
 
 type FolderNode = {
   id: string;
@@ -238,7 +234,7 @@ async function submitTransfer() {
     showTransferDialog.value = false;
     await loadData();
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "转交失败");
+    ElMessage.error(extractError(err, "转交失败"));
   } finally {
     transferLoading.value = false;
   }
@@ -256,7 +252,7 @@ async function applyFlowAction(endpoint: string, label: string) {
     ElMessage.success(`${label}成功`);
     await loadData();
   } catch (err: any) {
-    const msg = err.response?.data?.message ?? `${label}失败`;
+    const msg = extractError(err, `${label}失败`);
     ElMessage.error(msg);
   } finally {
     actionLoading.value = false;
@@ -283,7 +279,7 @@ async function submitEdit() {
     showEditDialog.value = false;
     await loadData();
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "更新失败");
+    ElMessage.error(extractError(err, "更新失败"));
   } finally {
     editLoading.value = false;
   }
@@ -297,7 +293,7 @@ async function deleteDocument() {
     ElMessage.success("文档已删除");
     router.push("/documents");
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "删除失败");
+    ElMessage.error(extractError(err, "删除失败"));
   } finally {
     actionLoading.value = false;
   }
@@ -310,7 +306,7 @@ async function restoreDocument() {
     ElMessage.success("文档已恢复");
     await loadData();
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "恢复失败");
+    ElMessage.error(extractError(err, "恢复失败"));
   } finally {
     actionLoading.value = false;
   }
@@ -349,7 +345,7 @@ async function submitUpload() {
     showUploadDialog.value = false;
     await loadData();
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "上传失败");
+    ElMessage.error(extractError(err, "上传失败"));
   } finally {
     uploadLoading.value = false;
   }
@@ -405,7 +401,7 @@ async function requestSummary() {
       void pollSummaryRequest(requestID);
     }
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "摘要提交失败");
+    ElMessage.error(extractError(err, "摘要提交失败"));
   } finally {
     summaryLoading.value = false;
   }
@@ -422,7 +418,7 @@ async function updateSuggestionStatus(id: string, action: "confirm" | "dismiss")
     ElMessage.success(action === "confirm" ? "建议已确认" : "建议已忽略");
     await loadData();
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "操作失败");
+    ElMessage.error(extractError(err, "操作失败"));
   }
 }
 
@@ -434,7 +430,7 @@ onMounted(async () => {
   try {
     await Promise.all([loadData(), loadUsers()]);
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "加载文档详情失败");
+    ElMessage.error(extractError(err, "加载文档详情失败"));
   }
 });
 

@@ -13,10 +13,9 @@ import { ElMessage } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 
 import api from "@/api";
+import { extractError } from "@/utils/error";
 import AppLayout from "@/components/AppLayout.vue";
-
-type TeamSpaceOption = { id: string; name: string };
-type ProjectOption = { id: string; name: string; team_space_id?: string };
+import type { ProjectOption, TeamSpaceOption } from "@/types";
 
 type CodeRepository = {
   id: string;
@@ -161,7 +160,7 @@ async function selectRepository(id: string) {
     selectedRepo.value = detailRes.data?.data ?? null;
     pushEvents.value = eventRes.data?.data ?? [];
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "加载代码仓库失败");
+    ElMessage.error(extractError(err, "加载代码仓库失败"));
   } finally {
     detailLoading.value = false;
   }
@@ -195,7 +194,7 @@ async function submitCreate() {
     selectedRepo.value = repo;
     pushEvents.value = [];
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "创建失败");
+    ElMessage.error(extractError(err, "创建失败"));
   } finally {
     createLoading.value = false;
   }

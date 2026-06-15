@@ -14,18 +14,10 @@ import { computed, onMounted, reactive, ref } from "vue";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+import { extractError } from "@/utils/error";
 import { useAuthStore } from "@/stores/auth";
-
-type UserOption = {
-  id: string;
-  display_name: string;
-  role: string;
-};
-
-type ProjectOption = {
-  id: string;
-  name: string;
-};
+import { formatFileSize } from "@/utils/format";
+import type { ProjectOption, UserOption } from "@/types";
 
 type DocumentOption = {
   id: string;
@@ -251,7 +243,7 @@ async function fetchReferenceData() {
     );
     projects.value = projectResponses.flatMap((item) => item.data?.data ?? []);
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "加载基础选项失败");
+    ElMessage.error(extractError(err, "加载基础选项失败"));
   } finally {
     referenceLoading.value = false;
   }
@@ -313,14 +305,6 @@ function buildEditableDataItems(dataItems: HandoverDataLine[], assets: DataAsset
   editableDataItems.value = result;
 }
 
-function formatFileSize(bytes?: number): string {
-  if (!bytes) return "-";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
-
 function buildEditableItems(detail: HandoverDetail, documents: DocumentOption[]) {
   const itemMap = new Map(detail.items?.map((item) => [item.document_id, item]) ?? []);
   const baseDocuments = documents.map((item) => ({
@@ -371,7 +355,7 @@ async function submitCreate() {
     showDialog.value = false;
     await fetchHandovers();
   } catch (err: any) {
-    const msg = err.response?.data?.message ?? "创建失败";
+    const msg = extractError(err, "创建失败");
     ElMessage.error(msg);
   } finally {
     formLoading.value = false;
@@ -398,7 +382,7 @@ async function openDetail(handoverID: string) {
     buildEditableDataItems(dataItems, projectDataAssets.value);
     showDetailDialog.value = true;
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "加载交接单详情失败");
+    ElMessage.error(extractError(err, "加载交接单详情失败"));
   } finally {
     detailLoading.value = false;
   }
@@ -421,7 +405,7 @@ async function saveItems() {
     await openDetail(activeHandover.value.id);
     await fetchHandovers();
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "更新交接清单失败");
+    ElMessage.error(extractError(err, "更新交接清单失败"));
   } finally {
     actionLoading.value = false;
   }
@@ -442,7 +426,7 @@ async function saveDataItems() {
     });
     ElMessage.success("数据资产清单已更新");
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "更新数据资产清单失败");
+    ElMessage.error(extractError(err, "更新数据资产清单失败"));
   } finally {
     actionLoading.value = false;
   }
@@ -480,7 +464,7 @@ async function applyAction(action: "confirm" | "complete" | "cancel") {
     await openDetail(activeHandover.value.id);
     await fetchHandovers();
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "交接动作执行失败");
+    ElMessage.error(extractError(err, "交接动作执行失败"));
   } finally {
     actionLoading.value = false;
   }

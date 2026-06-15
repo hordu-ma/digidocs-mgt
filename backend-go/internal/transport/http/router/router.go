@@ -149,6 +149,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 		middleware.CORS(cfg.CORSAllowOrigins),
 		middleware.RequestID,
 		middleware.JSONContentType,
+		middleware.LimitBody,
 		middleware.AccessLog,
 	)
 }

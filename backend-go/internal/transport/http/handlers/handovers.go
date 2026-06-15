@@ -35,15 +35,7 @@ func (h HandoverHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ActorRole:      middleware.UserRoleFromContext(r.Context()),
 	})
 	if err != nil {
-		if errors.Is(err, service.ErrValidation) {
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-			return
-		}
-		if errors.Is(err, service.ErrForbidden) {
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create handover")
+		writeServiceError(w, err, "handover not found", "failed to create handover")
 		return
 	}
 
@@ -63,11 +55,7 @@ func (h HandoverHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h HandoverHandler) Get(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.Get(r.Context(), r.PathValue("handoverID"))
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "handover not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to get handover")
+		writeServiceError(w, err, "handover not found", "failed to get handover")
 		return
 	}
 
@@ -103,15 +91,7 @@ func (h HandoverHandler) UpdateItems(w http.ResponseWriter, r *http.Request) {
 		ActorRole:  middleware.UserRoleFromContext(r.Context()),
 	})
 	if err != nil {
-		if errors.Is(err, service.ErrValidation) {
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-			return
-		}
-		if errors.Is(err, service.ErrForbidden) {
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update handover items")
+		writeServiceError(w, err, "handover not found", "failed to update handover items")
 		return
 	}
 
@@ -145,19 +125,11 @@ func (h HandoverHandler) writeAction(w http.ResponseWriter, r *http.Request, act
 		ActorRole:  middleware.UserRoleFromContext(r.Context()),
 	})
 	if err != nil {
-		if errors.Is(err, service.ErrValidation) {
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-			return
-		}
 		if errors.Is(err, service.ErrInvalidTransition) {
 			response.WriteError(w, http.StatusBadRequest, "handover_status_invalid", "invalid handover transition")
 			return
 		}
-		if errors.Is(err, service.ErrForbidden) {
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to apply handover action")
+		writeServiceError(w, err, "handover not found", "failed to apply handover action")
 		return
 	}
 

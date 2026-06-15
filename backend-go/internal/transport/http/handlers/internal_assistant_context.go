@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -50,11 +49,7 @@ func (h InternalAssistantContextHandler) GetDocumentContext(w http.ResponseWrite
 	documentID := r.PathValue("documentID")
 	document, err := h.documents.GetDocument(r.Context(), documentID)
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "document not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to load document context")
+		writeServiceError(w, err, "document not found", "failed to load document context")
 		return
 	}
 
@@ -131,11 +126,7 @@ func (h InternalAssistantContextHandler) GetHandoverContext(w http.ResponseWrite
 	handoverID := r.PathValue("handoverID")
 	handover, err := h.handovers.Get(r.Context(), handoverID)
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "handover not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to load handover context")
+		writeServiceError(w, err, "handover not found", "failed to load handover context")
 		return
 	}
 

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -21,12 +20,8 @@ type DocumentHandler struct {
 	assistant service.AssistantService
 }
 
-func NewDocumentHandler(svc service.DocumentService, assistant ...service.AssistantService) DocumentHandler {
-	h := DocumentHandler{service: svc}
-	if len(assistant) > 0 {
-		h.assistant = assistant[0]
-	}
-	return h
+func NewDocumentHandler(svc service.DocumentService, assistant service.AssistantService) DocumentHandler {
+	return DocumentHandler{service: svc, assistant: assistant}
 }
 
 func (h DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -72,15 +67,7 @@ func (h DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		file,
 	)
 	if err != nil {
-		if errors.Is(err, service.ErrValidation) {
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-			return
-		}
-		if errors.Is(err, service.ErrForbidden) {
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create document")
+		writeServiceError(w, err, "document not found", "failed to create document")
 		return
 	}
 
@@ -91,7 +78,7 @@ func (h DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h DocumentHandler) queueExtraction(r *http.Request, data map[string]any, fileName string) {
-	if (h.assistant == service.AssistantService{}) {
+	if !h.assistant.Configured() {
 		return
 	}
 	documentID, _ := data["id"].(string)
@@ -149,11 +136,7 @@ func (h DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.GetDocument(r.Context(), r.PathValue("documentID"))
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "document not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to get document")
+		writeServiceError(w, err, "document not found", "failed to get document")
 		return
 	}
 
@@ -182,19 +165,7 @@ func (h DocumentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		ActorRole:   actorRole,
 	})
 	if err != nil {
-		if errors.Is(err, service.ErrValidation) {
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-			return
-		}
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "document not found")
-			return
-		}
-		if errors.Is(err, service.ErrForbidden) {
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update document")
+		writeServiceError(w, err, "document not found", "failed to update document")
 		return
 	}
 
@@ -220,15 +191,7 @@ func (h DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		ActorRole:  actorRole,
 	})
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "document not found")
-			return
-		}
-		if errors.Is(err, service.ErrForbidden) {
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to delete document")
+		writeServiceError(w, err, "document not found", "failed to delete document")
 		return
 	}
 
@@ -241,15 +204,7 @@ func (h DocumentHandler) Restore(w http.ResponseWriter, r *http.Request) {
 	documentID := r.PathValue("documentID")
 	err := h.service.RestoreDocument(r.Context(), documentID, actorID, actorRole)
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "document not found")
-			return
-		}
-		if errors.Is(err, service.ErrForbidden) {
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to restore document")
+		writeServiceError(w, err, "document not found", "failed to restore document")
 		return
 	}
 

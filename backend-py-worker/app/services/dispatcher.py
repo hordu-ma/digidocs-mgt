@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from typing import cast
 
@@ -54,22 +55,10 @@ class WorkerDispatcher:
             }
             context = self._build_context(task, normalized_scope)
             # Inline document text extraction when scoped to a document
-            doc_id = _string_value(normalized_scope.get("document_id"))
-            if doc_id:
+            if _string_value(normalized_scope.get("document_id")):
                 self._ensure_document_text(task, context)
-            try:
-                answer = self.skill_adapter.run(task, context, normalized_scope)
-            except (OpenClawClientError, SkillAdapterError) as exc:
-                return TaskResult(
-                    request_id=task.request_id,
-                    status="failed",
-                    error_message=str(exc),
-                )
-            return TaskResult(
-                request_id=task.request_id,
-                status="completed",
-                output=answer,
-            )
+            output, failure = self._run_skill(task, context, normalized_scope)
+            return failure or self._completed(task, output)
 
         if task.task_type == "document.summarize":
             context = self._build_context(task)
@@ -80,77 +69,56 @@ class WorkerDispatcher:
                 context["document_text_warning"] = str(exc)
             if extracted_text:
                 context["document_text"] = extracted_text
-            try:
-                output = self.skill_adapter.run(task, context)
-            except (OpenClawClientError, SkillAdapterError) as exc:
-                return TaskResult(
-                    request_id=task.request_id,
-                    status="failed",
-                    error_message=str(exc),
-                )
+            output, failure = self._run_skill(task, context)
+            if failure:
+                return failure
             if extracted_text:
                 output["extracted_text"] = extracted_text
-            return TaskResult(
-                request_id=task.request_id,
-                status="completed",
-                output=output,
-            )
+            return self._completed(task, output)
 
-        if task.task_type == "handover.summarize":
-            context = self._build_context(task)
-            try:
-                output = self.skill_adapter.run(task, context)
-            except (OpenClawClientError, SkillAdapterError) as exc:
-                return TaskResult(
-                    request_id=task.request_id,
-                    status="failed",
-                    error_message=str(exc),
-                )
-            return TaskResult(
-                request_id=task.request_id,
-                status="completed",
-                output=output,
-            )
-
-        if task.task_type == "assistant.generate_suggestion":
-            context = self._build_context(task)
-            try:
-                output = self.skill_adapter.run(task, context)
-            except (OpenClawClientError, SkillAdapterError) as exc:
-                return TaskResult(
-                    request_id=task.request_id,
-                    status="failed",
-                    error_message=str(exc),
-                )
-            return TaskResult(
-                request_id=task.request_id,
-                status="completed",
-                output=output,
-            )
+        if task.task_type in ("handover.summarize", "assistant.generate_suggestion"):
+            output, failure = self._run_skill(task, self._build_context(task))
+            return failure or self._completed(task, output)
 
         if task.task_type == "document.extract_text":
             try:
                 extracted_text = self._resolve_document_text(task, self._build_context(task))
             except DocumentTextExtractionError as exc:
-                return TaskResult(
-                    request_id=task.request_id,
-                    status="failed",
-                    error_message=str(exc),
-                )
-            return TaskResult(
-                request_id=task.request_id,
-                status="completed",
-                output={
+                return self._failed(task, str(exc))
+            return self._completed(
+                task,
+                {
                     "task_type": "document.extract_text",
                     "extracted_text": extracted_text,
                 },
             )
 
-        return TaskResult(
-            request_id=task.request_id,
-            status="failed",
-            error_message=f"unsupported task type: {task.task_type}",
-        )
+        return self._failed(task, f"unsupported task type: {task.task_type}")
+
+    def _run_skill(
+        self,
+        task: WorkerTask,
+        context: ObjectDict,
+        scope: ObjectDict | None = None,
+    ) -> tuple[ObjectDict, TaskResult | None]:
+        """Run the skill adapter, returning (output, None) on success or
+        ({}, failure_result) when the adapter or OpenClaw client errors."""
+        try:
+            if scope is None:
+                output = self.skill_adapter.run(task, context)
+            else:
+                output = self.skill_adapter.run(task, context, scope)
+        except (OpenClawClientError, SkillAdapterError) as exc:
+            return {}, self._failed(task, str(exc))
+        return output, None
+
+    @staticmethod
+    def _completed(task: WorkerTask, output: ObjectDict) -> TaskResult:
+        return TaskResult(request_id=task.request_id, status="completed", output=output)
+
+    @staticmethod
+    def _failed(task: WorkerTask, message: str) -> TaskResult:
+        return TaskResult(request_id=task.request_id, status="failed", error_message=message)
 
     def handle_and_callback(self, task: WorkerTask) -> ObjectDict:
         result = self.handle_task(task)
@@ -266,11 +234,7 @@ def _latest_version_id(document_context: ObjectDict | None) -> str:
 
 
 def _extract_filename(content_disposition: str, fallback: str) -> str:
-    match = None
-    if content_disposition:
-        import re
-
-        match = re.search(r'filename="([^"]+)"', content_disposition)
+    match = re.search(r'filename="([^"]+)"', content_disposition) if content_disposition else None
     if match:
         return match.group(1)
     return fallback

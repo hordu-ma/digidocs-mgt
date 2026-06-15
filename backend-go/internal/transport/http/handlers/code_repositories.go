@@ -48,11 +48,7 @@ func (h CodeRepositoryHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h CodeRepositoryHandler) Get(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.Get(r.Context(), r.PathValue("id"))
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "code repository not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to get code repository")
+		writeServiceError(w, err, "code repository not found", "failed to get code repository")
 		return
 	}
 	item.RemoteURL = h.remoteURL(r, item.Slug)
@@ -83,7 +79,7 @@ func (h CodeRepositoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ActorRole:        middleware.UserRoleFromContext(r.Context()),
 	})
 	if err != nil {
-		h.writeServiceError(w, err, "failed to create code repository")
+		writeServiceError(w, err, "code repository not found", "failed to create code repository")
 		return
 	}
 	item.RemoteURL = h.remoteURL(r, item.Slug)
@@ -111,7 +107,7 @@ func (h CodeRepositoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 		ActorRole:        middleware.UserRoleFromContext(r.Context()),
 	})
 	if err != nil {
-		h.writeServiceError(w, err, "failed to update code repository")
+		writeServiceError(w, err, "code repository not found", "failed to update code repository")
 		return
 	}
 	item.RemoteURL = h.remoteURL(r, item.Slug)
@@ -121,7 +117,7 @@ func (h CodeRepositoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h CodeRepositoryHandler) ListPushEvents(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListPushEvents(r.Context(), r.PathValue("id"))
 	if err != nil {
-		h.writeServiceError(w, err, "failed to list push events")
+		writeServiceError(w, err, "code repository not found", "failed to list push events")
 		return
 	}
 	response.WriteData(w, http.StatusOK, items)
@@ -232,19 +228,4 @@ func (h CodeRepositoryHandler) remoteURL(r *http.Request, slug string) string {
 		scheme = xf
 	}
 	return scheme + "://" + r.Host + h.prefix + "/git/" + slug + ".git"
-}
-
-func (h CodeRepositoryHandler) writeServiceError(w http.ResponseWriter, err error, fallback string) {
-	switch {
-	case errors.Is(err, service.ErrValidation):
-		response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-	case errors.Is(err, service.ErrForbidden):
-		response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-	case errors.Is(err, service.ErrNotFound):
-		response.WriteError(w, http.StatusNotFound, "not_found", "code repository not found")
-	case errors.Is(err, service.ErrConflict):
-		response.WriteError(w, http.StatusConflict, "conflict", "code repository already exists")
-	default:
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", fallback)
-	}
 }

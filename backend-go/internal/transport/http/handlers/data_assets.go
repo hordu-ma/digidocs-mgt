@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -30,11 +29,7 @@ func (h DataAssetHandler) ListFolders(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
 	items, err := h.service.ListDataFolders(r.Context(), projectID)
 	if err != nil {
-		if errors.Is(err, service.ErrValidation) {
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list folders")
+		writeServiceError(w, err, "folder not found", "failed to list folders")
 		return
 	}
 	response.WriteData(w, http.StatusOK, items)
@@ -63,16 +58,7 @@ func (h DataAssetHandler) CreateFolder(w http.ResponseWriter, r *http.Request) {
 		ActorRole: actorRole,
 	})
 	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrValidation):
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-		case errors.Is(err, service.ErrForbidden):
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-		case errors.Is(err, service.ErrConflict):
-			response.WriteError(w, http.StatusConflict, "conflict", err.Error())
-		default:
-			response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create folder")
-		}
+		writeServiceError(w, err, "folder not found", "failed to create folder")
 		return
 	}
 	response.WriteData(w, http.StatusCreated, folder)
@@ -85,16 +71,7 @@ func (h DataAssetHandler) DeleteFolder(w http.ResponseWriter, r *http.Request) {
 	actorRole := middleware.UserRoleFromContext(r.Context())
 
 	if err := h.service.DeleteDataFolder(r.Context(), id, actorID, actorRole); err != nil {
-		switch {
-		case errors.Is(err, service.ErrNotFound):
-			response.WriteError(w, http.StatusNotFound, "not_found", "folder not found")
-		case errors.Is(err, service.ErrValidation):
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-		case errors.Is(err, service.ErrForbidden):
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-		default:
-			response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to delete folder")
-		}
+		writeServiceError(w, err, "folder not found", "failed to delete folder")
 		return
 	}
 	response.WriteData(w, http.StatusOK, map[string]string{"status": "deleted"})
@@ -130,11 +107,7 @@ func (h DataAssetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	asset, err := h.service.GetDataAsset(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "data asset not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to get data asset")
+		writeServiceError(w, err, "data asset not found", "failed to get data asset")
 		return
 	}
 	response.WriteData(w, http.StatusOK, asset)
@@ -178,14 +151,7 @@ func (h DataAssetHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		header.Filename,
 	)
 	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrValidation):
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-		case errors.Is(err, service.ErrForbidden):
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-		default:
-			response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to upload data asset")
-		}
+		writeServiceError(w, err, "data asset not found", "failed to upload data asset")
 		return
 	}
 	response.WriteData(w, http.StatusCreated, result)
@@ -215,16 +181,7 @@ func (h DataAssetHandler) Update(w http.ResponseWriter, r *http.Request) {
 		ActorID:     actorID,
 		ActorRole:   actorRole,
 	}); err != nil {
-		switch {
-		case errors.Is(err, service.ErrValidation):
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-		case errors.Is(err, service.ErrForbidden):
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-		case errors.Is(err, service.ErrNotFound):
-			response.WriteError(w, http.StatusNotFound, "not_found", "data asset not found")
-		default:
-			response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update data asset")
-		}
+		writeServiceError(w, err, "data asset not found", "failed to update data asset")
 		return
 	}
 	response.WriteData(w, http.StatusOK, map[string]string{"status": "updated"})
@@ -241,14 +198,7 @@ func (h DataAssetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		ActorID:     actorID,
 		ActorRole:   actorRole,
 	}); err != nil {
-		switch {
-		case errors.Is(err, service.ErrNotFound):
-			response.WriteError(w, http.StatusNotFound, "not_found", "data asset not found")
-		case errors.Is(err, service.ErrForbidden):
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-		default:
-			response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to delete data asset")
-		}
+		writeServiceError(w, err, "data asset not found", "failed to delete data asset")
 		return
 	}
 	response.WriteData(w, http.StatusOK, map[string]string{"status": "deleted"})
@@ -259,11 +209,7 @@ func (h DataAssetHandler) Download(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	out, asset, err := h.service.DownloadDataAsset(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "data asset not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to download data asset")
+		writeServiceError(w, err, "data asset not found", "failed to download data asset")
 		return
 	}
 	defer out.Reader.Close()
@@ -289,11 +235,7 @@ func (h DataAssetHandler) ListHandoverDataItems(w http.ResponseWriter, r *http.R
 	handoverID := r.PathValue("id")
 	items, err := h.service.ListHandoverDataItems(r.Context(), handoverID)
 	if err != nil {
-		if errors.Is(err, service.ErrValidation) {
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list handover data items")
+		writeServiceError(w, err, "handover not found", "failed to list handover data items")
 		return
 	}
 	response.WriteData(w, http.StatusOK, items)
@@ -315,11 +257,7 @@ func (h DataAssetHandler) UpdateHandoverDataItems(w http.ResponseWriter, r *http
 		Items:      body.Items,
 	})
 	if err != nil {
-		if errors.Is(err, service.ErrValidation) {
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update handover data items")
+		writeServiceError(w, err, "handover not found", "failed to update handover data items")
 		return
 	}
 	response.WriteData(w, http.StatusOK, result)

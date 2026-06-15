@@ -59,8 +59,11 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| `frontend/src/api.ts` | Axios 实例封装，统一设置 `baseURL` 和 `Authorization` 头。 |
+| `frontend/src/api.ts` | Axios 实例封装，统一设置 `baseURL` 与 `Authorization` 头；响应拦截器在收到 401 时清空登录态并跳转登录页（登录请求自身豁免）。 |
 | `frontend/src/stores/auth.ts` | Pinia 登录态仓库，负责保存 token、用户 ID、显示名、角色，并同步到 `localStorage`。 |
+| `frontend/src/types/index.ts` | 跨视图复用的共享类型（`UserOption`、`ProjectOption`、`TeamSpaceOption`、`PaginationMeta`）。 |
+| `frontend/src/utils/format.ts` | 通用格式化函数（`formatFileSize` 文件大小）。 |
+| `frontend/src/utils/error.ts` | `extractError`：统一从 axios 错误中提取后端 `message`，替代各视图重复的 `err.response?.data?.message` 写法。 |
 
 ### 4.3 路由
 

@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
+import { extractError } from "@/utils/error";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -36,7 +37,7 @@ async function submit() {
     });
     void router.push("/dashboard");
   } catch (err: any) {
-    const msg = err.response?.data?.message ?? "登录失败，请检查用户名和密码";
+    const msg = extractError(err, "登录失败，请检查用户名和密码");
     ElMessage.error(msg);
   } finally {
     loading.value = false;

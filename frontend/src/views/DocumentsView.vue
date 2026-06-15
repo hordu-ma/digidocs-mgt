@@ -14,23 +14,14 @@ import { useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+import { extractError } from "@/utils/error";
 import { useAuthStore } from "@/stores/auth";
+import type { ProjectOption, UserOption } from "@/types";
 
 type TeamSpaceOption = {
   id: string;
   name: string;
   code: string;
-};
-
-type UserOption = {
-  id: string;
-  display_name: string;
-  role: string;
-};
-
-type ProjectOption = {
-  id: string;
-  name: string;
 };
 
 type FolderNode = {
@@ -218,7 +209,7 @@ async function toggleArchiveState(row: any) {
     }
     await fetchDocuments();
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "操作失败");
+    ElMessage.error(extractError(err, "操作失败"));
   }
 }
 
@@ -280,7 +271,7 @@ async function fetchReferenceData() {
     teamSpaces.value = teamRes.data?.data ?? [];
     users.value = userRes.data?.data ?? [];
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "加载基础选项失败");
+    ElMessage.error(extractError(err, "加载基础选项失败"));
   } finally {
     referenceLoading.value = false;
   }
@@ -361,7 +352,7 @@ async function submitCreate() {
     showCreateDialog.value = false;
     await fetchDocuments();
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "创建失败");
+    ElMessage.error(extractError(err, "创建失败"));
   } finally {
     createLoading.value = false;
   }
@@ -371,7 +362,7 @@ async function handleTeamSpaceChange(teamSpaceID: string) {
   try {
     await loadProjects(teamSpaceID);
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "加载课题列表失败");
+    ElMessage.error(extractError(err, "加载课题列表失败"));
   }
 }
 
@@ -379,7 +370,7 @@ async function handleProjectChange(projectID: string) {
   try {
     await loadFolders(projectID);
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "加载目录树失败");
+    ElMessage.error(extractError(err, "加载目录树失败"));
   }
 }
 

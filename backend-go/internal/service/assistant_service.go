@@ -38,6 +38,13 @@ func NewAssistantService(
 	}
 }
 
+// Configured reports whether the service was built with its dependencies.
+// A zero-value AssistantService is not configured; handlers use this to skip
+// optional assistant side effects (e.g. auto-queuing text extraction).
+func (s AssistantService) Configured() bool {
+	return s.publisher != nil
+}
+
 func (s AssistantService) Ask(
 	ctx context.Context,
 	payload map[string]any,

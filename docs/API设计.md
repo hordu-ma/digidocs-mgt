@@ -1323,6 +1323,11 @@
 - `assistant_timeout`
 - `assistant_scope_forbidden`
 
+### 11.3 请求体大小限制
+
+- 普通 JSON 请求体上限为 **1 MB**，超出返回 `413 Request Entity Too Large`。
+- 文件上传接口（`multipart/form-data`，如创建文档、提交版本、上传数据资产）与 git smart-HTTP 端点（`/api/v1/git/*`）不受此限制，由各自的上传大小配置或后端处理。
+
 ---
 
 ## 12. 首期必须优先实现的 API

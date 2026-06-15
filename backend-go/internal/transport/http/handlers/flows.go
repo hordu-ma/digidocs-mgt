@@ -70,19 +70,11 @@ func (h FlowHandler) writeAction(w http.ResponseWriter, r *http.Request, action 
 		ActorRole:  middleware.UserRoleFromContext(r.Context()),
 	})
 	if err != nil {
-		if errors.Is(err, service.ErrValidation) {
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-			return
-		}
 		if errors.Is(err, service.ErrInvalidTransition) {
 			response.WriteError(w, http.StatusBadRequest, "invalid_status_transition", "invalid flow transition")
 			return
 		}
-		if errors.Is(err, service.ErrForbidden) {
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to apply flow action")
+		writeServiceError(w, err, "document not found", "failed to apply flow action")
 		return
 	}
 

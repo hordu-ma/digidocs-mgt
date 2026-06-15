@@ -3,6 +3,7 @@ import { ElMessage } from "element-plus";
 import { onMounted, reactive, ref } from "vue";
 
 import api from "@/api";
+import { extractError } from "@/utils/error";
 import AppLayout from "@/components/AppLayout.vue";
 import { useAuthStore } from "@/stores/auth";
 
@@ -48,7 +49,7 @@ async function loadProfile() {
     const res = await api.get("/auth/me");
     fillForm(res.data?.data);
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "加载个人信息失败");
+    ElMessage.error(extractError(err, "加载个人信息失败"));
   } finally {
     loading.value = false;
   }
@@ -71,7 +72,7 @@ async function saveProfile() {
     fillForm(res.data?.data);
     ElMessage.success("个人信息已更新");
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.message ?? "保存个人信息失败");
+    ElMessage.error(extractError(err, "保存个人信息失败"));
   } finally {
     saving.value = false;
   }

@@ -13,11 +13,11 @@ import { computed, onMounted, reactive, ref } from "vue";
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
 import { useAuthStore } from "@/stores/auth";
+import { formatFileSize } from "@/utils/format";
+import type { ProjectOption, TeamSpaceOption } from "@/types";
 
 // ─────────────────────────── types ───────────────────────────────
 
-type ProjectOption = { id: string; name: string };
-type TeamSpaceOption = { id: string; name: string };
 type FolderItem = {
   id: string;
   project_id: string;
@@ -421,13 +421,6 @@ async function deleteFolder(node: FolderItem) {
 
 // ─────────────────────────── utils ───────────────────────────────
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
-
 function formatDate(s: string): string {
   if (!s) return "";
   return s.slice(0, 10);
@@ -626,7 +619,7 @@ onMounted(async () => {
                     <template v-if="row.folder_name"> / {{ row.folder_name }}</template>
                   </span>
                 </div>
-                <span class="asset-meta size">{{ formatSize(row.file_size) }}</span>
+                <span class="asset-meta size">{{ formatFileSize(row.file_size) }}</span>
                 <span class="asset-meta owner">{{ row.created_by_name }}</span>
                 <span class="asset-meta date">{{ formatDate(row.created_at) }}</span>
                 <div class="asset-actions">
@@ -687,7 +680,7 @@ onMounted(async () => {
               <template v-if="uploadFile">
                 <div class="dz-file-info">
                   <span class="dz-name">{{ uploadFile.name }}</span>
-                  <span class="dz-size">{{ formatSize(uploadFile.size) }}</span>
+                  <span class="dz-size">{{ formatFileSize(uploadFile.size) }}</span>
                 </div>
                 <button class="dz-clear" type="button" @click.stop="clearUploadFile">✕ 重新选择</button>
               </template>

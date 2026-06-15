@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -193,5 +195,57 @@ func TestContextHelpersDefault(t *testing.T) {
 	}
 	if got := UserRoleFromContext(context.Background()); got != "" {
 		t.Fatalf("default role = %q", got)
+	}
+}
+
+func TestLimitBodyRejectsOversizedJSON(t *testing.T) {
+	handler := LimitBody(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	big := bytes.Repeat([]byte("a"), MaxJSONBodySize+1)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/x", bytes.NewReader(big))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized JSON status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
+	}
+}
+
+func TestLimitBodyExemptsMultipartAndGit(t *testing.T) {
+	handler := LimitBody(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, err := io.ReadAll(r.Body); err != nil {
+			http.Error(w, "too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	big := bytes.Repeat([]byte("a"), MaxJSONBodySize+1)
+
+	cases := []struct {
+		name        string
+		path        string
+		contentType string
+	}{
+		{"multipart", "/api/v1/documents", "multipart/form-data; boundary=x"},
+		{"git path", "/api/v1/git/foo.git/git-receive-pack", "application/x-git-receive-pack-request"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, tc.path, bytes.NewReader(big))
+			req.Header.Set("Content-Type", tc.contentType)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("%s status = %d, want %d", tc.name, rec.Code, http.StatusOK)
+			}
+		})
 	}
 }

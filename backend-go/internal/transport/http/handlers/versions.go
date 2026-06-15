@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"errors"
 	"log"
 	"net/http"
 
@@ -17,12 +16,8 @@ type VersionHandler struct {
 	assistant service.AssistantService
 }
 
-func NewVersionHandler(svc service.VersionService, assistant ...service.AssistantService) VersionHandler {
-	h := VersionHandler{service: svc}
-	if len(assistant) > 0 {
-		h.assistant = assistant[0]
-	}
-	return h
+func NewVersionHandler(svc service.VersionService, assistant service.AssistantService) VersionHandler {
+	return VersionHandler{service: svc, assistant: assistant}
 }
 
 func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {
@@ -55,15 +50,7 @@ func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		log.Printf("[versions] upload failed document=%s actor=%s err=%v", r.PathValue("documentID"), middleware.UserIDFromContext(r.Context()), err)
-		if errors.Is(err, service.ErrValidation) {
-			response.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
-			return
-		}
-		if errors.Is(err, service.ErrForbidden) {
-			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to upload version")
+		writeServiceError(w, err, "document not found", "failed to upload version")
 		return
 	}
 
@@ -74,7 +61,7 @@ func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h VersionHandler) queueExtraction(r *http.Request, documentID string, versionData map[string]any) {
-	if (h.assistant == service.AssistantService{}) {
+	if !h.assistant.Configured() {
 		return
 	}
 	versionID, _ := versionData["id"].(string)

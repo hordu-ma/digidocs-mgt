@@ -170,6 +170,7 @@ handler 负责把 HTTP 请求映射成 service 调用。
 | `backend-go/internal/transport/http/handlers/auth.go` | 登录、当前用户、退出登录接口。 |
 | `backend-go/internal/transport/http/handlers/dashboard.go` | 仪表盘 overview / recent flows / risk documents 接口。 |
 | `backend-go/internal/transport/http/handlers/documents.go` | 文档创建、详情、列表、更新、删除、恢复接口。 |
+| `backend-go/internal/transport/http/handlers/errors.go` | `writeServiceError`：把 service 层 `Err*` 哨兵错误统一映射为 HTTP 状态码与错误码，供各 handler 复用，消除重复的 `errors.Is` 链。 |
 | `backend-go/internal/transport/http/handlers/flows.go` | 文档流转动作与流转列表接口。 |
 | `backend-go/internal/transport/http/handlers/handlers_test.go` | handler 层集成测试。 |
 | `backend-go/internal/transport/http/handlers/handovers.go` | 交接单 CRUD 与动作接口。 |
@@ -188,6 +189,7 @@ handler 负责把 HTTP 请求映射成 service 调用。
 | --- | --- |
 | `backend-go/internal/transport/http/middleware/access_log.go` | HTTP 访问日志。 |
 | `backend-go/internal/transport/http/middleware/auth.go` | JWT 鉴权并把用户信息注入上下文。 |
+| `backend-go/internal/transport/http/middleware/body_limit.go` | `LimitBody`：用 `http.MaxBytesReader` 限制普通请求体大小（默认 1 MB），豁免 multipart 上传与 git smart-HTTP。 |
 | `backend-go/internal/transport/http/middleware/chain.go` | 中间件链组合器。 |
 | `backend-go/internal/transport/http/middleware/cors.go` | CORS 处理。 |
 | `backend-go/internal/transport/http/middleware/json_content_type.go` | 默认响应头 Content-Type 为 JSON。 |

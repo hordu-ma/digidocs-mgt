@@ -74,11 +74,7 @@ func (h AssistantHandler) CreateConversation(w http.ResponseWriter, r *http.Requ
 		middleware.UserIDFromContext(r.Context()),
 	)
 	if err != nil {
-		if errors.Is(err, service.ErrValidation) {
-			response.WriteError(w, http.StatusBadRequest, "bad_request", err.Error())
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create assistant conversation")
+		writeServiceError(w, err, "assistant conversation not found", "failed to create assistant conversation")
 		return
 	}
 	response.WriteData(w, http.StatusOK, conversation)
@@ -118,11 +114,7 @@ func (h AssistantHandler) ListConversations(w http.ResponseWriter, r *http.Reque
 func (h AssistantHandler) GetConversation(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.GetConversation(r.Context(), r.PathValue("conversationID"))
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "assistant conversation not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to get assistant conversation")
+		writeServiceError(w, err, "assistant conversation not found", "failed to get assistant conversation")
 		return
 	}
 	response.WriteData(w, http.StatusOK, item)
@@ -131,11 +123,7 @@ func (h AssistantHandler) GetConversation(w http.ResponseWriter, r *http.Request
 func (h AssistantHandler) ListConversationMessages(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListConversationMessages(r.Context(), r.PathValue("conversationID"))
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "assistant conversation not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list assistant messages")
+		writeServiceError(w, err, "assistant conversation not found", "failed to list assistant messages")
 		return
 	}
 	response.WriteData(w, http.StatusOK, items)
@@ -200,11 +188,7 @@ func (h AssistantHandler) SummarizeHandover(w http.ResponseWriter, r *http.Reque
 func (h AssistantHandler) GetRequest(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.GetRequest(r.Context(), r.PathValue("requestID"))
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "assistant request not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to get assistant request")
+		writeServiceError(w, err, "assistant request not found", "failed to get assistant request")
 		return
 	}
 	response.WriteData(w, http.StatusOK, item)
@@ -277,11 +261,7 @@ func (h AssistantHandler) ArchiveConversation(w http.ResponseWriter, r *http.Req
 	}
 	err := h.service.ArchiveConversation(r.Context(), conversationID, archive)
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "conversation not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to archive conversation")
+		writeServiceError(w, err, "conversation not found", "failed to archive conversation")
 		return
 	}
 	label := "已归档"
@@ -322,11 +302,7 @@ func (h AssistantHandler) ConfirmSuggestion(w http.ResponseWriter, r *http.Reque
 		stringValue(payload["note"]),
 	)
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "suggestion not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to confirm suggestion")
+		writeServiceError(w, err, "suggestion not found", "failed to confirm suggestion")
 		return
 	}
 	response.WriteData(w, http.StatusOK, data)
@@ -345,11 +321,7 @@ func (h AssistantHandler) DismissSuggestion(w http.ResponseWriter, r *http.Reque
 		stringValue(payload["reason"]),
 	)
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "suggestion not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to dismiss suggestion")
+		writeServiceError(w, err, "suggestion not found", "failed to dismiss suggestion")
 		return
 	}
 	response.WriteData(w, http.StatusOK, data)

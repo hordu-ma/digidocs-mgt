@@ -542,6 +542,11 @@
 - ~~增加更细粒度的 smoke test 和分层验证矩阵~~ ✅ 已完成（smoke-local.sh 已覆盖业务端点）
 - ~~将 smoke 验证进一步细化到关键业务闭环接口~~ ✅ 已完成
 - ~~前端 Element Plus 改为按需引入~~ ✅ 已完成（JS bundle 从 1,041 KB 降至 470 KB）
+- ~~全栈代码质量优化一轮（DRY / 健壮性 / 构建）~~ ✅ 已完成
+  - Go：集中错误映射 `handlers/errors.go`、请求体大小限制中间件、handler 依赖注入清理
+  - Worker：`dispatcher.handle_task` 分支去重
+  - 前端：共享 `types`/`utils` 层、`extractError`、`api.ts` 401 拦截器、Vite 供应商分包
+  - 全量 `build`/`vet`/`test` + `ruff`/`pytest` + `vue-tsc`/`vitest` 验证通过
 - Go 后端覆盖率下一步
   - 继续补齐 `internal/repository/memory/assistant_repository.go` 边界分支和 handler 剩余 4xx/5xx 分支
   - 继续补齐 `internal/repository/postgres` 中 Assistant、data asset 文件元数据、版本事务 workflow、action transaction 等复杂 SQL 写链

@@ -382,5 +382,10 @@ docker compose up -d postgres
   - 前端引入 Vitest + jsdom + V8 coverage，覆盖认证 store 与路由鉴权守卫，关键 TS 单元覆盖率达到 `97.87%`
   - `make verify` 已纳入前端单元测试；新增 `make coverage-worker`、`make coverage-frontend`
   - 前端生产依赖 `npm audit --omit=dev` 当前为 0 漏洞
+- 已完成**全栈代码质量优化（DRY / 健壮性 / 构建）一轮**：
+  - Go：新增 `handlers/errors.go` 的 `writeServiceError` 集中错误映射，替换约 68 处重复 `errors.Is` 链；新增 `middleware/body_limit.go` 限制普通请求体 1 MB（multipart 上传与 git 端点豁免）；`NewDocumentHandler`/`NewVersionHandler` 依赖改为显式必传 + `AssistantService.Configured()` 判定
+  - Python Worker：`dispatcher.handle_task` 抽出 `_run_skill`/`_completed`/`_failed`，消除重复 try/except 与 TaskResult 构造
+  - 前端：新增 `src/types`、`src/utils/{format,error}.ts` 共享层，去重类型与文件大小函数、统一 `extractError`；`api.ts` 增加 401 响应拦截器（自动登出跳登录）；`vite.config.ts` 拆分 `vue-vendor` / `element-plus` 独立缓存 chunk
+  - 验证：Go `build`/`vet`/`test ./...`、Worker `ruff` + `pytest`(38)、前端 `vue-tsc` + `vite build` + `vitest`(7) 全部通过；净减约 188 行
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

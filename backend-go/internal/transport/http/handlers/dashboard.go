@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 
 	"digidocs-mgt/backend-go/internal/service"
@@ -41,11 +40,7 @@ func (h DashboardHandler) RecentFlows(w http.ResponseWriter, r *http.Request) {
 func (h DashboardHandler) RiskDocuments(w http.ResponseWriter, r *http.Request) {
 	items, err := h.queryService.RiskDocuments(r.Context(), r.URL.Query().Get("project_id"))
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			response.WriteError(w, http.StatusNotFound, "not_found", "project not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to load risk documents")
+		writeServiceError(w, err, "project not found", "failed to load risk documents")
 		return
 	}
 
