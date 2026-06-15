@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+	"time"
 
 	"digidocs-mgt/backend-go/internal/bootstrap"
 	"digidocs-mgt/backend-go/internal/config"
@@ -50,7 +51,8 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	// --- Public routes (no JWT required) ---
 	mux.HandleFunc("GET /healthz", systemHandler.Healthz)
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/system/info", systemHandler.Info)
-	mux.HandleFunc("POST "+cfg.APIV1Prefix+"/auth/login", authHandler.Login)
+	loginLimiter := middleware.NewRateLimiter(cfg.LoginRateLimitPerMin, time.Minute)
+	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/login", loginLimiter.Limit(authHandler.Login))
 	// Worker callback uses its own shared-secret token, not user JWT.
 	mux.HandleFunc("POST "+cfg.APIV1Prefix+"/internal/worker-results", internalWorkerHandler.ReceiveResult)
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/poll-tasks", internalWorkerHandler.PollTasks)

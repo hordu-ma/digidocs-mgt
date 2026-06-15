@@ -193,6 +193,7 @@ handler 负责把 HTTP 请求映射成 service 调用。
 | `backend-go/internal/transport/http/middleware/chain.go` | 中间件链组合器。 |
 | `backend-go/internal/transport/http/middleware/cors.go` | CORS 处理。 |
 | `backend-go/internal/transport/http/middleware/json_content_type.go` | 默认响应头 Content-Type 为 JSON。 |
+| `backend-go/internal/transport/http/middleware/rate_limit.go` | `RateLimiter`：按客户端 IP 的内存固定窗口限流，超限返回 429；当前用于保护 `/auth/login` 防暴力破解。 |
 | `backend-go/internal/transport/http/middleware/request_id.go` | 为请求生成 request ID。 |
 
 ### 9.3 request / response / router

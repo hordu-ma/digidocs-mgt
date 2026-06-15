@@ -5,11 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import urllib.request
-from http.client import HTTPResponse
 from typing import cast
 
 from ..core.config import settings
 from ..tasks.contracts import TaskType, WorkerTask
+from .http_util import fetch
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,8 @@ class TaskPollerClient:
         req.add_header("Accept", "application/json")
 
         try:
-            with cast(HTTPResponse, urllib.request.urlopen(req, timeout=10)) as resp:
-                parsed = cast(object, json.loads(resp.read()))
+            _, _, raw = fetch(req, timeout=10, label="poll-tasks")
+            parsed = cast(object, json.loads(raw))
         except Exception:
             logger.debug("poll failed (backend may be offline)")
             return []

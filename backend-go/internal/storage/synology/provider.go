@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -258,8 +259,16 @@ func (p *Provider) ensureSession(ctx context.Context) error {
 
 // callAPI executes a FileStation API call and returns parsed data.
 // On auth error (code 105/106), it re-authenticates once and retries.
-func (p *Provider) callAPI(ctx context.Context, params url.Values) (*dsmResponse, error) {
-	if err := p.ensureSession(ctx); err != nil {
+func (p *Provider) callAPI(ctx context.Context, params url.Values) (_ *dsmResponse, err error) {
+	op := params.Get("api") + "." + params.Get("method")
+	started := time.Now()
+	defer func() {
+		if err != nil {
+			log.Printf("[synology] op=%s failed duration_ms=%d err=%v", op, time.Since(started).Milliseconds(), err)
+		}
+	}()
+
+	if err = p.ensureSession(ctx); err != nil {
 		return nil, err
 	}
 
@@ -404,7 +413,19 @@ func (p *Provider) GetObject(ctx context.Context, objectKey string) (*storage.Ge
 		return nil, err
 	}
 
-	resp, err := p.client.Do(req)
+	// Download is an idempotent read, so transient transport errors are safe
+	// to retry with a small backoff.
+	var resp *http.Response
+	for attempt := 1; attempt <= 3; attempt++ {
+		resp, err = p.client.Do(req)
+		if err == nil {
+			break
+		}
+		log.Printf("[synology] download transient error key=%s attempt=%d err=%v", objectKey, attempt, err)
+		if attempt < 3 {
+			time.Sleep(time.Duration(attempt) * 200 * time.Millisecond)
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("synology download: %w", err)
 	}

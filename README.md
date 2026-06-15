@@ -392,5 +392,11 @@ docker compose up -d postgres
   - ②根治：`frontend/nginx/default.conf` 给 `index.html` 与 SPA 入口路由加 `Cache-Control: no-cache`，`/assets/` 长缓存不变；杜绝"部署后需手动强刷"
   - ③优化：`CodeView` 的 `onMounted` 串行瀑布改为并行（`Promise.all` + 团队空间项目并发拉取）
   - 已重新部署到生产并验证 `Cache-Control: no-cache` 生效、smoke 通过
+- 已完成**持续优化 P1（健壮性/可靠性）一轮**：
+  - Worker：新增共享 `clients/http_util.fetch`，为 poll/context/callback/openclaw 的 HTTP 调用加指数退避重试（瞬时错误 + 5xx），结果回写失败不再静默丢任务
+  - Worker：轮询循环改为按任务隔离（单任务崩溃不影响同批其它任务）+ 崩溃兜底回写失败状态 + 每任务耗时日志
+  - 后端：新增 `middleware/rate_limit.go` 登录限流（per-IP 固定窗口，默认 10/min，超限 429），`LOGIN_RATE_LIMIT_PER_MIN` 可配
+  - 后端：群晖 `callAPI` 失败日志（操作+耗时）、只读下载加传输错误重试；`code_repository` git 操作失败补结构化日志
+  - 验证：Go `build`/`vet`/`test`、Worker `ruff` + `pytest`(43)、新增 http_util/限流测试全部通过
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

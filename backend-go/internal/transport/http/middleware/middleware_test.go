@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"digidocs-mgt/backend-go/internal/domain/auth"
 	"digidocs-mgt/backend-go/internal/service"
@@ -248,5 +249,69 @@ func TestLimitBodyExemptsMultipartAndGit(t *testing.T) {
 				t.Fatalf("%s status = %d, want %d", tc.name, rec.Code, http.StatusOK)
 			}
 		})
+	}
+}
+
+func TestRateLimiterAllowsUpToLimitThenBlocks(t *testing.T) {
+	rl := NewRateLimiter(3, time.Minute)
+	calls := 0
+	h := rl.Limit(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusOK)
+	})
+
+	codes := make([]int, 0, 5)
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
+		req.RemoteAddr = "203.0.113.7:5555"
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		codes = append(codes, rec.Code)
+	}
+	// first 3 pass, next 2 are 429
+	want := []int{200, 200, 200, http.StatusTooManyRequests, http.StatusTooManyRequests}
+	for i := range want {
+		if codes[i] != want[i] {
+			t.Fatalf("req %d code = %d, want %d (all=%v)", i, codes[i], want[i], codes)
+		}
+	}
+	if calls != 3 {
+		t.Fatalf("handler calls = %d, want 3", calls)
+	}
+}
+
+func TestRateLimiterIsolatesByClientIP(t *testing.T) {
+	rl := NewRateLimiter(1, time.Minute)
+	h := rl.Limit(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+
+	do := func(xff string) int {
+		req := httptest.NewRequest(http.MethodPost, "/x", nil)
+		req.Header.Set("X-Forwarded-For", xff)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	if c := do("198.51.100.1"); c != http.StatusOK {
+		t.Fatalf("ip1 first = %d", c)
+	}
+	if c := do("198.51.100.1"); c != http.StatusTooManyRequests {
+		t.Fatalf("ip1 second = %d, want 429", c)
+	}
+	if c := do("198.51.100.2"); c != http.StatusOK {
+		t.Fatalf("ip2 first = %d, want 200 (isolated)", c)
+	}
+}
+
+func TestRateLimiterZeroDisables(t *testing.T) {
+	rl := NewRateLimiter(0, time.Minute)
+	h := rl.Limit(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	for i := 0; i < 50; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/x", nil)
+		req.RemoteAddr = "10.0.0.1:1"
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("disabled limiter blocked at %d", i)
+		}
 	}
 }

@@ -551,6 +551,9 @@
   - nginx：`index.html`/SPA 路由 `Cache-Control: no-cache`，`/assets/` 长缓存不变
   - CodeView：onMounted 串行瀑布改为并行
   - 已重新部署生产并验证缓存头生效 + smoke 通过
+- ~~持续优化 P1：健壮性/可靠性一轮~~ ✅ 已完成（详见下方 Backlog P1 勾选项）
+  - Worker HTTP 重试 + 轮询按任务隔离 + 崩溃兜底；后端登录限流；群晖/git 失败可观测性
+  - Go `build`/`vet`/`test`、Worker `ruff`/`pytest`(43) 通过；已部署生产并 smoke 验证
 - Go 后端覆盖率下一步
   - 继续补齐 `internal/repository/memory/assistant_repository.go` 边界分支和 handler 剩余 4xx/5xx 分支
   - 继续补齐 `internal/repository/postgres` 中 Assistant、data asset 文件元数据、版本事务 workflow、action transaction 等复杂 SQL 写链
@@ -562,14 +565,12 @@
 
 > 按优先级排序，逐项可独立完成。P1=收益高/风险低，建议优先；P2=中期可维护性；P3=长期/锦上添花。
 
-### 健壮性与可靠性（P1）
+### 健壮性与可靠性（P1）✅ 已完成（2026-06-15）
 
-- [ ] **Worker HTTP 客户端无重试** — `backend-py-worker/app/clients/` 下 `callback_client`（回写结果）、`task_poller`、`backend_context_client`、`openclaw_client` 均为 `urllib.urlopen` 单次调用（仅有 timeout）。
-  - 风险：`callback_client.submit_result` 瞬时失败 → 任务结果丢失，前端永远停在 processing。
-  - 方案：对幂等的 GET（poll/context）和结果回写加指数退避重试（2–3 次）；回写失败落本地待重投或显式标记失败。
-- [ ] **Worker 轮询循环韧性** — `dispatcher.run_forever` 单线程顺序处理任务，单个慢任务（大文档抽取 / LLM 长响应）会阻塞后续任务。评估：超时保护 + 可选并发/任务级超时。
-- [ ] **后端缺少限流与登录失败保护** — 无任何 rate limit；`/auth/login` 无失败次数限制。公网暴露场景建议对登录、worker 回调、git 端点加基础限流。
-- [ ] **群晖 / git 操作的失败可观测性** — `storage/synology/provider.go`（120s timeout，无重试）与 `code_repository_service` 的 `git` exec 失败目前只回错误码；补充结构化日志 + 关键操作重试/超时口径。
+- [x] **Worker HTTP 客户端重试** — 新增 `clients/http_util.fetch`（指数退避，瞬时错误 + 5xx 重试，4xx 不重试），接入 `task_poller`/`backend_context_client`/`callback_client`/`openclaw_client`；结果回写失败不再静默丢任务。配置 `HTTP_RETRY_ATTEMPTS`/`HTTP_RETRY_BASE_DELAY`。
+- [x] **Worker 轮询循环韧性** — `run_forever` 改为按任务隔离（`_process_one`，单任务崩溃不影响同批其它任务）+ 崩溃兜底回写失败状态 + 每任务耗时日志。（注：任务级并发仍可后续按需引入）
+- [x] **后端登录限流** — 新增 `middleware/rate_limit.go`（per-IP 固定窗口，默认 10/min，超限 429），应用于 `/auth/login`，`LOGIN_RATE_LIMIT_PER_MIN` 可配（0 关闭）。
+- [x] **群晖 / git 操作可观测性** — 群晖 `callAPI` 失败日志（操作+耗时），只读下载加传输错误重试；`code_repository` git 操作（init/branch/archive）失败补结构化日志。
 
 ### 前端架构与可维护性（P2）
 

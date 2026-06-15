@@ -28,6 +28,9 @@ type Config struct {
 	SynologySharePath          string // shared folder path, e.g. "/DigiDocs"
 
 	CodeRepoRoot string
+
+	// LoginRateLimitPerMin caps login attempts per client IP per minute (0 disables).
+	LoginRateLimitPerMin int
 }
 
 func Load() Config {
@@ -53,6 +56,7 @@ func Load() Config {
 		SynologyPassword:           getEnv("SYNOLOGY_PASSWORD", ""),
 		SynologySharePath:          getEnv("SYNOLOGY_SHARE_PATH", "/DigiDocs"),
 		CodeRepoRoot:               getEnv("CODE_REPO_ROOT", "/tmp/digidocs-code-repos"),
+		LoginRateLimitPerMin:       getEnvInt("LOGIN_RATE_LIMIT_PER_MIN", 10),
 	}
 
 	if cfg.AppEnv == "production" {
@@ -77,4 +81,16 @@ func getEnv(key string, fallback string) string {
 	}
 
 	return value
+}
+
+func getEnvInt(key string, fallback int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }

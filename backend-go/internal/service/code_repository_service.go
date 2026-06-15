@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -184,6 +185,7 @@ func (s CodeRepositoryService) syncCommitToTarget(ctx context.Context, repo *que
 	cmd := exec.CommandContext(ctx, "git", "--git-dir", repo.RepoStoragePath, "archive", "--format=tar", commitSHA)
 	out, err := cmd.Output()
 	if err != nil {
+		log.Printf("[code-repo] git archive failed repo=%s commit=%s err=%v", repo.RepoStoragePath, commitSHA, err)
 		return fmt.Errorf("git archive failed: %w", err)
 	}
 	reader := tar.NewReader(bytes.NewReader(out))
@@ -228,6 +230,7 @@ func runGit(ctx context.Context, gitDir string, args ...string) error {
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		log.Printf("[code-repo] git %v failed gitDir=%s out=%s err=%v", args, gitDir, strings.TrimSpace(string(out)), err)
 		return fmt.Errorf("%v: %s", args, strings.TrimSpace(string(out)))
 	}
 	return nil

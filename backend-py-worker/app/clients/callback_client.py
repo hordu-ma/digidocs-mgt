@@ -5,11 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import urllib.request
-from http.client import HTTPResponse
 from typing import cast
 
 from ..core.config import settings
 from ..tasks.contracts import TaskResult
+from .http_util import fetch
 
 type ObjectDict = dict[str, object]
 
@@ -40,15 +40,14 @@ class CallbackClient:
         req.add_header("Content-Type", "application/json")
 
         try:
-            with cast(HTTPResponse, urllib.request.urlopen(req, timeout=10)) as resp:
-                body = resp.read().decode()
-                parsed = cast(object, json.loads(body))
-                parsed_dict = _as_object_dict(parsed)
-                if parsed_dict is not None:
-                    return parsed_dict
+            _, _, raw = fetch(req, timeout=10, label="worker-results callback")
+            parsed = cast(object, json.loads(raw.decode()))
+            parsed_dict = _as_object_dict(parsed)
+            if parsed_dict is not None:
+                return parsed_dict
         except Exception:
             logger.warning(
-                "callback failed for request_id=%s", result.request_id, exc_info=True
+                "callback failed for request_id=%s after retries", result.request_id, exc_info=True
             )
 
         return {

@@ -18,6 +18,8 @@ class Settings:
     callback_base_url: str = "http://localhost:8080"
     callback_token: str = "replace-me"
     poll_interval: int = 5
+    http_retry_attempts: int = 3
+    http_retry_base_delay: float = 0.5
 
 
 def load_settings() -> Settings:
@@ -48,6 +50,8 @@ def load_settings() -> Settings:
         callback_base_url=os.getenv("CALLBACK_BASE_URL", "http://localhost:8080"),
         callback_token=os.getenv("CALLBACK_TOKEN", "replace-me"),
         poll_interval=int(os.getenv("POLL_INTERVAL", "5")),
+        http_retry_attempts=int(os.getenv("HTTP_RETRY_ATTEMPTS", "3")),
+        http_retry_base_delay=float(os.getenv("HTTP_RETRY_BASE_DELAY", "0.5")),
     )
 
 

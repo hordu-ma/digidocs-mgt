@@ -5,13 +5,12 @@ from __future__ import annotations
 import json
 import logging
 import time
-import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from http.client import HTTPResponse
 from typing import cast
 
 from ..core.config import settings
+from .http_util import HttpError, fetch
 
 type ObjectDict = dict[str, object]
 
@@ -206,20 +205,18 @@ class OpenClawClient:
         started_at = time.perf_counter()
         logger.info("calling openclaw path=%s model=%s", path, payload.get("model", self.model))
         try:
-            with cast(
-                HTTPResponse, urllib.request.urlopen(request, timeout=self.timeout_seconds)
-            ) as response:
-                body = response.read().decode()
-        except urllib.error.HTTPError as exc:
-            error_body = exc.read().decode(errors="ignore")
+            _, _, raw = fetch(request, timeout=self.timeout_seconds, label=f"openclaw {path}")
+            body = raw.decode()
+        except HttpError as exc:
+            error_body = exc.body.decode(errors="ignore")
             logger.warning(
                 "openclaw http error path=%s status=%s duration_ms=%d",
                 path,
-                exc.code,
+                exc.status,
                 int((time.perf_counter() - started_at) * 1000),
             )
             raise OpenClawClientError(
-                f"OpenClaw HTTP {exc.code}: {error_body or exc.reason}"
+                f"OpenClaw HTTP {exc.status}: {error_body or exc.reason}"
             ) from exc
         except Exception as exc:
             logger.warning(

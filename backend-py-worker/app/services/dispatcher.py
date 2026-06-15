@@ -39,12 +39,35 @@ class WorkerDispatcher:
         while True:
             try:
                 tasks = self.poller.poll()
-                for task in tasks:
-                    logger.info("processing task=%s request_id=%s", task.task_type, task.request_id)
-                    _ = self.handle_and_callback(task)
             except Exception:
-                logger.exception("poll loop error")
+                logger.exception("poll failed")
+                tasks = []
+            # Isolate each task: one task crashing must not skip its siblings.
+            for task in tasks:
+                self._process_one(task)
             time.sleep(settings.poll_interval)
+
+    def _process_one(self, task: WorkerTask) -> None:
+        started_at = time.perf_counter()
+        logger.info("processing task=%s request_id=%s", task.task_type, task.request_id)
+        try:
+            self.handle_and_callback(task)
+        except Exception:
+            logger.exception(
+                "task crashed task=%s request_id=%s", task.task_type, task.request_id
+            )
+            # Best-effort: report failure so the request does not hang forever.
+            try:
+                self.callback_client.submit_result(self._failed(task, "worker internal error"))
+            except Exception:
+                logger.exception("failed to report crash request_id=%s", task.request_id)
+        finally:
+            logger.info(
+                "task done task=%s request_id=%s duration_ms=%d",
+                task.task_type,
+                task.request_id,
+                int((time.perf_counter() - started_at) * 1000),
+            )
 
     def handle_task(self, task: WorkerTask) -> TaskResult:
         if task.task_type == "assistant.ask":

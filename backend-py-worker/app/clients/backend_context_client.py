@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 import logging
 import urllib.request
-from http.client import HTTPResponse
 from typing import cast
 
 from ..core.config import settings
+from .http_util import fetch
 
 type ObjectDict = dict[str, object]
 
@@ -34,12 +34,12 @@ class BackendContextClient:
         req = urllib.request.Request(url, method="GET")
         req.add_header("Authorization", f"Bearer {self.token}")
 
-        with cast(HTTPResponse, urllib.request.urlopen(req, timeout=20)) as resp:
-            headers = {
-                "content_type": resp.headers.get("Content-Type", ""),
-                "content_disposition": resp.headers.get("Content-Disposition", ""),
-            }
-            return headers, resp.read()
+        _, resp_headers, body = fetch(req, timeout=20, label="download-version-file")
+        headers = {
+            "content_type": resp_headers.get("Content-Type", ""),
+            "content_disposition": resp_headers.get("Content-Disposition", ""),
+        }
+        return headers, body
 
     def _fetch(self, path: str) -> ObjectDict:
         url = f"{self.base_url}{path}"
@@ -48,8 +48,8 @@ class BackendContextClient:
         req.add_header("Accept", "application/json")
 
         try:
-            with cast(HTTPResponse, urllib.request.urlopen(req, timeout=10)) as resp:
-                parsed = cast(object, json.loads(resp.read()))
+            _, _, raw = fetch(req, timeout=10, label=f"context {path}")
+            parsed = cast(object, json.loads(raw))
         except Exception as exc:
             logger.warning("assistant context fetch failed path=%s", path)
             return {

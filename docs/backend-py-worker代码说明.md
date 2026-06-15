@@ -54,8 +54,9 @@
 | 文件 | 作用 |
 | --- | --- |
 | `backend-py-worker/app/clients/__init__.py` | clients 包初始化占位文件。 |
-| `backend-py-worker/app/clients/backend_context_client.py` | 调用 Go 后端内部接口，获取项目/文档/交接单上下文，并下载文档版本原文件。 |
-| `backend-py-worker/app/clients/callback_client.py` | 将任务处理结果回写到 Go 后端 `/internal/worker-results`。 |
+| `backend-py-worker/app/clients/http_util.py` | 共享 `fetch`：`urlopen` 带指数退避重试（瞬时网络错误 + HTTP 5xx 重试，4xx 不重试），供各客户端复用；次数/退避由 `HTTP_RETRY_ATTEMPTS`、`HTTP_RETRY_BASE_DELAY` 配置。 |
+| `backend-py-worker/app/clients/backend_context_client.py` | 调用 Go 后端内部接口，获取项目/文档/交接单上下文，并下载文档版本原文件（经 `fetch` 重试）。 |
+| `backend-py-worker/app/clients/callback_client.py` | 将任务处理结果回写到 Go 后端 `/internal/worker-results`（经 `fetch` 重试，失败不静默丢任务）。 |
 | `backend-py-worker/app/clients/openclaw_client.py` | OpenClaw Gateway 客户端，封装问答、文档摘要、交接摘要、建议生成逻辑。 |
 | `backend-py-worker/app/clients/task_poller.py` | 轮询 Go 后端待处理任务，把原始 JSON 解析成 `WorkerTask`。 |
 
