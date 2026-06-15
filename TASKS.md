@@ -556,6 +556,56 @@
   - 继续补齐 `internal/repository/postgres` 中 Assistant、data asset 文件元数据、版本事务 workflow、action transaction 等复杂 SQL 写链
   - 若继续大幅提升总覆盖率，优先引入临时 PostgreSQL/testcontainer 覆盖真实迁移 schema，并拆分 `cmd/api/main.go` 启动胶水
 
+---
+
+## 持续优化 Backlog（2026-06-15 盘整）
+
+> 按优先级排序，逐项可独立完成。P1=收益高/风险低，建议优先；P2=中期可维护性；P3=长期/锦上添花。
+
+### 健壮性与可靠性（P1）
+
+- [ ] **Worker HTTP 客户端无重试** — `backend-py-worker/app/clients/` 下 `callback_client`（回写结果）、`task_poller`、`backend_context_client`、`openclaw_client` 均为 `urllib.urlopen` 单次调用（仅有 timeout）。
+  - 风险：`callback_client.submit_result` 瞬时失败 → 任务结果丢失，前端永远停在 processing。
+  - 方案：对幂等的 GET（poll/context）和结果回写加指数退避重试（2–3 次）；回写失败落本地待重投或显式标记失败。
+- [ ] **Worker 轮询循环韧性** — `dispatcher.run_forever` 单线程顺序处理任务，单个慢任务（大文档抽取 / LLM 长响应）会阻塞后续任务。评估：超时保护 + 可选并发/任务级超时。
+- [ ] **后端缺少限流与登录失败保护** — 无任何 rate limit；`/auth/login` 无失败次数限制。公网暴露场景建议对登录、worker 回调、git 端点加基础限流。
+- [ ] **群晖 / git 操作的失败可观测性** — `storage/synology/provider.go`（120s timeout，无重试）与 `code_repository_service` 的 `git` exec 失败目前只回错误码；补充结构化日志 + 关键操作重试/超时口径。
+
+### 前端架构与可维护性（P2）
+
+- [ ] **拆分巨型视图组件** — 5 个 view 超 1000 行：`HandoversView`(1296)、`DataView`(1140)、`DocumentDetailView`(1131)、`AssistantView`(1083)、`DocumentsView`(1000)。按"对话框 / 表格 / 表单"拆子组件，数据请求抽 `composables/`（如 `useHandovers()`）。
+- [ ] **消除 `any`** — 全前端 48 处 `: any` / `as any`，结合已建的 `src/types` 逐步替换为具体类型（接口响应类型尤其值得补全）。
+- [ ] **前端组件级测试缺失** — 目前仅 `stores/auth`、`router` 有测试。为关键交互（登录、文档上传、流转动作、交接编辑）补 Vitest + Testing Library 组件测试。
+- [ ] **统一时间格式化** — 各 view 的 `formatTime/formatDate` 文案与精度不一（"-"/"暂无更新时间"/"尚未推送"…）。在 `utils/format.ts` 提供带 `fallback` 与精度参数的统一函数，按需迁移（保留各处文案语义）。
+
+### 后端架构与可维护性（P2）
+
+- [ ] **拆分超大仓储文件** — `repository/postgres/assistant_repository.go`(1257) 按职责拆为 conversation / request / suggestion + 共用 scanners；`repository/memory/assistant_repository.go`(734) 同理。
+- [ ] **`cmd/api/main.go` 启动胶水拆分** — 便于注入与启动流程测试（与覆盖率目标联动）。
+- [ ] **审计事件统计聚合细化** — 见上方"过滤条件已补齐、统计聚合待后续细化"。
+
+### 测试与质量门禁（P2）
+
+- [ ] **引入临时 PostgreSQL/testcontainer** — 覆盖真实迁移 schema 与复杂 SQL 写链（事务/action workflow），替代部分 sqlmock。
+- [ ] **CI 流水线** — 将 `make verify`（含三端）接入 `.github/workflows`，PR 自动跑；前端测试需固定 Node 版本（避免 Node 24 实验性 localStorage 覆盖 jsdom 的问题）。
+
+### 安全（P2）
+
+- [ ] **JWT 存储方式评估** — 前端 token 存 `localStorage`（XSS 可窃取）。公网长期运行建议评估 httpOnly cookie 方案（需后端配合 set-cookie + CSRF 口径）。
+- [ ] **CORS 白名单收敛** — 生产已强制非 `*`，但建议把允许来源做成显式可配置列表并文档化。
+- [ ] **清理残留 copilot 凭据（可选）** — 见 OpenClaw：`auth-profiles.json` 仍有失效的 `github-copilot:github` token；如需彻底废弃在 GitHub 侧吊销。
+
+### 性能（P3）
+
+- [ ] **Vite 进一步分包/瘦身** — element-plus 单 chunk 896KB，评估按需路由级懒加载或更细粒度 manualChunks；确认 icon 按需引入。
+- [ ] **前端请求瀑布排查** — 已优化 CodeView；排查其余 view 的 `onMounted` 是否仍有可并行化的串行请求（如 DataView 的 `loadAllProjects` 团队空间循环）。
+
+### 运维/部署（P3）
+
+- [ ] **生产入口反向代理与 TLS 收口** — 按 `docs/部署准备与运行说明.md` 5.1，统一 443 入口 + 80 跳转；当前容器仅绑 `127.0.0.1`，明确对外暴露链路与证书来源。
+- [ ] **镜像版本/迁移一致性校验** — 部署后自动校验镜像内 `schema_migrations` 与仓库迁移一致（已知限制项），避免"代码已更新但容器仍旧版"。
+- [ ] **OpenClaw 依赖健康检查** — 部署/启动时校验 `/v1/chat/completions` 真实可用（当前默认 ollama），异常时显著告警而非静默退化。
+
 ## 更新规则
 
 - 每次完成一个可感知阶段后更新本文件。
