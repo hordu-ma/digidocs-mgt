@@ -387,5 +387,10 @@ docker compose up -d postgres
   - Python Worker：`dispatcher.handle_task` 抽出 `_run_skill`/`_completed`/`_failed`，消除重复 try/except 与 TaskResult 构造
   - 前端：新增 `src/types`、`src/utils/{format,error}.ts` 共享层，去重类型与文件大小函数、统一 `extractError`；`api.ts` 增加 401 响应拦截器（自动登出跳登录）；`vite.config.ts` 拆分 `vue-vendor` / `element-plus` 独立缓存 chunk
   - 验证：Go `build`/`vet`/`test ./...`、Worker `ruff` + `pytest`(38)、前端 `vue-tsc` + `vite build` + `vitest`(7) 全部通过；净减约 188 行
+- 已修复**前端部署后页面打不开（缓存）问题 + 「代码」页加载优化**：
+  - 根因：`index.html` 缺少 `no-cache`，前端重建后老浏览器仍引用已删除的旧分块哈希 → 懒加载路由（如「代码」）404 打不开
+  - ②根治：`frontend/nginx/default.conf` 给 `index.html` 与 SPA 入口路由加 `Cache-Control: no-cache`，`/assets/` 长缓存不变；杜绝"部署后需手动强刷"
+  - ③优化：`CodeView` 的 `onMounted` 串行瀑布改为并行（`Promise.all` + 团队空间项目并发拉取）
+  - 已重新部署到生产并验证 `Cache-Control: no-cache` 生效、smoke 通过
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

@@ -116,12 +116,15 @@ function remoteWithToken(repo: CodeRepository | null) {
 async function loadReference() {
   const tsRes = await api.get("/team-spaces");
   teamSpaces.value = tsRes.data?.data ?? [];
-  const projects: ProjectOption[] = [];
-  for (const ts of teamSpaces.value) {
-    const res = await api.get("/projects", { params: { team_space_id: ts.id } });
-    projects.push(...(res.data?.data ?? []).map((p: ProjectOption) => ({ ...p, team_space_id: ts.id })));
-  }
-  allProjects.value = projects;
+  // Fetch each team space's projects concurrently instead of serially.
+  const projectLists = await Promise.all(
+    teamSpaces.value.map((ts) =>
+      api
+        .get("/projects", { params: { team_space_id: ts.id } })
+        .then((res) => (res.data?.data ?? []).map((p: ProjectOption) => ({ ...p, team_space_id: ts.id }))),
+    ),
+  );
+  allProjects.value = projectLists.flat();
 }
 
 async function fetchRepositories() {
@@ -207,8 +210,9 @@ async function copyText(value: string, label: string) {
 }
 
 onMounted(async () => {
-  await loadReference();
-  await fetchRepositories();
+  // Reference data (for the create dialog) and the repository list are
+  // independent; load them in parallel to avoid a serial request waterfall.
+  await Promise.all([loadReference(), fetchRepositories()]);
 });
 </script>
 

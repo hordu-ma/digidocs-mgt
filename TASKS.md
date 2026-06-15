@@ -547,6 +547,10 @@
   - Worker：`dispatcher.handle_task` 分支去重
   - 前端：共享 `types`/`utils` 层、`extractError`、`api.ts` 401 拦截器、Vite 供应商分包
   - 全量 `build`/`vet`/`test` + `ruff`/`pytest` + `vue-tsc`/`vitest` 验证通过
+- ~~修复前端部署后懒加载路由打不开（index.html 缓存）+ 「代码」页加载优化~~ ✅ 已完成
+  - nginx：`index.html`/SPA 路由 `Cache-Control: no-cache`，`/assets/` 长缓存不变
+  - CodeView：onMounted 串行瀑布改为并行
+  - 已重新部署生产并验证缓存头生效 + smoke 通过
 - Go 后端覆盖率下一步
   - 继续补齐 `internal/repository/memory/assistant_repository.go` 边界分支和 handler 剩余 4xx/5xx 分支
   - 继续补齐 `internal/repository/postgres` 中 Assistant、data asset 文件元数据、版本事务 workflow、action transaction 等复杂 SQL 写链
