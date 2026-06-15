@@ -13,9 +13,12 @@ const MaxJSONBodySize = 1 << 20 // 1 MB
 // LimitBody wraps eligible request bodies with http.MaxBytesReader so an
 // oversized payload is rejected with 413 instead of being read into memory.
 //
-// Multipart uploads and the git smart-HTTP endpoints are left untouched: those
-// carry intentionally large bodies and enforce (or don't need) their own limits
-// — document/data-asset handlers via r.ParseMultipartForm, git via the backend.
+// The following carry intentionally large bodies and are left untouched:
+//   - multipart uploads — document/data-asset handlers enforce their own limit
+//     via r.ParseMultipartForm;
+//   - git smart-HTTP endpoints (/git/) — push packs stream through git-backend;
+//   - internal worker endpoints (/internal/) — result callbacks carry full
+//     document text extraction / AI output, which routinely exceeds 1 MB.
 func LimitBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil && !bodyExempt(r) {
@@ -33,6 +36,8 @@ func bodyExempt(r *http.Request) bool {
 	if strings.HasPrefix(contentType, "application/x-git-") {
 		return true
 	}
-	// Git smart-HTTP requests are namespaced under /git/.
-	return strings.Contains(r.URL.Path, "/git/")
+	// Git smart-HTTP (/git/) and worker callbacks (/internal/) are namespaced
+	// path prefixes that legitimately carry large bodies.
+	return strings.Contains(r.URL.Path, "/git/") ||
+		strings.Contains(r.URL.Path, "/internal/")
 }

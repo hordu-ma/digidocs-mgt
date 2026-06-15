@@ -236,6 +236,7 @@ func TestLimitBodyExemptsMultipartAndGit(t *testing.T) {
 	}{
 		{"multipart", "/api/v1/documents", "multipart/form-data; boundary=x"},
 		{"git path", "/api/v1/git/foo.git/git-receive-pack", "application/x-git-receive-pack-request"},
+		{"internal callback", "/api/v1/internal/worker-results", "application/json"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
