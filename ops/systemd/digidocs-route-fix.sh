@@ -17,17 +17,30 @@ if [[ -z "$IP_BIN" ]]; then
   exit 1
 fi
 
+# `ip route show` prints a trailing space on every line, so a whole-line match
+# (grep -Fqx "throw $cidr") can never succeed. Compare parsed fields instead.
+has_throw_route() {
+  "$IP_BIN" route show table 52 |
+    awk -v want="$1" '$1 == "throw" && $2 == want { found = 1 } END { exit !found }'
+}
+
+declare -A repaired=()
 for ((attempt = 1; attempt <= ATTEMPTS; attempt++)); do
   for cidr in "${ROUTE_FIX_CIDRS[@]}"; do
-    "$IP_BIN" route replace throw "$cidr" table 52
+    if ! has_throw_route "$cidr"; then
+      "$IP_BIN" route replace throw "$cidr" table 52
+      repaired["$cidr"]=1
+    fi
   done
 
+  # The retry passes exist to win the race when tailscaled rewrites table 52 a
+  # moment after we repair it. Once the table is converged they are read-only.
   if (( attempt < ATTEMPTS )); then
     sleep "$SLEEP_SECONDS"
   fi
 done
 
-echo "digidocs route fix applied:"
-for cidr in "${ROUTE_FIX_CIDRS[@]}"; do
-  "$IP_BIN" route show table 52 | grep -F "throw $cidr" || true
-done
+# Log only real repairs, so a log line means something actually happened.
+if (( ${#repaired[@]} > 0 )); then
+  printf 'digidocs route fix repaired: %s\n' "${!repaired[*]}"
+fi
