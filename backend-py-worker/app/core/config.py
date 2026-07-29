@@ -30,7 +30,7 @@ def load_settings() -> Settings:
         openclaw_api_key=os.getenv("OPENCLAW_API_KEY", "replace-me"),
         openclaw_model=os.getenv("OPENCLAW_MODEL", "openclaw/default"),
         openclaw_backend_model=os.getenv("OPENCLAW_BACKEND_MODEL", ""),
-        openclaw_timeout_seconds=int(os.getenv("OPENCLAW_TIMEOUT_SECONDS", "60")),
+        openclaw_timeout_seconds=int(os.getenv("OPENCLAW_TIMEOUT_SECONDS", "180")),
         openclaw_skills_assistant_ask=os.getenv(
             "OPENCLAW_SKILLS_ASSISTANT_ASK",
             "answer_with_context",
