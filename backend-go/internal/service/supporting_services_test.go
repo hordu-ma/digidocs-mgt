@@ -139,6 +139,12 @@ func (m mockPermissionReader) CanManageCodeRepository(context.Context, string, s
 func (m mockPermissionReader) CanPushCodeRepository(context.Context, string, string, string) (bool, error) {
 	return m.ok, m.err
 }
+func (m mockPermissionReader) CanViewProjectMembers(context.Context, string, string, string) (bool, error) {
+	return m.ok, m.err
+}
+func (m mockPermissionReader) CanManageProjectMembers(context.Context, string, string, string) (bool, error) {
+	return m.ok, m.err
+}
 
 func TestPermissionServiceAllowsNilReaderAndGrantedActions(t *testing.T) {
 	if err := (PermissionService{}).EnsureCreateDocument(context.Background(), "u", "member", "p"); err != nil {
@@ -159,6 +165,8 @@ func TestPermissionServiceAllowsNilReaderAndGrantedActions(t *testing.T) {
 		func() error { return svc.EnsureCreateCodeRepository(context.Background(), "u", "member", "p") },
 		func() error { return svc.EnsureManageCodeRepository(context.Background(), "u", "member", "r") },
 		func() error { return svc.EnsurePushCodeRepository(context.Background(), "u", "member", "r") },
+		func() error { return svc.EnsureViewProjectMembers(context.Background(), "u", "member", "p") },
+		func() error { return svc.EnsureManageProjectMembers(context.Background(), "u", "member", "p") },
 	}
 	for _, check := range checks {
 		if err := check(); err != nil {

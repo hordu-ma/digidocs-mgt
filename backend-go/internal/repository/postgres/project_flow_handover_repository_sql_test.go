@@ -18,8 +18,8 @@ func TestProjectRepositoryListAndFolderTree(t *testing.T) {
 
 	mock.ExpectQuery("FROM projects p\\s+JOIN users u").
 		WithArgs("ts-1").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "team_space_id", "name", "code", "owner_id", "owner_name"}).
-			AddRow("p-1", "ts-1", "Project", "proj", "u-1", "Owner"))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "team_space_id", "name", "code", "owner_id", "owner_name", "my_role"}).
+			AddRow("p-1", "ts-1", "Project", "proj", "u-1", "Owner", ""))
 	projects, err := repo.ListProjects(ctx, "ts-1", "admin", "admin")
 	if err != nil || len(projects) != 1 || projects[0].Owner.DisplayName != "Owner" {
 		t.Fatalf("admin ListProjects got %#v err=%v", projects, err)
@@ -27,8 +27,8 @@ func TestProjectRepositoryListAndFolderTree(t *testing.T) {
 
 	mock.ExpectQuery("FROM projects p\\s+JOIN users u.*JOIN project_members").
 		WithArgs("u-1", "ts-1").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "team_space_id", "name", "code", "owner_id", "owner_name"}).
-			AddRow("p-2", "ts-1", "Member Project", "member", "u-2", "Lead"))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "team_space_id", "name", "code", "owner_id", "owner_name", "my_role"}).
+			AddRow("p-2", "ts-1", "Member Project", "member", "u-2", "Lead", "contributor"))
 	projects, err = repo.ListProjects(ctx, "ts-1", "u-1", "member")
 	if err != nil || len(projects) != 1 || projects[0].ID != "p-2" {
 		t.Fatalf("member ListProjects got %#v err=%v", projects, err)

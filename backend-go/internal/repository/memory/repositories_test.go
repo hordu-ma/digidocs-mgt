@@ -213,6 +213,8 @@ func TestPermissionRepositoryAlwaysAllows(t *testing.T) {
 		func() (bool, error) { return repo.CanCreateCodeRepository(ctx, "", "", "") },
 		func() (bool, error) { return repo.CanManageCodeRepository(ctx, "", "", "") },
 		func() (bool, error) { return repo.CanPushCodeRepository(ctx, "", "", "") },
+		func() (bool, error) { return repo.CanViewProjectMembers(ctx, "", "", "") },
+		func() (bool, error) { return repo.CanManageProjectMembers(ctx, "", "", "") },
 	}
 	for idx, check := range checks {
 		ok, err := check()

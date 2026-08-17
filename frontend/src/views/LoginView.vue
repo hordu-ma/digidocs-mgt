@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
 import { reactive, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
 import { extractError } from "@/utils/error";
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
 const loading = ref(false);
 const form = reactive({
@@ -35,7 +36,8 @@ async function submit() {
       displayName: data.user.display_name,
       role: data.user.role,
     });
-    void router.push("/dashboard");
+    const redirect = typeof route.query.redirect === "string" ? route.query.redirect : "";
+    void router.push(redirect.startsWith("/") ? redirect : "/dashboard");
   } catch (err: unknown) {
     ElMessage.error(extractError(err, "登录失败，请检查账号和密码"));
   } finally {

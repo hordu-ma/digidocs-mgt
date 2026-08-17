@@ -71,3 +71,11 @@ func (r PermissionRepository) CanManageCodeRepository(context.Context, string, s
 func (r PermissionRepository) CanPushCodeRepository(context.Context, string, string, string) (bool, error) {
 	return true, nil
 }
+
+func (r PermissionRepository) CanViewProjectMembers(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+
+func (r PermissionRepository) CanManageProjectMembers(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}

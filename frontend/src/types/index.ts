@@ -10,6 +10,7 @@ export type ProjectOption = {
   id: string;
   name: string;
   team_space_id?: string;
+  my_role?: string;
 };
 
 export type TeamSpaceOption = {

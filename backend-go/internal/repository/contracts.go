@@ -79,6 +79,8 @@ type PermissionReader interface {
 	CanCreateCodeRepository(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
 	CanManageCodeRepository(ctx context.Context, actorID string, actorRole string, repositoryID string) (bool, error)
 	CanPushCodeRepository(ctx context.Context, actorID string, actorRole string, repositoryID string) (bool, error)
+	CanViewProjectMembers(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
+	CanManageProjectMembers(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
 }
 
 type DocumentReader interface {

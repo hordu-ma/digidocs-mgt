@@ -28,6 +28,7 @@ type ProjectSummary struct {
 	Name        string      `json:"name"`
 	Code        string      `json:"code"`
 	Owner       UserSummary `json:"owner"`
+	MyRole      string      `json:"my_role"`
 }
 
 type FolderTreeNode struct {
@@ -199,6 +200,26 @@ type ProjectMemberItem struct {
 	DisplayName string `json:"display_name"`
 	Username    string `json:"username"`
 	ProjectRole string `json:"project_role"`
+}
+
+type ProjectInviteItem struct {
+	ID          string `json:"id"`
+	ProjectID   string `json:"project_id"`
+	Token       string `json:"token"`
+	ProjectRole string `json:"project_role"`
+	Status      string `json:"status"`
+	ExpiresAt   string `json:"expires_at"`
+	CreatedAt   string `json:"created_at"`
+}
+
+type ProjectInvitePreview struct {
+	ProjectID     string `json:"project_id"`
+	ProjectName   string `json:"project_name"`
+	TeamSpaceName string `json:"team_space_name"`
+	ProjectRole   string `json:"project_role"`
+	Status        string `json:"status"`
+	ExpiresAt     string `json:"expires_at"`
+	Expired       bool   `json:"expired"`
 }
 
 type AssistantSuggestionItem struct {

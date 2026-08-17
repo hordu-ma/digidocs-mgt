@@ -12,12 +12,15 @@ import {
   Menu,
   Search,
   Setting,
+  User,
 } from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import GlobalCommandDialog from "@/components/GlobalCommandDialog.vue";
+import NoProjectMembership from "@/components/NoProjectMembership.vue";
 import { useAuthStore } from "@/stores/auth";
+import api from "@/api";
 
 const route = useRoute();
 const router = useRouter();
@@ -27,15 +30,44 @@ const isMobile = ref(false);
 const mobileNavVisible = ref(false);
 
 const isAdmin = computed(() => auth.role === "admin");
+const joinedProjects = ref<{ id: string; my_role?: string }[]>([]);
+const membershipReady = ref(false);
 
-const menus = [
-  { label: "总览", path: "/dashboard", icon: DataBoard, caption: "负责人工作台" },
-  { label: "文档", path: "/documents", icon: Document, caption: "文档资产与流转" },
-  { label: "数据", path: "/data", icon: Folder, caption: "图片、模型与数据文件" },
-  { label: "代码", path: "/code", icon: Coin, caption: "Git 推送与代码目录" },
-  { label: "交接", path: "/handovers", icon: Connection, caption: "成员交接闭环" },
-  { label: "助手", path: "/assistant", icon: ChatDotRound, caption: "可信 AI 工作区" },
-];
+const hasJoinedProject = computed(() => isAdmin.value || joinedProjects.value.length > 0);
+const showMembersNav = computed(() => hasJoinedProject.value);
+const workspacePaths = ["/dashboard", "/documents", "/data", "/code", "/handovers", "/assistant"];
+const showNoProjectState = computed(() => {
+  if (!membershipReady.value || isAdmin.value || joinedProjects.value.length > 0) {
+    return false;
+  }
+  return workspacePaths.some((path) => route.path === path || route.path.startsWith(`${path}/`));
+});
+
+const menus = computed(() => {
+  const items = [
+    { label: "总览", path: "/dashboard", icon: DataBoard, caption: "负责人工作台" },
+    { label: "文档", path: "/documents", icon: Document, caption: "文档资产与流转" },
+    { label: "数据", path: "/data", icon: Folder, caption: "图片、模型与数据文件" },
+    { label: "代码", path: "/code", icon: Coin, caption: "Git 推送与代码目录" },
+    { label: "交接", path: "/handovers", icon: Connection, caption: "成员交接闭环" },
+  ];
+  if (showMembersNav.value) {
+    items.push({ label: "成员", path: "/members", icon: User, caption: "课题名单与邀请" });
+  }
+  items.push({ label: "助手", path: "/assistant", icon: ChatDotRound, caption: "可信 AI 工作区" });
+  return items;
+});
+
+async function loadJoinedProjects() {
+  try {
+    const res = await api.get("/projects");
+    joinedProjects.value = res.data?.data ?? [];
+  } catch {
+    joinedProjects.value = [];
+  } finally {
+    membershipReady.value = true;
+  }
+}
 
 const workbenchActions = [
   {
@@ -96,6 +128,12 @@ const routeMeta = computed(() => {
       caption: "基于受控上下文生成建议",
     };
   }
+  if (path.startsWith("/members")) {
+    return {
+      title: "课题成员",
+      caption: "名单、加人与邀请链接",
+    };
+  }
   if (path.startsWith("/admin")) {
     return {
       title: "系统管理",
@@ -131,9 +169,11 @@ const breadcrumbs = computed(() => {
     crumbs.push({ label: "文档档案", path });
     return crumbs;
   }
-  const menu = menus.find((item) => path === item.path || path.startsWith(`${item.path}/`));
+  const menu = menus.value.find((item) => path === item.path || path.startsWith(`${item.path}/`));
   if (menu) {
     crumbs.push({ label: menu.label, path: menu.path });
+  } else if (path.startsWith("/members")) {
+    crumbs.push({ label: "成员", path: "/members" });
   } else if (path.startsWith("/admin")) {
     crumbs.push({ label: "系统管理", path: "/admin" });
   } else if (path.startsWith("/profile")) {
@@ -194,6 +234,7 @@ onMounted(() => {
   syncViewport();
   window.addEventListener("keydown", handleGlobalKeydown);
   window.addEventListener("resize", syncViewport);
+  void loadJoinedProjects();
 });
 
 onBeforeUnmount(() => {
@@ -313,7 +354,8 @@ onBeforeUnmount(() => {
           </ElDropdown>
         </div>
       </header>
-      <slot />
+      <NoProjectMembership v-if="showNoProjectState" />
+      <slot v-else />
     </main>
   </div>
   <ElDrawer

@@ -170,6 +170,52 @@ func TestAuth_LoginLogoutAndErrorBranches(t *testing.T) {
 	}
 }
 
+func TestMembership_InvitePreviewAndAccept(t *testing.T) {
+	handler, token := testServer(t)
+	projectID := "00000000-0000-0000-0000-000000000020"
+
+	created := httptest.NewRecorder()
+	handler.ServeHTTP(created, authedRequest("POST", "/api/v1/projects/"+projectID+"/invites", strings.NewReader("{}"), token))
+	if created.Code != http.StatusCreated {
+		t.Fatalf("create invite status = %d, want 201; body = %s", created.Code, created.Body.String())
+	}
+	inviteData, _ := parseResponse(t, created)["data"].(map[string]any)
+	inviteToken, _ := inviteData["token"].(string)
+	if inviteToken == "" {
+		t.Fatalf("expected invite token, got %#v", inviteData)
+	}
+
+	preview := httptest.NewRecorder()
+	handler.ServeHTTP(preview, httptest.NewRequest("GET", "/api/v1/invites/"+inviteToken, nil))
+	if preview.Code != http.StatusOK {
+		t.Fatalf("preview status = %d, want 200; body = %s", preview.Code, preview.Body.String())
+	}
+
+	register := httptest.NewRecorder()
+	handler.ServeHTTP(register, httptest.NewRequest("POST", "/api/v1/auth/register", jsonBody(map[string]string{
+		"email":        "invitee@example.com",
+		"password":     "password1",
+		"display_name": "受邀用户",
+	})))
+	if register.Code != http.StatusOK {
+		t.Fatalf("register status = %d; body = %s", register.Code, register.Body.String())
+	}
+	regData, _ := parseResponse(t, register)["data"].(map[string]any)
+	memberToken, _ := regData["access_token"].(string)
+
+	accept := httptest.NewRecorder()
+	handler.ServeHTTP(accept, authedRequest("POST", "/api/v1/invites/"+inviteToken+"/accept", nil, memberToken))
+	if accept.Code != http.StatusOK {
+		t.Fatalf("accept status = %d, want 200; body = %s", accept.Code, accept.Body.String())
+	}
+
+	members := httptest.NewRecorder()
+	handler.ServeHTTP(members, authedRequest("GET", "/api/v1/projects/"+projectID+"/members", nil, token))
+	if members.Code != http.StatusOK {
+		t.Fatalf("list members status = %d; body = %s", members.Code, members.Body.String())
+	}
+}
+
 func TestAuth_RegisterAndLoginByContact(t *testing.T) {
 	handler, _ := testServer(t)
 

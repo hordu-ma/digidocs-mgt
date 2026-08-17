@@ -37,6 +37,7 @@ type Container struct {
 	AuthService           service.AuthService
 	TokenService          service.TokenService
 	AuditService          service.AuditService
+	MembershipService     service.MembershipService
 }
 
 func BuildContainer(cfg config.Config) (Container, error) {
@@ -89,6 +90,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			AuthService:           authService,
 			TokenService:          tokenService,
 			AuditService:          auditService,
+			MembershipService:     service.NewMembershipService(pgrepo.NewMembershipRepository(postgresDB), permissionService),
 		}, nil
 	default:
 		actionRepo := memory.NewActionRepository()
@@ -118,6 +120,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			AuthService:           authService,
 			TokenService:          tokenService,
 			AuditService:          auditService,
+			MembershipService:     service.NewMembershipService(memory.NewMembershipRepository(), permissionService),
 		}, nil
 	}
 }

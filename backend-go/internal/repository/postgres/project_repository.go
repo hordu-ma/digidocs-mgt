@@ -18,14 +18,14 @@ func (r ProjectRepository) ListProjects(ctx context.Context, teamSpaceID, actorI
 	var q string
 	var args []any
 	if actorRole == "admin" {
-		q = `SELECT p.id::text, p.team_space_id::text, p.name, p.code, u.id::text, u.display_name
+		q = `SELECT p.id::text, p.team_space_id::text, p.name, p.code, u.id::text, u.display_name, ''
 			FROM projects p
 			JOIN users u ON u.id = p.owner_id
 			WHERE ($1 = '' OR p.team_space_id::text = $1)
 			ORDER BY p.name ASC`
 		args = append(args, teamSpaceID)
 	} else {
-		q = `SELECT p.id::text, p.team_space_id::text, p.name, p.code, u.id::text, u.display_name
+		q = `SELECT p.id::text, p.team_space_id::text, p.name, p.code, u.id::text, u.display_name, pm.project_role
 			FROM projects p
 			JOIN users u ON u.id = p.owner_id
 			JOIN project_members pm ON pm.project_id = p.id
@@ -49,6 +49,7 @@ func (r ProjectRepository) ListProjects(ctx context.Context, teamSpaceID, actorI
 			&item.Code,
 			&item.Owner.ID,
 			&item.Owner.DisplayName,
+			&item.MyRole,
 		); err != nil {
 			return nil, err
 		}

@@ -250,11 +250,14 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
       "owner": {
         "id": "uuid",
         "display_name": "李老师"
-      }
+      },
+      "my_role": "contributor"
     }
   ]
 }
 ```
+
+`my_role` 是当前登录用户在该课题中的 `project_members.project_role`。`admin` 查看全部课题时该字段为空字符串。非 admin 且不属于任何课题时返回空列表。
 
 ### 3.4 目录树
 
@@ -274,6 +277,61 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
   ]
 }
 ```
+
+### 3.4.1 课题成员
+
+`GET /api/v1/projects/{project_id}/members`
+
+课题成员或 `admin` 可查看。响应为 `project_members` 列表，字段与管理端成员列表一致。
+
+`POST /api/v1/projects/{project_id}/members`
+
+课题 `owner` / `manager` 或 `admin` 可将已有平台用户加入本课题。默认 `project_role` 为 `contributor`。负责人侧不可通过本接口指定 `owner`。
+
+```json
+{
+  "user_id": "uuid",
+  "project_role": "contributor"
+}
+```
+
+`PATCH /api/v1/projects/{project_id}/members/{member_id}`
+
+更新课题角色。负责人侧不可把成员改成 `owner`。
+
+`DELETE /api/v1/projects/{project_id}/members/{member_id}`
+
+移出课题。不可移除课题的最后一位 `owner`。
+
+### 3.4.2 课题邀请
+
+`POST /api/v1/projects/{project_id}/invites`
+
+生成可复用邀请链接，默认角色 `contributor`，默认 7 天有效。仅 `owner` / `manager` / `admin`。
+
+响应：
+
+```json
+{
+  "data": {
+    "id": "uuid",
+    "project_id": "uuid",
+    "token": "hex",
+    "project_role": "contributor",
+    "status": "active",
+    "expires_at": "2026-08-24T00:00:00Z",
+    "created_at": "2026-08-17T00:00:00Z"
+  }
+}
+```
+
+`GET /api/v1/projects/{project_id}/invites` 列出本课题邀请（含已撤销/过期，便于管理）。
+
+`POST /api/v1/projects/{project_id}/invites/{invite_id}/revoke` 撤销邀请。
+
+`GET /api/v1/invites/{token}` 公开预览（无需登录），只返回课题名称、团队空间名称、将获得的角色、状态和过期时间，不返回成员名单。
+
+`POST /api/v1/invites/{token}/accept` 需登录。校验邀请有效后写入 `project_members`；已是成员则幂等返回当前成员关系。
 
 ### 3.5 首期权限矩阵
 
@@ -297,6 +355,8 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 | 编辑交接清单 | `admin`、项目 `owner/manager` |
 | 确认交接 | `admin`、项目 `owner/manager`、交接接收人 |
 | 完成交接 / 取消交接 | `admin`、项目 `owner/manager` |
+| 查看课题成员 | `admin`、该课题任意成员 |
+| 添加/移除课题成员、生成/撤销邀请 | `admin`、项目 `owner/manager` |
 
 权限不足时统一返回：
 

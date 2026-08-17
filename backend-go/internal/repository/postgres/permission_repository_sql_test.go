@@ -25,6 +25,8 @@ func TestPermissionRepositoryAdminShortCircuits(t *testing.T) {
 		func() (bool, error) { return repo.CanCreateCodeRepository(context.Background(), "u", "admin", "p") },
 		func() (bool, error) { return repo.CanManageCodeRepository(context.Background(), "u", "admin", "r") },
 		func() (bool, error) { return repo.CanPushCodeRepository(context.Background(), "u", "admin", "r") },
+		func() (bool, error) { return repo.CanViewProjectMembers(context.Background(), "u", "admin", "p") },
+		func() (bool, error) { return repo.CanManageProjectMembers(context.Background(), "u", "admin", "p") },
 	}
 	for _, check := range checks {
 		ok, err := check()

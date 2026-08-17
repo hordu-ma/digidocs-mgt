@@ -68,6 +68,12 @@ const quickActions = computed(() => {
       icon: Connection,
     },
     {
+      title: "课题成员",
+      caption: "查看名单、加人与邀请链接",
+      route: "/members",
+      icon: User,
+    },
+    {
       title: "OpenClaw 助手",
       caption: "进入可信问答工作区",
       route: "/assistant",

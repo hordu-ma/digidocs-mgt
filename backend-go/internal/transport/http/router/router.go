@@ -38,6 +38,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	adminHandler := handlers.NewAdminHandler(container.AdminService)
 	dataAssetHandler := handlers.NewDataAssetHandler(container.DataAssetService)
 	codeRepositoryHandler := handlers.NewCodeRepositoryHandler(container.CodeRepositoryService, cfg.APIV1Prefix)
+	membershipHandler := handlers.NewMembershipHandler(container.MembershipService)
 
 	authMw := middleware.Auth(container.TokenService)
 	protect := func(h http.HandlerFunc) http.Handler {
@@ -55,6 +56,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	registerLimiter := middleware.NewRateLimiter(cfg.RegisterRateLimitPerMin, time.Minute)
 	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/login", loginLimiter.Limit(authHandler.Login))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/register", registerLimiter.Limit(authHandler.Register))
+	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/invites/{token}", membershipHandler.PreviewInvite)
 	// Worker callback uses its own shared-secret token, not user JWT.
 	mux.HandleFunc("POST "+cfg.APIV1Prefix+"/internal/worker-results", internalWorkerHandler.ReceiveResult)
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/poll-tasks", internalWorkerHandler.PollTasks)
@@ -86,6 +88,14 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.Handle("GET "+cfg.APIV1Prefix+"/team-spaces", protect(teamSpaceHandler.List))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/projects", protect(projectHandler.List))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/projects/{projectID}/folders/tree", protect(projectHandler.FolderTree))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/projects/{projectID}/members", protect(membershipHandler.ListMembers))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/projects/{projectID}/members", protect(membershipHandler.AddMember))
+	mux.Handle("PATCH "+cfg.APIV1Prefix+"/projects/{projectID}/members/{memberID}", protect(membershipHandler.UpdateMember))
+	mux.Handle("DELETE "+cfg.APIV1Prefix+"/projects/{projectID}/members/{memberID}", protect(membershipHandler.RemoveMember))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/projects/{projectID}/invites", protect(membershipHandler.ListInvites))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/projects/{projectID}/invites", protect(membershipHandler.CreateInvite))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/projects/{projectID}/invites/{inviteID}/revoke", protect(membershipHandler.RevokeInvite))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/invites/{token}/accept", protect(membershipHandler.AcceptInvite))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/documents", protect(documentHandler.Create))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/documents", protect(documentHandler.List))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/documents/{documentID}", protect(documentHandler.Get))

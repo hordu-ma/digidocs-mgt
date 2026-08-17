@@ -307,6 +307,34 @@ func (r PermissionRepository) CanManageCodeRepository(ctx context.Context, actor
 	`, repositoryID, actorID)
 }
 
+func (r PermissionRepository) CanViewProjectMembers(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error) {
+	if isAdmin(actorRole) {
+		return true, nil
+	}
+	return r.isProjectMember(ctx, actorID, projectID)
+}
+
+func (r PermissionRepository) CanManageProjectMembers(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error) {
+	if isAdmin(actorRole) {
+		return true, nil
+	}
+	return r.isProjectManager(ctx, actorID, projectID)
+}
+
+func (r PermissionRepository) isProjectMember(ctx context.Context, actorID string, projectID string) (bool, error) {
+	return r.exists(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM projects p
+			LEFT JOIN project_members pm
+			  ON pm.project_id = p.id
+			 AND pm.user_id::text = $2
+			WHERE p.id::text = $1
+			  AND (p.owner_id::text = $2 OR pm.id IS NOT NULL)
+		)
+	`, projectID, actorID)
+}
+
 func (r PermissionRepository) CanPushCodeRepository(ctx context.Context, actorID string, actorRole string, repositoryID string) (bool, error) {
 	if isAdmin(actorRole) {
 		return true, nil

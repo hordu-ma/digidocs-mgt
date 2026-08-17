@@ -200,6 +200,20 @@ func TestPostgresIntegrationSelfRegistration(t *testing.T) {
 	if err != nil || profile.Username != "" || profile.Email != "self@example.com" {
 		t.Fatalf("GetUserProfile for self-registered user got %#v err=%v", profile, err)
 	}
+
+	membership := pgrepo.NewMembershipRepository(database)
+	invite, err := membership.CreateInvite(ctx, integrationProjectID, "token-integration-001", "contributor", integrationUserID, time.Now().Add(time.Hour))
+	if err != nil || invite.Token != "token-integration-001" {
+		t.Fatalf("CreateInvite: %#v err=%v", invite, err)
+	}
+	preview, err := membership.GetInvitePreview(ctx, "token-integration-001")
+	if err != nil || preview.ProjectID != integrationProjectID || preview.Expired {
+		t.Fatalf("GetInvitePreview: %#v err=%v", preview, err)
+	}
+	joined, err := membership.AddProjectMember(ctx, integrationProjectID, created.ID, "contributor")
+	if err != nil || joined.UserID != created.ID {
+		t.Fatalf("AddProjectMember: %#v err=%v", joined, err)
+	}
 }
 
 func openIntegrationDB(t *testing.T) *sql.DB {

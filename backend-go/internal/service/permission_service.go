@@ -135,6 +135,22 @@ func (s PermissionService) EnsureManageCodeRepository(ctx context.Context, actor
 	return permissionResult(ok, err, "manage code repository")
 }
 
+func (s PermissionService) EnsureViewProjectMembers(ctx context.Context, actorID string, actorRole string, projectID string) error {
+	if s.reader == nil {
+		return nil
+	}
+	ok, err := s.reader.CanViewProjectMembers(ctx, actorID, actorRole, projectID)
+	return permissionResult(ok, err, "view project members")
+}
+
+func (s PermissionService) EnsureManageProjectMembers(ctx context.Context, actorID string, actorRole string, projectID string) error {
+	if s.reader == nil {
+		return nil
+	}
+	ok, err := s.reader.CanManageProjectMembers(ctx, actorID, actorRole, projectID)
+	return permissionResult(ok, err, "manage project members")
+}
+
 func (s PermissionService) EnsurePushCodeRepository(ctx context.Context, actorID string, actorRole string, repositoryID string) error {
 	if s.reader == nil {
 		return nil

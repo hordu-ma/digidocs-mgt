@@ -199,6 +199,40 @@ if [[ "$backend_ready" == "1" ]]; then
     echo "[OK] auth/login returned token"
     auth_header="Authorization: Bearer $token"
 
+    projects_resp=$(smoke_curl -sS --max-time 5 -H "$auth_header" "$backend_url/api/v1/projects" 2>/dev/null || true)
+    smoke_project_id=""
+    if command -v python3 >/dev/null 2>&1; then
+      smoke_project_id=$(printf '%s' "$projects_resp" | python3 -c 'import json,sys; data=(json.load(sys.stdin).get("data") or []); print(data[0]["id"] if data else "", end="")' 2>/dev/null || true)
+    fi
+    invite_resp=""
+    if [[ -n "$smoke_project_id" ]]; then
+      invite_resp=$(smoke_curl -sS --max-time 8 -X POST "$backend_url/api/v1/projects/$smoke_project_id/invites" \
+        -H "$auth_header" -H 'Content-Type: application/json' -d '{}' 2>/dev/null || true)
+    fi
+    invite_token=$(echo "$invite_resp" | extract_json_string token)
+    if [[ -n "$invite_token" ]]; then
+      echo "[OK] project invite created"
+      preview_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+        "$backend_url/api/v1/invites/$invite_token" 2>/dev/null)
+      if [[ "$preview_status" == "200" ]]; then
+        echo "[OK] GET /invites/{token} -> $preview_status"
+      else
+        require_or_skip "GET /invites/{token} -> $preview_status (expected 200)"
+      fi
+      if [[ -n "$register_token" ]]; then
+        accept_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+          -X POST -H "Authorization: Bearer $register_token" \
+          "$backend_url/api/v1/invites/$invite_token/accept" 2>/dev/null)
+        if [[ "$accept_status" == "200" ]]; then
+          echo "[OK] registered user accepted invite -> $accept_status"
+        else
+          require_or_skip "POST /invites/{token}/accept -> $accept_status (expected 200)"
+        fi
+      fi
+    else
+      require_or_skip "create project invite did not return a token"
+    fi
+
     # GET /documents
     doc_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
       -H "$auth_header" "$backend_url/api/v1/documents?page=1&page_size=5" 2>/dev/null)

@@ -6,6 +6,10 @@
 
 ## 已完成
 
+- 完成**未入组空状态 + 课题负责人成员/邀请**
+  - 未加入任何课题的用户在总览/文档等业务页看到明确空状态：注册不等于入组，需邀请链接或负责人加入
+  - 课题 `owner/manager` 可在「成员」页查看名单、添加已有账号、生成 7 天可复用邀请链接并撤销
+  - 新增 `project_invites` 迁移 011，公开预览 `GET /invites/{token}`，登录后 `POST /invites/{token}/accept` 写入 `project_members`
 - 完成**用户注册登录改造（手机号/邮箱 + 密码）**
   - 新增迁移 `010_self_registration.sql`：`users.username` 可空，`email` / `phone` 部分唯一索引
   - 新增公开接口 `POST /api/v1/auth/register`：注册即激活、角色强制 `member`、成功即签发 JWT；独立限流 `REGISTER_RATE_LIMIT_PER_MIN`

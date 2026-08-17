@@ -11,12 +11,15 @@ const HandoversView = () => import("@/views/HandoversView.vue");
 const LoginView = () => import("@/views/LoginView.vue");
 const RegisterView = () => import("@/views/RegisterView.vue");
 const ProfileView = () => import("@/views/ProfileView.vue");
+const MembersView = () => import("@/views/MembersView.vue");
+const JoinView = () => import("@/views/JoinView.vue");
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/login", name: "login", component: LoginView },
     { path: "/register", name: "register", component: RegisterView },
+    { path: "/join/:token", name: "join", component: JoinView },
     { path: "/", redirect: "/dashboard" },
     { path: "/dashboard", name: "dashboard", component: DashboardView, meta: { requiresAuth: true } },
     { path: "/documents", name: "documents", component: DocumentsView, meta: { requiresAuth: true } },
@@ -27,6 +30,7 @@ const router = createRouter({
     { path: "/assistant", name: "assistant", component: AssistantView, meta: { requiresAuth: true } },
     { path: "/admin", name: "admin", component: AdminView, meta: { requiresAuth: true, requiresAdmin: true } },
     { path: "/profile", name: "profile", component: ProfileView, meta: { requiresAuth: true } },
+    { path: "/members", name: "members", component: MembersView, meta: { requiresAuth: true } },
   ],
 });
 

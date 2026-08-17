@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
 import { reactive, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
 import { extractError } from "@/utils/error";
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
 const loading = ref(false);
 const form = reactive({
@@ -64,7 +65,8 @@ async function submit() {
       role: data.user.role,
     });
     ElMessage.success("注册成功");
-    void router.push("/dashboard");
+    const redirect = typeof route.query.redirect === "string" ? route.query.redirect : "";
+    void router.push(redirect.startsWith("/") ? redirect : "/dashboard");
   } catch (err: unknown) {
     ElMessage.error(extractError(err, "注册失败，请检查填写信息"));
   } finally {
