@@ -126,9 +126,12 @@ func (s CodeRepositoryService) Update(ctx context.Context, input command.CodeRep
 	return s.writer.UpdateCodeRepository(ctx, input)
 }
 
-func (s CodeRepositoryService) ListPushEvents(ctx context.Context, repositoryID string) ([]query.CodePushEventItem, error) {
+func (s CodeRepositoryService) ListPushEvents(ctx context.Context, repositoryID string, actorID string, actorRole string) ([]query.CodePushEventItem, error) {
 	if repositoryID == "" {
 		return nil, fmt.Errorf("%w: repository_id is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureViewCodeRepository(ctx, actorID, actorRole, repositoryID); err != nil {
+		return nil, err
 	}
 	return s.reader.ListCodePushEvents(ctx, repositoryID)
 }
@@ -185,13 +188,33 @@ func (s CodeRepositoryService) syncCommitToTarget(ctx context.Context, repo *que
 	if s.storage == nil {
 		return nil
 	}
+	// The archive is streamed rather than read into memory with cmd.Output():
+	// a repository's whole working tree can be arbitrarily large, and buffering
+	// it made the push path's memory use scale with repo size.
 	cmd := exec.CommandContext(ctx, "git", "--git-dir", repo.RepoStoragePath, "archive", "--format=tar", commitSHA)
-	out, err := cmd.Output()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		return fmt.Errorf("git archive pipe failed: %w", err)
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
 		log.Printf("[code-repo] git archive failed repo=%s commit=%s err=%v", repo.RepoStoragePath, commitSHA, err)
 		return fmt.Errorf("git archive failed: %w", err)
 	}
-	reader := tar.NewReader(bytes.NewReader(out))
+	// On any early return the child must still be reaped, or the goroutine and
+	// its pipe leak for the lifetime of the process. The success path waits
+	// explicitly (below) and clears this.
+	waited := false
+	defer func() {
+		if waited {
+			return
+		}
+		_, _ = io.Copy(io.Discard, stdout)
+		_ = cmd.Wait()
+	}()
+
+	reader := tar.NewReader(stdout)
 	targetRoot := strings.Trim(strings.TrimSpace(repo.TargetFolderPath), "/")
 	for {
 		header, err := reader.Next()
@@ -220,6 +243,15 @@ func (s CodeRepositoryService) syncCommitToTarget(ctx context.Context, repo *que
 		}); err != nil {
 			return fmt.Errorf("sync file %s failed: %w", cleanName, err)
 		}
+	}
+
+	// Reaching tar EOF is not proof the archive was complete: if git died
+	// mid-stream the sync would otherwise be recorded as successful.
+	waited = true
+	if err := cmd.Wait(); err != nil {
+		log.Printf("[code-repo] git archive failed repo=%s commit=%s stderr=%s err=%v",
+			repo.RepoStoragePath, commitSHA, strings.TrimSpace(stderr.String()), err)
+		return fmt.Errorf("git archive failed: %w", err)
 	}
 	return nil
 }

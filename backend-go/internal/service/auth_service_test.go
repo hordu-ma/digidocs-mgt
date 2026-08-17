@@ -22,6 +22,9 @@ type mockUserAuthReader struct {
 	lastLookup   string
 	registered   *auth.RegisterUserInput
 	registerUser *auth.UserRecord
+	credentials  *auth.UserRecord
+	newHash      string
+	updateErr    error
 }
 
 func (m *mockUserAuthReader) FindUserByIdentifier(_ context.Context, identifier string) (*auth.UserRecord, error) {
@@ -64,6 +67,21 @@ func (m *mockUserAuthReader) UpdateUserProfile(_ context.Context, userID string,
 		Wechat:      input.Wechat,
 		Status:      "active",
 	}, nil
+}
+
+func (m *mockUserAuthReader) GetUserCredentials(_ context.Context, _ string) (*auth.UserRecord, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.credentials, nil
+}
+
+func (m *mockUserAuthReader) UpdateUserPassword(_ context.Context, _ string, passwordHash string) error {
+	if m.updateErr != nil {
+		return m.updateErr
+	}
+	m.newHash = passwordHash
+	return nil
 }
 
 // --- helpers ---
@@ -279,5 +297,62 @@ func TestUpdateProfile_RequiresDisplayName(t *testing.T) {
 	})
 	if !errors.Is(err, ErrValidation) {
 		t.Errorf("err = %v, want ErrValidation", err)
+	}
+}
+
+// --- ChangePassword ---
+
+func TestChangePasswordRotatesHashAfterVerifyingCurrent(t *testing.T) {
+	repo := &mockUserAuthReader{
+		credentials: &auth.UserRecord{ID: "u-1", PasswordHash: hashPassword(t, "old-password")},
+	}
+	svc := NewAuthService(repo, NewTokenService("secret"))
+
+	if err := svc.ChangePassword(context.Background(), "u-1", "old-password", "brand-new-password"); err != nil {
+		t.Fatalf("ChangePassword: %v", err)
+	}
+	if repo.newHash == "" {
+		t.Fatal("password hash was not written")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(repo.newHash), []byte("brand-new-password")); err != nil {
+		t.Fatalf("stored hash does not match the new password: %v", err)
+	}
+}
+
+func TestChangePasswordRejectsWrongCurrentPassword(t *testing.T) {
+	repo := &mockUserAuthReader{
+		credentials: &auth.UserRecord{ID: "u-1", PasswordHash: hashPassword(t, "old-password")},
+	}
+	svc := NewAuthService(repo, NewTokenService("secret"))
+
+	err := svc.ChangePassword(context.Background(), "u-1", "not-the-password", "brand-new-password")
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("err = %v, want ErrUnauthorized", err)
+	}
+	if repo.newHash != "" {
+		t.Fatal("password must not be written when the current password is wrong")
+	}
+}
+
+func TestChangePasswordValidatesNewPassword(t *testing.T) {
+	repo := &mockUserAuthReader{
+		credentials: &auth.UserRecord{ID: "u-1", PasswordHash: hashPassword(t, "old-password")},
+	}
+	svc := NewAuthService(repo, NewTokenService("secret"))
+
+	cases := map[string][2]string{
+		"too short":       {"old-password", "short"},
+		"same as current": {"old-password", "old-password"},
+		"missing current": {"", "brand-new-password"},
+	}
+	for name, pair := range cases {
+		t.Run(name, func(t *testing.T) {
+			if err := svc.ChangePassword(context.Background(), "u-1", pair[0], pair[1]); err == nil {
+				t.Fatal("expected a validation error")
+			}
+			if repo.newHash != "" {
+				t.Fatal("password must not be written for an invalid request")
+			}
+		})
 	}
 }

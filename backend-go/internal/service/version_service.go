@@ -87,16 +87,41 @@ func (s VersionService) UploadAndCreateVersion(
 	return versionData, nil
 }
 
-func (s VersionService) List(ctx context.Context, documentID string) ([]query.VersionItem, error) {
+// List returns the version history of a document. The caller must be allowed to
+// read the document itself: version ids are surfaced by the audit log, so an
+// unguarded version listing would hand out cross-project file handles.
+func (s VersionService) List(ctx context.Context, documentID string, actorID string, actorRole string) ([]query.VersionItem, error) {
+	if documentID == "" {
+		return nil, fmt.Errorf("%w: document_id is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureViewDocument(ctx, actorID, actorRole, documentID); err != nil {
+		return nil, err
+	}
 	return s.reader.ListVersions(ctx, documentID)
 }
 
-func (s VersionService) Get(ctx context.Context, versionID string) (*query.VersionDetail, error) {
+func (s VersionService) Get(ctx context.Context, versionID string, actorID string, actorRole string) (*query.VersionDetail, error) {
+	if versionID == "" {
+		return nil, fmt.Errorf("%w: version_id is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureViewVersion(ctx, actorID, actorRole, versionID); err != nil {
+		return nil, err
+	}
 	return s.reader.GetVersion(ctx, versionID)
 }
 
 // GetFile returns the file content for a version from storage.
-func (s VersionService) GetFile(ctx context.Context, versionID string) (*query.VersionDetail, *storage.GetObjectOutput, error) {
+//
+// The worker-facing internal endpoint has no acting user and passes
+// ("", "admin"), matching DocumentService.GetDocument's existing convention.
+func (s VersionService) GetFile(ctx context.Context, versionID string, actorID string, actorRole string) (*query.VersionDetail, *storage.GetObjectOutput, error) {
+	if versionID == "" {
+		return nil, nil, fmt.Errorf("%w: version_id is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureViewVersion(ctx, actorID, actorRole, versionID); err != nil {
+		return nil, nil, err
+	}
+
 	ver, err := s.reader.GetVersion(ctx, versionID)
 	if err != nil {
 		return nil, nil, err

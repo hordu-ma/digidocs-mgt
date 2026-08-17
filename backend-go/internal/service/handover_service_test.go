@@ -44,7 +44,7 @@ type mockHandoverReader struct {
 	err   error
 }
 
-func (m *mockHandoverReader) ListHandovers(_ context.Context) ([]query.HandoverItem, error) {
+func (m *mockHandoverReader) ListHandovers(_ context.Context, _ query.ActorScope) ([]query.HandoverItem, error) {
 	return m.items, m.err
 }
 
@@ -194,7 +194,7 @@ func TestHandoverService_ApplyAction_MissingActorID(t *testing.T) {
 
 func TestHandoverService_Get_MissingID(t *testing.T) {
 	svc := NewHandoverService(&mockHandoverReader{}, &mockHandoverActionWriter{})
-	_, err := svc.Get(context.Background(), "")
+	_, err := svc.Get(context.Background(), "", "u-1", "member")
 	if !errors.Is(err, ErrValidation) {
 		t.Errorf("err = %v, want ErrValidation", err)
 	}
@@ -203,7 +203,7 @@ func TestHandoverService_Get_MissingID(t *testing.T) {
 func TestHandoverService_Get_OK(t *testing.T) {
 	r := &mockHandoverReader{item: &query.HandoverItem{ID: "ho-1", Status: "generated"}}
 	svc := NewHandoverService(r, &mockHandoverActionWriter{})
-	item, err := svc.Get(context.Background(), "ho-1")
+	item, err := svc.Get(context.Background(), "ho-1", "u-1", "member")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

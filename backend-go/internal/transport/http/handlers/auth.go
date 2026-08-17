@@ -143,6 +143,34 @@ func (h AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	response.WriteData(w, http.StatusOK, profile)
 }
 
+func (h AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	actorID, _ := actorFrom(r)
+	if actorID == "" {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "missing bearer token")
+		return
+	}
+
+	var payload struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid request body")
+		return
+	}
+
+	if err := h.authService.ChangePassword(r.Context(), actorID, payload.CurrentPassword, payload.NewPassword); err != nil {
+		if errors.Is(err, service.ErrUnauthorized) {
+			response.WriteError(w, http.StatusUnauthorized, "unauthorized", "当前密码不正确")
+			return
+		}
+		writeServiceError(w, err, "user not found", "failed to change password")
+		return
+	}
+
+	response.WriteData(w, http.StatusOK, map[string]bool{"success": true})
+}
+
 func (h AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	_ = r
 

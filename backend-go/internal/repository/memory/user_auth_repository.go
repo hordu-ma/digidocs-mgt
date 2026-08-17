@@ -206,3 +206,26 @@ func validBcryptHash(hash string) bool {
 	}
 	return true
 }
+
+func (r *UserAuthRepository) GetUserCredentials(_ context.Context, userID string) (*auth.UserRecord, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	user, ok := r.users[userID]
+	if !ok || user.Status != "active" {
+		return nil, service.ErrNotFound
+	}
+	return toUserRecord(user), nil
+}
+
+func (r *UserAuthRepository) UpdateUserPassword(_ context.Context, userID string, passwordHash string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	user, ok := r.users[userID]
+	if !ok || user.Status != "active" {
+		return service.ErrNotFound
+	}
+	user.PasswordHash = passwordHash
+	return nil
+}

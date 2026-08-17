@@ -21,7 +21,12 @@ func NewVersionHandler(svc service.VersionService, assistant service.AssistantSe
 }
 
 func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(shared.MaxUploadSize); err != nil {
+	shared.LimitUploadBody(w, r, shared.MaxUploadSize)
+	if err := r.ParseMultipartForm(shared.MaxMultipartMemory); err != nil {
+		if shared.IsBodyTooLarge(err) {
+			response.WriteError(w, http.StatusRequestEntityTooLarge, "payload_too_large", "文件超过 32 MB 上限")
+			return
+		}
 		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid multipart form")
 		return
 	}

@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -119,7 +121,8 @@ func (h CodeRepositoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h CodeRepositoryHandler) ListPushEvents(w http.ResponseWriter, r *http.Request) {
-	items, err := h.service.ListPushEvents(r.Context(), r.PathValue("id"))
+	actorID, actorRole := actorFrom(r)
+	items, err := h.service.ListPushEvents(r.Context(), r.PathValue("id"), actorID, actorRole)
 	if err != nil {
 		writeServiceError(w, err, "code repository not found", "failed to list push events")
 		return
@@ -168,6 +171,13 @@ func (h CodeRepositoryHandler) ServeGit(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// runGitHTTPBackend proxies the request to `git http-backend` (CGI) and streams
+// the response straight through.
+//
+// This used to buffer git's entire stdout with cmd.Output() before writing a
+// byte, which meant a clone allocated the whole pack in memory and lost
+// git's incremental progress reporting. Only the CGI header block is read
+// eagerly; the body is copied as it arrives.
 func (h CodeRepositoryHandler) runGitHTTPBackend(w http.ResponseWriter, r *http.Request, repoPath string, pathInfo string) error {
 	cmd := exec.CommandContext(r.Context(), "git", "http-backend")
 	cmd.Env = append(os.Environ(),
@@ -184,33 +194,86 @@ func (h CodeRepositoryHandler) runGitHTTPBackend(w http.ResponseWriter, r *http.
 		defer r.Body.Close()
 		cmd.Stdin = r.Body
 	}
-	out, err := cmd.Output()
+
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
-	header, body, ok := bytes.Cut(out, []byte("\r\n\r\n"))
-	if !ok {
-		header, body, ok = bytes.Cut(out, []byte("\n\n"))
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Start(); err != nil {
+		return err
 	}
-	if !ok {
-		_, _ = w.Write(out)
+
+	reader := bufio.NewReader(stdout)
+	status, err := writeCGIHeaders(w, reader)
+	if err != nil {
+		_ = cmd.Wait()
+		return err
+	}
+	w.WriteHeader(status)
+
+	// Flush per chunk so git's sideband progress reaches the client live
+	// instead of arriving all at once when the process exits.
+	flusher, _ := w.(http.Flusher)
+	buf := make([]byte, 32*1024)
+	for {
+		n, readErr := reader.Read(buf)
+		if n > 0 {
+			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				_ = cmd.Wait()
+				return writeErr
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			_ = cmd.Wait()
+			return readErr
+		}
+	}
+
+	if err := cmd.Wait(); err != nil {
+		log.Printf("[code-repo] git http-backend failed path=%s stderr=%s err=%v",
+			pathInfo, strings.TrimSpace(stderr.String()), err)
+		// The response is already on the wire; surfacing a second status here
+		// would corrupt it, so the failure is only logged.
 		return nil
 	}
+	return nil
+}
+
+// writeCGIHeaders consumes the CGI header block from reader, copies the headers
+// onto w and returns the status code to send. The reader is left positioned at
+// the first byte of the body.
+func writeCGIHeaders(w http.ResponseWriter, reader *bufio.Reader) (int, error) {
 	status := http.StatusOK
-	for _, line := range strings.Split(strings.ReplaceAll(string(header), "\r\n", "\n"), "\n") {
-		if line == "" {
-			continue
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err == io.EOF && strings.TrimSpace(line) == "" {
+				return status, nil
+			}
+			return status, err
 		}
-		key, value, found := strings.Cut(line, ":")
+		trimmed := strings.TrimRight(line, "\r\n")
+		if trimmed == "" {
+			return status, nil
+		}
+		key, value, found := strings.Cut(trimmed, ":")
 		if !found {
 			continue
 		}
 		key = strings.TrimSpace(key)
 		value = strings.TrimSpace(value)
 		if strings.EqualFold(key, "Status") {
-			fields := strings.Fields(value)
-			if len(fields) > 0 {
-				if code, err := strconv.Atoi(fields[0]); err == nil {
+			if fields := strings.Fields(value); len(fields) > 0 {
+				if code, convErr := strconv.Atoi(fields[0]); convErr == nil {
 					status = code
 				}
 			}
@@ -218,9 +281,6 @@ func (h CodeRepositoryHandler) runGitHTTPBackend(w http.ResponseWriter, r *http.
 		}
 		w.Header().Add(key, value)
 	}
-	w.WriteHeader(status)
-	_, _ = io.Copy(w, bytes.NewReader(body))
-	return nil
 }
 
 func (h CodeRepositoryHandler) remoteURL(r *http.Request, slug string) string {

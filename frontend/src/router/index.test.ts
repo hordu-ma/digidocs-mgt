@@ -39,6 +39,18 @@ describe("route auth guard", () => {
     ).toEqual({ name: "dashboard" });
   });
 
+  it("carries the attempted path so login can send the user back", () => {
+    expect(
+      resolveAuthRedirect({ requiresAuth: true }, storage({}), "/documents/doc-1"),
+    ).toEqual({ name: "login", query: { redirect: "/documents/doc-1" } });
+  });
+
+  it("omits the redirect query for the root path", () => {
+    expect(resolveAuthRedirect({ requiresAuth: true }, storage({}), "/")).toEqual({
+      name: "login",
+    });
+  });
+
   it("allows admin routes for admin users", () => {
     expect(
       resolveAuthRedirect(

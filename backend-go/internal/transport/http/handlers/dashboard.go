@@ -16,7 +16,7 @@ func NewDashboardHandler(queryService service.DashboardQueryService) DashboardHa
 }
 
 func (h DashboardHandler) Overview(w http.ResponseWriter, r *http.Request) {
-	data, err := h.queryService.Overview(r.Context(), r.URL.Query().Get("project_id"))
+	data, err := h.queryService.Overview(r.Context(), r.URL.Query().Get("project_id"), scopeFrom(r))
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to build dashboard overview")
 		return
@@ -26,7 +26,7 @@ func (h DashboardHandler) Overview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h DashboardHandler) RecentFlows(w http.ResponseWriter, r *http.Request) {
-	items, err := h.queryService.RecentFlows(r.Context(), r.URL.Query().Get("project_id"))
+	items, err := h.queryService.RecentFlows(r.Context(), r.URL.Query().Get("project_id"), scopeFrom(r))
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to load recent flows")
 		return
@@ -38,7 +38,7 @@ func (h DashboardHandler) RecentFlows(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h DashboardHandler) RiskDocuments(w http.ResponseWriter, r *http.Request) {
-	items, err := h.queryService.RiskDocuments(r.Context(), r.URL.Query().Get("project_id"))
+	items, err := h.queryService.RiskDocuments(r.Context(), r.URL.Query().Get("project_id"), scopeFrom(r))
 	if err != nil {
 		writeServiceError(w, err, "project not found", "failed to load risk documents")
 		return

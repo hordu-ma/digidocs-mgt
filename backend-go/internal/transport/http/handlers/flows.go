@@ -44,9 +44,10 @@ func (h FlowHandler) Unarchive(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h FlowHandler) List(w http.ResponseWriter, r *http.Request) {
-	items, err := h.service.ListFlows(r.Context(), r.PathValue("documentID"))
+	actorID, actorRole := actorFrom(r)
+	items, err := h.service.ListFlows(r.Context(), r.PathValue("documentID"), actorID, actorRole)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list flows")
+		writeServiceError(w, err, "document not found", "failed to list flows")
 		return
 	}
 

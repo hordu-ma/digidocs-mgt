@@ -643,9 +643,15 @@
 
 - 这种规则适合放在 shared 层，而不是散落在每个 handler 里。
 
-### `MaxUploadSize`
+### `MaxUploadSize` / `MaxDataAssetUploadSize` / `MaxMultipartMemory`
 
-作用：限制最大上传体积，这里是 32 MB。
+作用：上传体积上限（文档版本 32 MB、数据资产 512 MB）与 multipart 内存缓冲大小（32 MB）。
+
+学习点（这里踩过坑）：
+
+- `r.ParseMultipartForm(n)` 的 `n` **只是内存缓冲大小**，超出部分会自动落到临时文件，它本身不构成任何上限。早期代码把 `MaxUploadSize` 传给它，看起来像在限流，实际上后端从未拒绝过任何体积的上传。
+- 真正的上限要在读取请求体之前用 `http.MaxBytesReader` 包一层，见 `LimitUploadBody`；超限时 `ParseMultipartForm` 会返回 `*http.MaxBytesError`，用 `IsBodyTooLarge` 判定后回 413。
+- 常量与反向代理的 `client_max_body_size` 是两套闸门，改一处要记得对齐另一处。
 
 ### `ValidateFileName(fileName)`
 

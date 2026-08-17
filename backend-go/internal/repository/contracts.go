@@ -40,19 +40,19 @@ type FlowReader interface {
 }
 
 type HandoverReader interface {
-	ListHandovers(ctx context.Context) ([]query.HandoverItem, error)
+	ListHandovers(ctx context.Context, scope query.ActorScope) ([]query.HandoverItem, error)
 	GetHandover(ctx context.Context, handoverID string) (*query.HandoverItem, error)
 }
 
 type AuditReader interface {
 	ListAuditEvents(ctx context.Context, filter query.AuditEventFilter) ([]query.AuditEventItem, int, error)
-	GetAuditSummary(ctx context.Context, projectID string) (query.AuditSummary, error)
+	GetAuditSummary(ctx context.Context, projectID string, scope query.ActorScope) (query.AuditSummary, error)
 }
 
 type DashboardReader interface {
-	GetOverview(ctx context.Context, projectID string) (query.DashboardOverview, error)
-	ListRecentFlows(ctx context.Context, projectID string) ([]query.RecentFlowItem, error)
-	ListRiskDocuments(ctx context.Context, projectID string) ([]query.RiskDocumentItem, error)
+	GetOverview(ctx context.Context, projectID string, scope query.ActorScope) (query.DashboardOverview, error)
+	ListRecentFlows(ctx context.Context, projectID string, scope query.ActorScope) ([]query.RecentFlowItem, error)
+	ListRiskDocuments(ctx context.Context, projectID string, scope query.ActorScope) ([]query.RiskDocumentItem, error)
 }
 
 type ActionWriter interface {
@@ -74,6 +74,9 @@ type PermissionReader interface {
 	CanUploadDataAsset(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
 	CanManageDataAsset(ctx context.Context, actorID string, actorRole string, dataAssetID string) (bool, error)
 	CanViewDocument(ctx context.Context, actorID string, actorRole string, documentID string) (bool, error)
+	CanViewVersion(ctx context.Context, actorID string, actorRole string, versionID string) (bool, error)
+	CanViewHandover(ctx context.Context, actorID string, actorRole string, handoverID string) (bool, error)
+	CanViewProject(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
 	CanViewDataAsset(ctx context.Context, actorID string, actorRole string, dataAssetID string) (bool, error)
 	CanViewCodeRepository(ctx context.Context, actorID string, actorRole string, repositoryID string) (bool, error)
 	CanCreateCodeRepository(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
@@ -100,6 +103,8 @@ type UserAuthReader interface {
 	RegisterUser(ctx context.Context, input auth.RegisterUserInput) (*auth.UserRecord, error)
 	GetUserProfile(ctx context.Context, userID string) (*auth.UserProfile, error)
 	UpdateUserProfile(ctx context.Context, userID string, input auth.ProfileUpdateInput) (*auth.UserProfile, error)
+	GetUserCredentials(ctx context.Context, userID string) (*auth.UserRecord, error)
+	UpdateUserPassword(ctx context.Context, userID string, passwordHash string) error
 }
 
 // ========== Data Asset ==========

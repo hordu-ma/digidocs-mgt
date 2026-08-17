@@ -74,13 +74,16 @@ func (s HandoverService) ApplyAction(ctx context.Context, input command.Handover
 	return s.writer.ApplyHandover(ctx, input)
 }
 
-func (s HandoverService) List(ctx context.Context) ([]query.HandoverItem, error) {
-	return s.reader.ListHandovers(ctx)
+func (s HandoverService) List(ctx context.Context, scope query.ActorScope) ([]query.HandoverItem, error) {
+	return s.reader.ListHandovers(ctx, scope)
 }
 
-func (s HandoverService) Get(ctx context.Context, handoverID string) (*query.HandoverItem, error) {
+func (s HandoverService) Get(ctx context.Context, handoverID string, actorID string, actorRole string) (*query.HandoverItem, error) {
 	if handoverID == "" {
 		return nil, fmt.Errorf("%w: handover_id is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureViewHandover(ctx, actorID, actorRole, handoverID); err != nil {
+		return nil, err
 	}
 	return s.reader.GetHandover(ctx, handoverID)
 }

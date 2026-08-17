@@ -42,7 +42,7 @@
 | `frontend/tsconfig.node.json` | Node/Vite 配置文件所需的 TypeScript 配置。 |
 | `frontend/index.html` | Vite 应用入口 HTML。 |
 | `frontend/Dockerfile` | 前端生产镜像构建文件。 |
-| `frontend/nginx/default.conf` | 生产环境 Nginx 配置：把 `/api/` 转发到 `backend-go`，把已知前端路由回退到 `index.html`，把未知扫描路径直接 `404`，避免公网随机路径查找持续制造 negative dentry / slab 增长。 |
+| `frontend/nginx/default.conf` | 生产环境 Nginx 配置：`^~ /api/` 转发到 `backend-go`（`^~` 是必需的，否则 `/api/v1/git/<slug>.git` 会被扩展名正则截胡），带扩展名的路径只查真实文件，其余路径返回 SPA shell 交给 Vue Router（含前端 404 页）；另含 `server_tokens off` 与基础安全响应头。详见部署说明第 3 节。 |
 
 ## 4. src 目录文件说明
 
@@ -74,11 +74,24 @@
 当前页面路由包括：
 
 - `/login` 登录页
+- `/register` 自助注册页
+- `/join/:token` 邀请加入页
 - `/dashboard` 仪表盘
 - `/documents` 文档列表
 - `/documents/:id` 文档详情
+- `/data` 数据资产库
+- `/code` 代码资产库
 - `/handovers` 交接页
+- `/members` 课题成员
 - `/assistant` AI 助手页
+- `/admin` 系统管理（仅 `admin`）
+- `/profile` 个人信息
+- `/:pathMatch(.*)*` 兜底 404 页（`NotFoundView.vue`）
+
+两点口径：
+
+- **必须保留兜底路由。** 没有它时，SPA 内部跳到未知路径会渲染整页空白——没有导航、没有提示、也没有返回入口。
+- **登录拦截会带上 `redirect`。** `resolveAuthRedirect` 把用户原本想去的 `fullPath` 作为 `redirect` 查询参数传给登录页，`api.ts` 的 401 拦截器同样如此。`LoginView` / `RegisterView` 一直有读取 `redirect` 的逻辑，但两处跳转此前都没传该参数，等于这段代码从未被触发、会话过期后一律落回仪表盘。改动跳转处时不要把它丢掉。
 
 ### 4.4 通用布局组件
 
@@ -94,10 +107,12 @@
 | `frontend/src/views/RegisterView.vue` | 自助注册页，提交手机号或邮箱、密码和显示姓名到 `/auth/register`，成功后直接落地登录态并跳转仪表盘。 |
 | `frontend/src/views/JoinView.vue` | 邀请入组页，预览课题并在登录后调用 `/invites/{token}/accept`。 |
 | `frontend/src/views/MembersView.vue` | 课题成员页：查看名单，负责人可添加已有用户、生成/复制/撤销邀请链接。 |
+| `frontend/src/views/ProfileView.vue` | 个人信息页：维护显示姓名与联系方式，并提供自助修改密码（`POST /auth/change-password`）。账号信息区的角色/状态同样经映射表转中文。 |
+| `frontend/src/views/NotFoundView.vue` | 品牌化 404 页，由路由兜底项渲染。 |
 | `frontend/src/components/NoProjectMembership.vue` | 未加入任何课题时的空状态说明。 |
-| `frontend/src/views/DashboardView.vue` | 仪表盘页面，读取 `/dashboard/overview`、`/dashboard/recent-flows`、`/dashboard/risk-documents` 三组数据，展示 KPI、近期流转和风险提示。 |
+| `frontend/src/views/DashboardView.vue` | 仪表盘页面，读取 `/dashboard/overview`、`/dashboard/recent-flows`、`/dashboard/risk-documents` 三组数据，展示状态分布、一行 KPI、近期流转和风险提示。KPI 只保留**一行**：早期同时存在 `focusCards`、状态分布条和 KPI 卡三组，同一个数字（如「风险文档」）会在一屏里出现三次，移动端要滑过三屏重复数字才看到正文；现把原 focus 卡片的跳转目标合并进 KPI 卡本身。新增指标前先确认它没有在其它两处出现。 |
 | `frontend/src/views/DocumentsView.vue` | 文档列表页，支持分页、关键词搜索和“新建文档”弹窗。 |
-| `frontend/src/views/DocumentDetailView.vue` | 文档详情页，是前端业务最复杂的页面，负责展示基本信息、版本历史、流转历史、AI 建议，并支持编辑、删除/恢复、上传新版本、执行流转动作、触发摘要。 |
+| `frontend/src/views/DocumentDetailView.vue` | 文档详情页，是前端业务最复杂的页面，负责展示基本信息、版本历史、流转历史、AI 建议，并支持编辑、删除/恢复、上传新版本、执行流转动作、触发摘要。页面内的后端枚举一律走显式映射表（`statusLabel` / `summaryStatusLabel` / `suggestionTypeLabel` 等）后再渲染，不要直接把字段打到模板上——版本历史曾用 `item.summary_status \|\| "未生成摘要"` 兜底，而该字段恒为非空字符串，兜底从未触发，线上二十多个版本整齐显示英文 `pending`。 |
 | `frontend/src/views/HandoversView.vue` | 交接页，展示交接记录并支持创建交接单。 |
 | `frontend/src/views/AssistantView.vue` | AI 助手页，负责提交问答请求到 `/assistant/ask`，再轮询 `/assistant/requests/{id}` 获取结果。 |
 

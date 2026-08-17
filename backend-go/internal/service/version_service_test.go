@@ -152,7 +152,7 @@ func TestVersionService_UploadAndCreateVersion_WorkflowError(t *testing.T) {
 func TestVersionService_List_Delegates(t *testing.T) {
 	items := []query.VersionItem{{ID: "v-1", VersionNo: 1}}
 	svc := NewVersionService(&mockStorageProvider{}, &mockVersionWorkflow{}, &mockVersionReader{items: items})
-	got, err := svc.List(context.Background(), "doc-1")
+	got, err := svc.List(context.Background(), "doc-1", "u-1", "member")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestVersionService_GetFile_OK(t *testing.T) {
 	}}
 	svc := NewVersionService(&mockStorageProvider{getObject: output}, &mockVersionWorkflow{}, reader)
 
-	ver, obj, err := svc.GetFile(context.Background(), "v-1")
+	ver, obj, err := svc.GetFile(context.Background(), "v-1", "u-1", "member")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestVersionService_GetFile_StorageError(t *testing.T) {
 	}}
 	svc := NewVersionService(&mockStorageProvider{getErr: errors.New("storage down")}, &mockVersionWorkflow{}, reader)
 
-	ver, obj, err := svc.GetFile(context.Background(), "v-1")
+	ver, obj, err := svc.GetFile(context.Background(), "v-1", "u-1", "member")
 	if err == nil {
 		t.Fatal("expected error")
 	}

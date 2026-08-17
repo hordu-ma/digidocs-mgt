@@ -52,6 +52,18 @@ func (r PermissionRepository) CanViewDocument(context.Context, string, string, s
 	return true, nil
 }
 
+func (r PermissionRepository) CanViewVersion(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+
+func (r PermissionRepository) CanViewHandover(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+
+func (r PermissionRepository) CanViewProject(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+
 func (r PermissionRepository) CanViewDataAsset(context.Context, string, string, string) (bool, error) {
 	return true, nil
 }

@@ -11,23 +11,31 @@ import (
 // --- mock: DashboardReader ---
 
 type mockDashboardReader struct {
-	overview  query.DashboardOverview
-	flows     []query.RecentFlowItem
-	risks     []query.RiskDocumentItem
-	err       error
+	overview query.DashboardOverview
+	flows    []query.RecentFlowItem
+	risks    []query.RiskDocumentItem
+	err      error
+	gotScope query.ActorScope
 }
 
-func (m *mockDashboardReader) GetOverview(_ context.Context, _ string) (query.DashboardOverview, error) {
+func (m *mockDashboardReader) GetOverview(_ context.Context, _ string, scope query.ActorScope) (query.DashboardOverview, error) {
+	m.gotScope = scope
 	return m.overview, m.err
 }
 
-func (m *mockDashboardReader) ListRecentFlows(_ context.Context, _ string) ([]query.RecentFlowItem, error) {
+func (m *mockDashboardReader) ListRecentFlows(_ context.Context, _ string, scope query.ActorScope) ([]query.RecentFlowItem, error) {
+	m.gotScope = scope
 	return m.flows, m.err
 }
 
-func (m *mockDashboardReader) ListRiskDocuments(_ context.Context, _ string) ([]query.RiskDocumentItem, error) {
+func (m *mockDashboardReader) ListRiskDocuments(_ context.Context, _ string, scope query.ActorScope) ([]query.RiskDocumentItem, error) {
+	m.gotScope = scope
 	return m.risks, m.err
 }
+
+// callerScope is the non-admin scope every delegation test passes in, so that a
+// service that silently dropped the scope would fail these tests.
+var callerScope = query.ActorScope{ActorID: "u-1", IsAdmin: false}
 
 // --- tests ---
 
@@ -41,7 +49,7 @@ func TestOverview_Delegates(t *testing.T) {
 	r := &mockDashboardReader{overview: want}
 	svc := NewDashboardQueryService(r)
 
-	got, err := svc.Overview(context.Background(), "p-1")
+	got, err := svc.Overview(context.Background(), "p-1", callerScope)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -64,7 +72,7 @@ func TestOverview_PropagatesError(t *testing.T) {
 	r := &mockDashboardReader{err: repoErr}
 	svc := NewDashboardQueryService(r)
 
-	_, err := svc.Overview(context.Background(), "p-1")
+	_, err := svc.Overview(context.Background(), "p-1", callerScope)
 	if !errors.Is(err, repoErr) {
 		t.Errorf("err = %v, want %v", err, repoErr)
 	}
@@ -78,7 +86,7 @@ func TestRecentFlows_Delegates(t *testing.T) {
 	r := &mockDashboardReader{flows: want}
 	svc := NewDashboardQueryService(r)
 
-	got, err := svc.RecentFlows(context.Background(), "p-1")
+	got, err := svc.RecentFlows(context.Background(), "p-1", callerScope)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -100,7 +108,7 @@ func TestRiskDocuments_Delegates(t *testing.T) {
 	r := &mockDashboardReader{risks: want}
 	svc := NewDashboardQueryService(r)
 
-	got, err := svc.RiskDocuments(context.Background(), "p-1")
+	got, err := svc.RiskDocuments(context.Background(), "p-1", callerScope)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

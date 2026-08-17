@@ -54,6 +54,12 @@ func (s FlowService) ApplyAction(ctx context.Context, input command.FlowActionIn
 	return s.writer.CreateFlowRecord(ctx, input)
 }
 
-func (s FlowService) ListFlows(ctx context.Context, documentID string) ([]query.FlowItem, error) {
+func (s FlowService) ListFlows(ctx context.Context, documentID string, actorID string, actorRole string) ([]query.FlowItem, error) {
+	if documentID == "" {
+		return nil, fmt.Errorf("%w: document_id is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureViewDocument(ctx, actorID, actorRole, documentID); err != nil {
+		return nil, err
+	}
 	return s.reader.ListFlows(ctx, documentID)
 }

@@ -6,9 +6,16 @@ import (
 	"net/http"
 
 	"digidocs-mgt/backend-go/internal/config"
+	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/service"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
 )
+
+// workerScope is the scope used by the worker-facing internal endpoints. These
+// are gated by the shared-secret callback token above, not by a per-user JWT, so
+// there is no acting user to narrow against and they run unscoped — matching the
+// existing ("", "admin") convention used for the per-resource reads here.
+var workerScope = query.ActorScope{IsAdmin: true}
 
 type InternalAssistantContextHandler struct {
 	cfg       config.Config
@@ -56,13 +63,13 @@ func (h InternalAssistantContextHandler) GetDocumentContext(w http.ResponseWrite
 		return
 	}
 
-	versions, err := h.versions.List(r.Context(), documentID)
+	versions, err := h.versions.List(r.Context(), documentID, "", "admin")
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to load version context")
 		return
 	}
 
-	flows, err := h.flows.ListFlows(r.Context(), documentID)
+	flows, err := h.flows.ListFlows(r.Context(), documentID, "", "admin")
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to load flow context")
 		return
@@ -92,19 +99,19 @@ func (h InternalAssistantContextHandler) GetProjectContext(w http.ResponseWriter
 	}
 
 	projectID := r.PathValue("projectID")
-	overview, err := h.dashboard.Overview(r.Context(), projectID)
+	overview, err := h.dashboard.Overview(r.Context(), projectID, workerScope)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to load project overview")
 		return
 	}
 
-	recentFlows, err := h.dashboard.RecentFlows(r.Context(), projectID)
+	recentFlows, err := h.dashboard.RecentFlows(r.Context(), projectID, workerScope)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to load recent flow context")
 		return
 	}
 
-	riskDocuments, err := h.dashboard.RiskDocuments(r.Context(), projectID)
+	riskDocuments, err := h.dashboard.RiskDocuments(r.Context(), projectID, workerScope)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to load risk document context")
 		return
@@ -127,7 +134,7 @@ func (h InternalAssistantContextHandler) GetHandoverContext(w http.ResponseWrite
 	}
 
 	handoverID := r.PathValue("handoverID")
-	handover, err := h.handovers.Get(r.Context(), handoverID)
+	handover, err := h.handovers.Get(r.Context(), handoverID, "", "admin")
 	if err != nil {
 		writeServiceError(w, err, "handover not found", "failed to load handover context")
 		return
@@ -148,7 +155,7 @@ func (h InternalAssistantContextHandler) DownloadVersionFile(w http.ResponseWrit
 		return
 	}
 
-	ver, obj, err := h.versions.GetFile(r.Context(), r.PathValue("versionID"))
+	ver, obj, err := h.versions.GetFile(r.Context(), r.PathValue("versionID"), "", "admin")
 	if err != nil {
 		if ver == nil {
 			response.WriteError(w, http.StatusNotFound, "not_found", "version not found")

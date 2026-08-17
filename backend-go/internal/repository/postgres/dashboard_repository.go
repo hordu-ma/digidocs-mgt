@@ -14,7 +14,8 @@ func NewDashboardRepository(db DBTX) DashboardRepository {
 	return DashboardRepository{db: db}
 }
 
-func (r DashboardRepository) GetOverview(ctx context.Context, projectID string) (query.DashboardOverview, error) {
+func (r DashboardRepository) GetOverview(ctx context.Context, projectID string, scope query.ActorScope) (query.DashboardOverview, error) {
+	isAdmin, actorID := scopeArgs(scope)
 	overview := query.DashboardOverview{
 		StatusCounts: map[string]int{
 			"draft":            0,
@@ -32,9 +33,10 @@ func (r DashboardRepository) GetOverview(ctx context.Context, projectID string) 
 		SELECT COUNT(*)
 		FROM documents d
 		WHERE ($1 = '' OR d.project_id::text = $1)
+		  AND `+projectScopeSQL("d.project_id", "$2", "$3")+`
 		  AND d.is_deleted = false
 		`,
-		projectID,
+		projectID, isAdmin, actorID,
 	).Scan(&overview.DocumentTotal); err != nil {
 		return query.DashboardOverview{}, err
 	}
@@ -45,10 +47,11 @@ func (r DashboardRepository) GetOverview(ctx context.Context, projectID string) 
 		SELECT d.current_status::text, COUNT(*)::int
 		FROM documents d
 		WHERE ($1 = '' OR d.project_id::text = $1)
+		  AND `+projectScopeSQL("d.project_id", "$2", "$3")+`
 		  AND d.is_deleted = false
 		GROUP BY d.current_status
 		`,
-		projectID,
+		projectID, isAdmin, actorID,
 	)
 	if err != nil {
 		return query.DashboardOverview{}, err
@@ -73,9 +76,10 @@ func (r DashboardRepository) GetOverview(ctx context.Context, projectID string) 
 		SELECT COUNT(*)
 		FROM graduation_handovers gh
 		WHERE ($1 = '' OR gh.project_id::text = $1)
+		  AND `+projectScopeSQL("gh.project_id", "$2", "$3")+`
 		  AND gh.status = 'pending_confirm'::handover_status
 		`,
-		projectID,
+		projectID, isAdmin, actorID,
 	).Scan(&overview.HandoverPendingCount); err != nil {
 		return query.DashboardOverview{}, err
 	}
@@ -86,11 +90,12 @@ func (r DashboardRepository) GetOverview(ctx context.Context, projectID string) 
 		SELECT COUNT(*)
 		FROM documents d
 		WHERE ($1 = '' OR d.project_id::text = $1)
+		  AND `+projectScopeSQL("d.project_id", "$2", "$3")+`
 		  AND d.is_deleted = false
 		  AND d.current_status NOT IN ('archived'::document_status, 'finalized'::document_status)
 		  AND d.updated_at < NOW() - INTERVAL '30 days'
 		`,
-		projectID,
+		projectID, isAdmin, actorID,
 	).Scan(&overview.RiskDocumentCount); err != nil {
 		return query.DashboardOverview{}, err
 	}
@@ -101,7 +106,9 @@ func (r DashboardRepository) GetOverview(ctx context.Context, projectID string) 
 func (r DashboardRepository) ListRecentFlows(
 	ctx context.Context,
 	projectID string,
+	scope query.ActorScope,
 ) ([]query.RecentFlowItem, error) {
+	isAdmin, actorID := scopeArgs(scope)
 	rows, err := r.db.QueryContext(
 		ctx,
 		`
@@ -115,11 +122,12 @@ func (r DashboardRepository) ListRecentFlows(
 		FROM flow_records fr
 		JOIN documents d ON d.id = fr.document_id
 		WHERE ($1 = '' OR d.project_id::text = $1)
+		  AND `+projectScopeSQL("d.project_id", "$2", "$3")+`
 		  AND d.is_deleted = false
 		ORDER BY fr.created_at DESC
 		LIMIT 20
 		`,
-		projectID,
+		projectID, isAdmin, actorID,
 	)
 	if err != nil {
 		return nil, err
@@ -148,7 +156,9 @@ func (r DashboardRepository) ListRecentFlows(
 func (r DashboardRepository) ListRiskDocuments(
 	ctx context.Context,
 	projectID string,
+	scope query.ActorScope,
 ) ([]query.RiskDocumentItem, error) {
+	isAdmin, actorID := scopeArgs(scope)
 	rows, err := r.db.QueryContext(
 		ctx,
 		`
@@ -159,13 +169,14 @@ func (r DashboardRepository) ListRiskDocuments(
 			'超过30天未更新'
 		FROM documents d
 		WHERE ($1 = '' OR d.project_id::text = $1)
+		  AND `+projectScopeSQL("d.project_id", "$2", "$3")+`
 		  AND d.is_deleted = false
 		  AND d.current_status NOT IN ('archived'::document_status, 'finalized'::document_status)
 		  AND d.updated_at < NOW() - INTERVAL '30 days'
 		ORDER BY d.updated_at ASC
 		LIMIT 50
 		`,
-		projectID,
+		projectID, isAdmin, actorID,
 	)
 	if err != nil {
 		return nil, err

@@ -19,6 +19,7 @@ func (r AuditRepository) ListAuditEvents(
 	filter query.AuditEventFilter,
 ) ([]query.AuditEventItem, int, error) {
 	offset := (filter.Page - 1) * filter.PageSize
+	isAdmin, actorID := scopeArgs(filter.Scope)
 
 	var total int
 	if err := r.db.QueryRowContext(
@@ -33,6 +34,7 @@ func (r AuditRepository) ListAuditEvents(
 		  AND ($4 = '' OR ae.user_id::text = $4)
 		  AND ($5 = '' OR ae.created_at >= $5::timestamptz)
 		  AND ($6 = '' OR ae.created_at < $6::timestamptz + interval '1 day')
+		  AND `+projectScopeSQL("d.project_id", "$7", "$8")+`
 		`,
 		filter.ProjectID,
 		filter.DocumentID,
@@ -40,6 +42,8 @@ func (r AuditRepository) ListAuditEvents(
 		filter.UserID,
 		filter.DateFrom,
 		filter.DateTo,
+		isAdmin,
+		actorID,
 	).Scan(&total); err != nil {
 		return nil, 0, err
 	}
@@ -65,8 +69,9 @@ func (r AuditRepository) ListAuditEvents(
 		  AND ($4 = '' OR ae.user_id::text = $4)
 		  AND ($5 = '' OR ae.created_at >= $5::timestamptz)
 		  AND ($6 = '' OR ae.created_at < $6::timestamptz + interval '1 day')
+		  AND `+projectScopeSQL("d.project_id", "$7", "$8")+`
 		ORDER BY ae.created_at DESC
-		OFFSET $7 LIMIT $8
+		OFFSET $9 LIMIT $10
 		`,
 		filter.ProjectID,
 		filter.DocumentID,
@@ -74,6 +79,8 @@ func (r AuditRepository) ListAuditEvents(
 		filter.UserID,
 		filter.DateFrom,
 		filter.DateTo,
+		isAdmin,
+		actorID,
 		offset,
 		filter.PageSize,
 	)
@@ -104,7 +111,8 @@ func (r AuditRepository) ListAuditEvents(
 	return items, total, rows.Err()
 }
 
-func (r AuditRepository) GetAuditSummary(ctx context.Context, projectID string) (query.AuditSummary, error) {
+func (r AuditRepository) GetAuditSummary(ctx context.Context, projectID string, scope query.ActorScope) (query.AuditSummary, error) {
+	isAdmin, actorID := scopeArgs(scope)
 	summary := query.AuditSummary{
 		ProjectID:      projectID,
 		TopActiveUsers: make([]query.AuditUserMetric, 0),
@@ -121,8 +129,9 @@ func (r AuditRepository) GetAuditSummary(ctx context.Context, projectID string) 
 		FROM audit_events ae
 		LEFT JOIN documents d ON d.id = ae.document_id
 		WHERE ($1 = '' OR d.project_id::text = $1)
+		  AND `+projectScopeSQL("d.project_id", "$2", "$3")+`
 		`,
-		projectID,
+		projectID, isAdmin, actorID,
 	).Scan(
 		&summary.UploadCount,
 		&summary.DownloadCount,
@@ -144,11 +153,12 @@ func (r AuditRepository) GetAuditSummary(ctx context.Context, projectID string) 
 		LEFT JOIN users u ON u.id = ae.user_id
 		WHERE ae.user_id IS NOT NULL
 		  AND ($1 = '' OR d.project_id::text = $1)
+		  AND `+projectScopeSQL("d.project_id", "$2", "$3")+`
 		GROUP BY ae.user_id, u.display_name
 		ORDER BY COUNT(*) DESC, COALESCE(u.display_name, '') ASC
 		LIMIT 5
 		`,
-		projectID,
+		projectID, isAdmin, actorID,
 	)
 	if err != nil {
 		return query.AuditSummary{}, err

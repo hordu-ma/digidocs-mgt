@@ -29,6 +29,7 @@ func (h AuditEventHandler) List(w http.ResponseWriter, r *http.Request) {
 		DateTo:     r.URL.Query().Get("date_to"),
 		Page:       page,
 		PageSize:   pageSize,
+		Scope:      scopeFrom(r),
 	})
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list audit events")
@@ -43,7 +44,7 @@ func (h AuditEventHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h AuditEventHandler) Summary(w http.ResponseWriter, r *http.Request) {
-	data, err := h.queryService.Summary(r.Context(), r.URL.Query().Get("project_id"))
+	data, err := h.queryService.Summary(r.Context(), r.URL.Query().Get("project_id"), scopeFrom(r))
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to build audit summary")
 		return

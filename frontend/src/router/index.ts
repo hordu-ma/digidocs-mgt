@@ -13,6 +13,7 @@ const RegisterView = () => import("@/views/RegisterView.vue");
 const ProfileView = () => import("@/views/ProfileView.vue");
 const MembersView = () => import("@/views/MembersView.vue");
 const JoinView = () => import("@/views/JoinView.vue");
+const NotFoundView = () => import("@/views/NotFoundView.vue");
 
 const router = createRouter({
   history: createWebHistory(),
@@ -31,16 +32,31 @@ const router = createRouter({
     { path: "/admin", name: "admin", component: AdminView, meta: { requiresAuth: true, requiresAdmin: true } },
     { path: "/profile", name: "profile", component: ProfileView, meta: { requiresAuth: true } },
     { path: "/members", name: "members", component: MembersView, meta: { requiresAuth: true } },
+    // Without a catch-all an unknown path rendered a blank white page with no
+    // navigation and no way back.
+    { path: "/:pathMatch(.*)*", name: "not-found", component: NotFoundView },
   ],
 });
 
+/**
+ * Decides where an incoming navigation should be redirected, if anywhere.
+ *
+ * `fullPath` is the path the user was trying to reach; it is echoed back as the
+ * `redirect` query so LoginView can return them there after signing in. Both
+ * this guard and the axios 401 interceptor previously dropped it, which made the
+ * redirect handling in LoginView/RegisterView dead code and dumped every
+ * re-authenticated user on the dashboard.
+ */
 export function resolveAuthRedirect(
   meta: { requiresAuth?: unknown; requiresAdmin?: unknown },
   storage: Pick<Storage, "getItem"> = localStorage,
+  fullPath = "",
 ) {
   const token = storage.getItem("access_token");
   if (meta.requiresAuth && !token) {
-    return { name: "login" };
+    return fullPath && fullPath !== "/"
+      ? { name: "login", query: { redirect: fullPath } }
+      : { name: "login" };
   }
   if (meta.requiresAdmin && storage.getItem("role") !== "admin") {
     return { name: "dashboard" };
@@ -48,7 +64,7 @@ export function resolveAuthRedirect(
 }
 
 router.beforeEach((to) => {
-  return resolveAuthRedirect(to.meta);
+  return resolveAuthRedirect(to.meta, localStorage, to.fullPath);
 });
 
 export default router;

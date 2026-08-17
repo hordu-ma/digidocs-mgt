@@ -174,7 +174,37 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 - 非空 `email` 需包含 `@`；
 - 权限、角色和账号状态仍由管理员侧用户管理能力维护。
 
-### 2.4 退出登录
+### 2.4 修改当前用户密码
+
+`POST /api/v1/auth/change-password`
+
+自助注册账号此前无法自行改密，只能由管理员通过 `PATCH /api/v1/admin/users/{user_id}` 重置。本接口补齐自助改密闭环。
+
+请求体：
+
+```json
+{
+  "current_password": "old-password",
+  "new_password": "new-password"
+}
+```
+
+响应体：
+
+```json
+{
+  "data": { "success": true }
+}
+```
+
+校验规则：
+
+- `current_password` 必填，且必须与当前密码一致，否则返回 `401 unauthorized`（`message` 为「当前密码不正确」）；仅凭有效 JWT 不足以改密，避免令牌泄露后账号被直接锁死；
+- `new_password` 长度 8–72 字符，且不得与当前密码相同，否则返回 `400 validation_error`。
+
+已知限制：本系统签发的是无状态 JWT，没有吊销名单，因此**改密不会使已签发的令牌失效**，旧令牌仍可用至自然过期（2 小时）。前端「修改密码」面板已明确提示这一点。若要做到改密即登出，需要引入 token 版本号或黑名单，属于后续项。
+
+### 2.5 退出登录
 
 `POST /api/v1/auth/logout`
 
@@ -357,6 +387,29 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 | 完成交接 / 取消交接 | `admin`、项目 `owner/manager` |
 | 查看课题成员 | `admin`、该课题任意成员 |
 | 添加/移除课题成员、生成/撤销邀请 | `admin`、项目 `owner/manager` |
+
+读操作权限（2026-08-17 补齐）：
+
+早期实现只在少数详情接口上做了成员校验，其余读接口完全没有取调用者身份，导致任意登录用户可以凭 `GET /audit-events` 里返回的 `document_id` / `version_id` 跨课题读取甚至下载他人文件。现口径如下，非 `admin` 违反时统一返回 403：
+
+| 接口/动作 | 授权规则 |
+| --- | --- |
+| 查看文档详情 | `admin`、文档所属项目成员、文档当前责任人 |
+| 查看版本列表 `GET /documents/{id}/versions` | 同「查看文档详情」 |
+| 查看流转记录 `GET /documents/{id}/flows` | 同「查看文档详情」 |
+| 版本详情 / 下载 / 预览 `GET /versions/{id}[/download|/preview]` | 由版本反查所属文档后套用「查看文档详情」规则 |
+| 查看交接单详情 `GET /handovers/{id}` | `admin`、交接单所属项目成员、被交接人、接收人 |
+| 查看代码推送记录 `GET /code-repositories/{id}/push-events` | `admin`、仓库所属项目成员 |
+
+聚合类读接口没有单一资源 ID 可校验，因此不返回 403，而是在 SQL 层按调用者可见的项目集合收敛结果（`admin` 不收敛）：
+
+| 接口 | 收敛口径 |
+| --- | --- |
+| `GET /dashboard/overview`、`/recent-flows`、`/risk-documents` | 仅统计调用者拥有或所属项目下的文档与交接单；省略 `project_id` 时不再返回全库数据 |
+| `GET /audit-events`、`GET /audit-events/summary` | 仅返回可见项目下文档产生的事件；无关联文档的事件对非 `admin` 不可见 |
+| `GET /handovers` | 仅返回调用者可见项目的交接单，外加本人作为被交接人/接收人的交接单 |
+
+已知例外：`GET /users` 仍对全部登录用户返回精简用户名录（`id` / `username` / `display_name` / `role` / `status`，不含联系方式）。课题负责人的「添加成员」需要按姓名检索尚未加入本课题的账号，收敛该接口会直接破坏该功能，因此保持现状。
 
 权限不足时统一返回：
 
@@ -1435,8 +1488,16 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 
 ### 11.3 请求体大小限制
 
-- 普通 JSON 请求体上限为 **1 MB**，超出返回 `413 Request Entity Too Large`。
-- 文件上传接口（`multipart/form-data`，如创建文档、提交版本、上传数据资产）与 git smart-HTTP 端点（`/api/v1/git/*`）不受此限制，由各自的上传大小配置或后端处理。
+| 类别 | 上限 | 超出返回 |
+| --- | --- | --- |
+| 普通 JSON 请求体 | **1 MB** | `413 payload_too_large` |
+| 创建文档 / 提交版本（`multipart/form-data`） | **32 MB** | `413 payload_too_large`，`message` 为「文件超过 32 MB 上限」 |
+| 上传数据资产（`multipart/form-data`） | **512 MB** | `413 payload_too_large`，`message` 为「文件超过 512 MB 上限」 |
+| git smart-HTTP（`/api/v1/git/*`）、Worker 回调（`/api/v1/internal/*`） | 不限 | — |
+
+说明：上传上限由 `http.MaxBytesReader` 在处理器入口强制，常量定义在 `backend-go/internal/shared/upload.go`。此前代码把上限值传给 `ParseMultipartForm`，而该参数只是内存缓冲大小、超出部分会落盘，因此文档中的 32 MB 实际从未生效；现已改为真实强制。
+
+反向代理侧 `client_max_body_size`（`frontend/nginx/default.conf`）只作为粗粒度外层边界，应保持 **大于等于** 上表最大值（当前 512m），否则超限请求会得到 nginx 的通用错误页而不是 API 的可读 413。
 
 ---
 

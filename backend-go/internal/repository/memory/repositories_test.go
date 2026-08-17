@@ -148,14 +148,14 @@ func TestActionRepository(t *testing.T) {
 func TestReadOnlyMemoryRepositories(t *testing.T) {
 	ctx := context.Background()
 
-	overview, err := NewDashboardRepository().GetOverview(ctx, "project-1")
+	overview, err := NewDashboardRepository().GetOverview(ctx, "project-1", query.ActorScope{})
 	if err != nil || overview.StatusCounts == nil {
 		t.Fatalf("overview = (%+v, %v)", overview, err)
 	}
-	if flows, err := NewDashboardRepository().ListRecentFlows(ctx, "project-1"); err != nil || len(flows) != 0 {
+	if flows, err := NewDashboardRepository().ListRecentFlows(ctx, "project-1", query.ActorScope{}); err != nil || len(flows) != 0 {
 		t.Fatalf("recent flows = (%+v, %v)", flows, err)
 	}
-	if risks, err := NewDashboardRepository().ListRiskDocuments(ctx, "project-1"); err != nil || len(risks) != 0 {
+	if risks, err := NewDashboardRepository().ListRiskDocuments(ctx, "project-1", query.ActorScope{}); err != nil || len(risks) != 0 {
 		t.Fatalf("risk documents = (%+v, %v)", risks, err)
 	}
 
@@ -163,7 +163,7 @@ func TestReadOnlyMemoryRepositories(t *testing.T) {
 	if err != nil || total != 0 || len(events) != 0 {
 		t.Fatalf("audit events = (%+v, %d, %v)", events, total, err)
 	}
-	summary, err := NewAuditRepository().GetAuditSummary(ctx, "project-1")
+	summary, err := NewAuditRepository().GetAuditSummary(ctx, "project-1", query.ActorScope{})
 	if err != nil || summary.ProjectID != "project-1" {
 		t.Fatalf("audit summary = (%+v, %v)", summary, err)
 	}
@@ -188,7 +188,7 @@ func TestReadOnlyMemoryRepositories(t *testing.T) {
 	if flows, err := NewFlowRepository().ListFlows(ctx, "doc-1"); err != nil || len(flows) != 1 {
 		t.Fatalf("flows = (%+v, %v)", flows, err)
 	}
-	if handovers, err := NewHandoverRepository().ListHandovers(ctx); err != nil || len(handovers) != 1 {
+	if handovers, err := NewHandoverRepository().ListHandovers(ctx, query.ActorScope{}); err != nil || len(handovers) != 1 {
 		t.Fatalf("handovers = (%+v, %v)", handovers, err)
 	}
 	if handover, err := NewHandoverRepository().GetHandover(ctx, "handover-1"); err != nil || handover.ID != "handover-1" {

@@ -107,6 +107,7 @@
 | 文件 | 作用 |
 | --- | --- |
 | `backend-go/internal/repository/postgres/dbtx.go` | 抽象 `*sql.DB` / `*sql.Tx` 共同接口，便于事务内外复用查询逻辑。 |
+| `backend-go/internal/repository/postgres/scope.go` | 聚合查询的项目可见性谓词。dashboard / 审计 / 交接列表没有单一资源 ID 可校验，改为把调用者下推到 SQL 里收敛行集；`admin` 走 bypass。新增聚合查询时应复用 `projectScopeSQL` 而不是自己拼条件。 |
 | `backend-go/internal/repository/postgres/action_repository.go` | 文档流转和交接动作的真实落库实现。 |
 | `backend-go/internal/repository/postgres/assistant_repository.go` | AI 请求、结果、建议、确认/忽略等持久化逻辑。 |
 | `backend-go/internal/repository/postgres/audit_repository.go` | 审计事件列表与 summary 聚合查询。 |
@@ -170,7 +171,8 @@ handler 负责把 HTTP 请求映射成 service 调用。
 | `backend-go/internal/transport/http/handlers/auth.go` | 登录、当前用户、退出登录接口。 |
 | `backend-go/internal/transport/http/handlers/dashboard.go` | 仪表盘 overview / recent flows / risk documents 接口。 |
 | `backend-go/internal/transport/http/handlers/documents.go` | 文档创建、详情、列表、更新、删除、恢复接口。 |
-| `backend-go/internal/transport/http/handlers/errors.go` | `writeServiceError`：把 service 层 `Err*` 哨兵错误统一映射为 HTTP 状态码与错误码，供各 handler 复用，消除重复的 `errors.Is` 链。 |
+| `backend-go/internal/transport/http/handlers/errors.go` | `writeServiceError`：把 service 层 `Err*` 哨兵错误统一映射为 HTTP 状态码与错误码，供各 handler 复用，消除重复的 `errors.Is` 链。**读接口不要再直接 `WriteError(500)`**——那样会把权限拒绝也压成 500。 |
+| `backend-go/internal/transport/http/handlers/actor.go` | `actorFrom(r)` / `scopeFrom(r)`：统一从请求上下文取调用者身份与项目可见范围。受保护的 handler 一律经此取 actor，而不是各自去碰 context，这样「哪些 handler 做了鉴权」是可 grep 的——此前正是因为一部分 handler 压根没取 actor，才出现跨课题越权读取。 |
 | `backend-go/internal/transport/http/handlers/flows.go` | 文档流转动作与流转列表接口。 |
 | `backend-go/internal/transport/http/handlers/handlers_test.go` | handler 层集成测试。 |
 | `backend-go/internal/transport/http/handlers/handovers.go` | 交接单 CRUD 与动作接口。 |

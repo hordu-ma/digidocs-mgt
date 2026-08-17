@@ -124,6 +124,15 @@ func (m mockPermissionReader) CanManageDataAsset(context.Context, string, string
 func (m mockPermissionReader) CanViewDocument(context.Context, string, string, string) (bool, error) {
 	return m.ok, m.err
 }
+func (m mockPermissionReader) CanViewVersion(context.Context, string, string, string) (bool, error) {
+	return m.ok, m.err
+}
+func (m mockPermissionReader) CanViewHandover(context.Context, string, string, string) (bool, error) {
+	return m.ok, m.err
+}
+func (m mockPermissionReader) CanViewProject(context.Context, string, string, string) (bool, error) {
+	return m.ok, m.err
+}
 func (m mockPermissionReader) CanViewDataAsset(context.Context, string, string, string) (bool, error) {
 	return m.ok, m.err
 }

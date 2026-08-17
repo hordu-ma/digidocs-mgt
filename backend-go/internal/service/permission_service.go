@@ -103,6 +103,30 @@ func (s PermissionService) EnsureViewDocument(ctx context.Context, actorID strin
 	return permissionResult(ok, err, "view document")
 }
 
+func (s PermissionService) EnsureViewVersion(ctx context.Context, actorID string, actorRole string, versionID string) error {
+	if s.reader == nil {
+		return nil
+	}
+	ok, err := s.reader.CanViewVersion(ctx, actorID, actorRole, versionID)
+	return permissionResult(ok, err, "view version")
+}
+
+func (s PermissionService) EnsureViewHandover(ctx context.Context, actorID string, actorRole string, handoverID string) error {
+	if s.reader == nil {
+		return nil
+	}
+	ok, err := s.reader.CanViewHandover(ctx, actorID, actorRole, handoverID)
+	return permissionResult(ok, err, "view handover")
+}
+
+func (s PermissionService) EnsureViewProject(ctx context.Context, actorID string, actorRole string, projectID string) error {
+	if s.reader == nil {
+		return nil
+	}
+	ok, err := s.reader.CanViewProject(ctx, actorID, actorRole, projectID)
+	return permissionResult(ok, err, "view project")
+}
+
 func (s PermissionService) EnsureViewDataAsset(ctx context.Context, actorID string, actorRole string, dataAssetID string) error {
 	if s.reader == nil {
 		return nil

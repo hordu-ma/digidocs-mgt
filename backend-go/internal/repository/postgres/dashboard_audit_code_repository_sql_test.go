@@ -11,32 +11,36 @@ import (
 	"digidocs-mgt/backend-go/internal/service"
 )
 
+// memberScope stands in for a non-admin caller; the repositories bind it as the
+// (isAdmin, actorID) pair appended to every scoped query.
+var memberScope = query.ActorScope{ActorID: "u-9", IsAdmin: false}
+
 func TestDashboardRepositoryMethods(t *testing.T) {
 	ctx := context.Background()
 	db, mock := newMockDB(t)
 	repo := NewDashboardRepository(db)
-	mock.ExpectQuery("SELECT COUNT\\(\\*\\)\\s+FROM documents").WithArgs("p-1").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(10))
-	mock.ExpectQuery("SELECT d.current_status::text").WithArgs("p-1").
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\)\\s+FROM documents").WithArgs("p-1", false, "u-9").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(10))
+	mock.ExpectQuery("SELECT d.current_status::text").WithArgs("p-1", false, "u-9").
 		WillReturnRows(sqlmock.NewRows([]string{"status", "count"}).AddRow("draft", 2).AddRow("in_progress", 3))
-	mock.ExpectQuery("FROM graduation_handovers gh").WithArgs("p-1").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	mock.ExpectQuery("AND d.current_status NOT IN").WithArgs("p-1").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(4))
-	overview, err := repo.GetOverview(ctx, "p-1")
+	mock.ExpectQuery("FROM graduation_handovers gh").WithArgs("p-1", false, "u-9").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("AND d.current_status NOT IN").WithArgs("p-1", false, "u-9").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(4))
+	overview, err := repo.GetOverview(ctx, "p-1", memberScope)
 	if err != nil || overview.DocumentTotal != 10 || overview.StatusCounts["in_progress"] != 3 || overview.RiskDocumentCount != 4 {
 		t.Fatalf("GetOverview got %#v err=%v", overview, err)
 	}
 
-	mock.ExpectQuery("FROM flow_records fr").WithArgs("p-1").
+	mock.ExpectQuery("FROM flow_records fr").WithArgs("p-1", false, "u-9").
 		WillReturnRows(sqlmock.NewRows([]string{"document_id", "title", "action", "from_status", "to_status", "created_at"}).
 			AddRow("doc-1", "Report", "transfer", "draft", "pending_handover", "2026-05-01T00:00:00Z"))
-	flows, err := repo.ListRecentFlows(ctx, "p-1")
+	flows, err := repo.ListRecentFlows(ctx, "p-1", memberScope)
 	if err != nil || len(flows) != 1 || flows[0].Action != "transfer" {
 		t.Fatalf("ListRecentFlows got %#v err=%v", flows, err)
 	}
 
-	mock.ExpectQuery("'超过30天未更新'").WithArgs("p-1").
+	mock.ExpectQuery("'超过30天未更新'").WithArgs("p-1", false, "u-9").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "risk_type", "risk_message"}).
 			AddRow("doc-1", "Report", "stale", "超过30天未更新"))
-	risks, err := repo.ListRiskDocuments(ctx, "p-1")
+	risks, err := repo.ListRiskDocuments(ctx, "p-1", memberScope)
 	if err != nil || len(risks) != 1 || risks[0].RiskType != "stale" {
 		t.Fatalf("ListRiskDocuments got %#v err=%v", risks, err)
 	}
@@ -47,12 +51,12 @@ func TestAuditRepositoryMethods(t *testing.T) {
 	ctx := context.Background()
 	db, mock := newMockDB(t)
 	repo := NewAuditRepository(db)
-	filter := query.AuditEventFilter{ProjectID: "p-1", DocumentID: "doc-1", ActionType: "download", UserID: "u-1", DateFrom: "2026-05-01", DateTo: "2026-05-01", Page: 2, PageSize: 5}
+	filter := query.AuditEventFilter{ProjectID: "p-1", DocumentID: "doc-1", ActionType: "download", UserID: "u-1", DateFrom: "2026-05-01", DateTo: "2026-05-01", Page: 2, PageSize: 5, Scope: memberScope}
 	mock.ExpectQuery("SELECT COUNT\\(\\*\\)\\s+FROM audit_events").
-		WithArgs("p-1", "doc-1", "download", "u-1", "2026-05-01", "2026-05-01").
+		WithArgs("p-1", "doc-1", "download", "u-1", "2026-05-01", "2026-05-01", false, "u-9").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(7))
 	mock.ExpectQuery("SELECT\\s+ae.id::text").
-		WithArgs("p-1", "doc-1", "download", "u-1", "2026-05-01", "2026-05-01", 5, 5).
+		WithArgs("p-1", "doc-1", "download", "u-1", "2026-05-01", "2026-05-01", false, "u-9", 5, 5).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "document_id", "version_id", "user_id", "action_type", "request_id", "ip", "terminal", "created_at"}).
 			AddRow("ae-1", "doc-1", "v-1", "u-1", "download", "req-1", "127.0.0.1", "web", "2026-05-01T00:00:00Z"))
 	events, total, err := repo.ListAuditEvents(ctx, filter)
@@ -61,12 +65,12 @@ func TestAuditRepositoryMethods(t *testing.T) {
 	}
 
 	mock.ExpectQuery("COUNT\\(\\*\\) FILTER").
-		WithArgs("p-1").
+		WithArgs("p-1", false, "u-9").
 		WillReturnRows(sqlmock.NewRows([]string{"upload", "download", "transfer", "archive"}).AddRow(1, 2, 3, 4))
 	mock.ExpectQuery("GROUP BY ae.user_id").
-		WithArgs("p-1").
+		WithArgs("p-1", false, "u-9").
 		WillReturnRows(sqlmock.NewRows([]string{"user_id", "display_name", "count"}).AddRow("u-1", "张三", 9))
-	summary, err := repo.GetAuditSummary(ctx, "p-1")
+	summary, err := repo.GetAuditSummary(ctx, "p-1", memberScope)
 	if err != nil || summary.DownloadCount != 2 || len(summary.TopActiveUsers) != 1 {
 		t.Fatalf("GetAuditSummary got %#v err=%v", summary, err)
 	}

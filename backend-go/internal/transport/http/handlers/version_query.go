@@ -11,9 +11,10 @@ import (
 )
 
 func (h VersionHandler) List(w http.ResponseWriter, r *http.Request) {
-	items, err := h.service.List(r.Context(), r.PathValue("documentID"))
+	actorID, actorRole := actorFrom(r)
+	items, err := h.service.List(r.Context(), r.PathValue("documentID"), actorID, actorRole)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list versions")
+		writeServiceError(w, err, "document not found", "failed to list versions")
 		return
 	}
 
@@ -23,9 +24,10 @@ func (h VersionHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h VersionHandler) Get(w http.ResponseWriter, r *http.Request) {
-	item, err := h.service.Get(r.Context(), r.PathValue("versionID"))
+	actorID, actorRole := actorFrom(r)
+	item, err := h.service.Get(r.Context(), r.PathValue("versionID"), actorID, actorRole)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to get version")
+		writeServiceError(w, err, "version not found", "failed to get version")
 		return
 	}
 
@@ -33,13 +35,10 @@ func (h VersionHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h VersionHandler) Download(w http.ResponseWriter, r *http.Request) {
-	ver, obj, err := h.service.GetFile(r.Context(), r.PathValue("versionID"))
+	actorID, actorRole := actorFrom(r)
+	ver, obj, err := h.service.GetFile(r.Context(), r.PathValue("versionID"), actorID, actorRole)
 	if err != nil {
-		if ver == nil {
-			response.WriteError(w, http.StatusNotFound, "not_found", "version not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to retrieve file")
+		writeServiceError(w, err, "version not found", "failed to retrieve file")
 		return
 	}
 	defer obj.Reader.Close()
@@ -54,13 +53,10 @@ func (h VersionHandler) Download(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h VersionHandler) Preview(w http.ResponseWriter, r *http.Request) {
-	ver, obj, err := h.service.GetFile(r.Context(), r.PathValue("versionID"))
+	actorID, actorRole := actorFrom(r)
+	ver, obj, err := h.service.GetFile(r.Context(), r.PathValue("versionID"), actorID, actorRole)
 	if err != nil {
-		if ver == nil {
-			response.WriteError(w, http.StatusNotFound, "not_found", "version not found")
-			return
-		}
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to retrieve file")
+		writeServiceError(w, err, "version not found", "failed to retrieve file")
 		return
 	}
 	defer obj.Reader.Close()

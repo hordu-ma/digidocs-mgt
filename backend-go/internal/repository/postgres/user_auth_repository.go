@@ -186,3 +186,50 @@ func (r UserAuthRepository) UpdateUserProfile(ctx context.Context, userID string
 
 	return &profile, nil
 }
+
+// GetUserCredentials loads the stored password hash so the service layer can
+// verify the caller's current password before changing it.
+func (r UserAuthRepository) GetUserCredentials(ctx context.Context, userID string) (*auth.UserRecord, error) {
+	var record auth.UserRecord
+	if err := r.db.QueryRowContext(
+		ctx,
+		`
+		SELECT id::text, COALESCE(username, ''), password_hash, display_name, role::text
+		FROM users
+		WHERE id::text = $1
+		  AND status = 'active'
+		`,
+		userID,
+	).Scan(&record.ID, &record.Username, &record.PasswordHash, &record.DisplayName, &record.Role); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, service.ErrNotFound
+		}
+		return nil, err
+	}
+	return &record, nil
+}
+
+func (r UserAuthRepository) UpdateUserPassword(ctx context.Context, userID string, passwordHash string) error {
+	result, err := r.db.ExecContext(
+		ctx,
+		`
+		UPDATE users
+		SET password_hash = $2, updated_at = now()
+		WHERE id::text = $1
+		  AND status = 'active'
+		`,
+		userID,
+		passwordHash,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return service.ErrNotFound
+	}
+	return nil
+}

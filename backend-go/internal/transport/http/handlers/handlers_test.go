@@ -1434,3 +1434,82 @@ func TestAuth_UpdateMe(t *testing.T) {
 		t.Fatalf("expected updated profile data, got %#v", data)
 	}
 }
+
+// TestAuth_ChangePassword covers the self-service password change added for
+// self-registered accounts, which previously had no way to rotate a password
+// without an administrator.
+func TestAuth_ChangePassword(t *testing.T) {
+	handler, _ := testServer(t)
+
+	register := httptest.NewRecorder()
+	handler.ServeHTTP(register, httptest.NewRequest("POST", "/api/v1/auth/register", jsonBody(map[string]string{
+		"email":        "rotate@example.com",
+		"password":     "initial-password",
+		"display_name": "Rotate User",
+	})))
+	if register.Code != http.StatusOK {
+		t.Fatalf("register status = %d, want 200 (body: %s)", register.Code, register.Body.String())
+	}
+	token, _ := parseResponse(t, register)["data"].(map[string]any)["access_token"].(string)
+	if token == "" {
+		t.Fatal("register did not return an access token")
+	}
+
+	// Wrong current password must be rejected.
+	wrong := httptest.NewRecorder()
+	handler.ServeHTTP(wrong, authedRequest("POST", "/api/v1/auth/change-password", jsonBody(map[string]string{
+		"current_password": "not-the-password",
+		"new_password":     "replacement-password",
+	}), token))
+	if wrong.Code != http.StatusUnauthorized {
+		t.Fatalf("wrong current password status = %d, want 401", wrong.Code)
+	}
+
+	// Too-short new password must be rejected.
+	short := httptest.NewRecorder()
+	handler.ServeHTTP(short, authedRequest("POST", "/api/v1/auth/change-password", jsonBody(map[string]string{
+		"current_password": "initial-password",
+		"new_password":     "short",
+	}), token))
+	if short.Code != http.StatusBadRequest {
+		t.Fatalf("short password status = %d, want 400", short.Code)
+	}
+
+	ok := httptest.NewRecorder()
+	handler.ServeHTTP(ok, authedRequest("POST", "/api/v1/auth/change-password", jsonBody(map[string]string{
+		"current_password": "initial-password",
+		"new_password":     "replacement-password",
+	}), token))
+	if ok.Code != http.StatusOK {
+		t.Fatalf("change password status = %d, want 200 (body: %s)", ok.Code, ok.Body.String())
+	}
+
+	// The old password must stop working and the new one must work.
+	oldLogin := httptest.NewRecorder()
+	handler.ServeHTTP(oldLogin, httptest.NewRequest("POST", "/api/v1/auth/login", jsonBody(map[string]string{
+		"identifier": "rotate@example.com",
+		"password":   "initial-password",
+	})))
+	if oldLogin.Code != http.StatusUnauthorized {
+		t.Errorf("login with the old password = %d, want 401", oldLogin.Code)
+	}
+
+	newLogin := httptest.NewRecorder()
+	handler.ServeHTTP(newLogin, httptest.NewRequest("POST", "/api/v1/auth/login", jsonBody(map[string]string{
+		"identifier": "rotate@example.com",
+		"password":   "replacement-password",
+	})))
+	if newLogin.Code != http.StatusOK {
+		t.Errorf("login with the new password = %d, want 200 (body: %s)", newLogin.Code, newLogin.Body.String())
+	}
+
+	// The endpoint must not be reachable without a session.
+	anon := httptest.NewRecorder()
+	handler.ServeHTTP(anon, httptest.NewRequest("POST", "/api/v1/auth/change-password", jsonBody(map[string]string{
+		"current_password": "replacement-password",
+		"new_password":     "another-password",
+	})))
+	if anon.Code != http.StatusUnauthorized {
+		t.Errorf("anonymous change-password = %d, want 401", anon.Code)
+	}
+}

@@ -81,6 +81,33 @@ const suggestionStatusLabel: Record<string, string> = {
   expired: "已过期",
 };
 
+// A version row always carries a summary_status, so an `||` fallback never fired
+// and users saw the raw enum ("pending") on every version. Map it explicitly.
+const summaryStatusLabel: Record<string, string> = {
+  pending: "未生成摘要",
+  processing: "摘要生成中",
+  completed: "已生成摘要",
+  failed: "摘要生成失败",
+};
+
+function summaryStatusText(status?: string): string {
+  if (!status) return "未生成摘要";
+  return summaryStatusLabel[status] ?? status;
+}
+
+// The suggestion card rendered the backend's raw type slug in uppercase
+// ("DOCUMENT_SUMMARY") above a Chinese title.
+const suggestionTypeLabel: Record<string, string> = {
+  document_summary: "文档摘要",
+  handover_summary: "交接摘要",
+  structured_suggestion: "结构化建议",
+};
+
+function suggestionTypeText(type?: string): string {
+  if (!type) return "AI 建议";
+  return suggestionTypeLabel[type] ?? type;
+}
+
 // Map current status → available flow actions
 const flowActions: Record<
   string,
@@ -560,7 +587,13 @@ onBeforeUnmount(() => {
                 <span class="version-chip">v{{ item.version_no }}</span>
                 <div class="version-body">
                   <strong>{{ item.file_name || "未命名文件" }}</strong>
-                  <span>{{ item.summary_status || "未生成摘要" }} · {{ formatTime(item.created_at) }}</span>
+                  <span>
+                    <em
+                      class="version-summary"
+                      :class="{ 'is-failed': item.summary_status === 'failed' }"
+                    >{{ summaryStatusText(item.summary_status) }}</em>
+                    · {{ formatTime(item.created_at) }}
+                  </span>
                 </div>
                 <ElButton
                   v-if="item.id"
@@ -637,7 +670,7 @@ onBeforeUnmount(() => {
               <div v-for="item in suggestions" :key="item.id" class="suggestion-item">
                 <div class="suggestion-head">
                   <div>
-                    <div class="suggestion-type">{{ item.suggestion_type }}</div>
+                    <div class="suggestion-type">{{ suggestionTypeText(item.suggestion_type) }}</div>
                     <div class="suggestion-title">
                       {{ item.title || "AI 建议" }}
                     </div>
@@ -955,6 +988,15 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 
+.version-summary {
+  font-style: normal;
+}
+
+.version-summary.is-failed {
+  color: var(--dd-danger, #c4443b);
+  font-weight: 650;
+}
+
 .flow-history-item {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
@@ -1022,8 +1064,18 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 8px;
+}
+
+/* Without this the title's flex item refuses to shrink and a long title runs
+   underneath the status pill. */
+.suggestion-head > div:first-child {
+  min-width: 0;
+}
+
+.suggestion-head .status-pill {
+  flex: 0 0 auto;
 }
 
 .suggestion-title {
@@ -1034,10 +1086,8 @@ onBeforeUnmount(() => {
 .suggestion-type {
   margin-bottom: 4px;
   color: var(--dd-ai);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .suggestion-actions {

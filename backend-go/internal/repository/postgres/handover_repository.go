@@ -17,20 +17,28 @@ func NewHandoverRepository(db DBTX) HandoverRepository {
 	return HandoverRepository{db: db}
 }
 
-func (r HandoverRepository) ListHandovers(ctx context.Context) ([]query.HandoverItem, error) {
+func (r HandoverRepository) ListHandovers(ctx context.Context, scope query.ActorScope) ([]query.HandoverItem, error) {
+	isAdmin, actorID := scopeArgs(scope)
 	rows, err := r.db.QueryContext(
 		ctx,
 		`
 		SELECT
-			id::text,
-			target_user_id::text,
-			receiver_user_id::text,
-			COALESCE(project_id::text, ''),
-			status::text,
-			COALESCE(remark, '')
-		FROM graduation_handovers
-		ORDER BY generated_at DESC
+			h.id::text,
+			h.target_user_id::text,
+			h.receiver_user_id::text,
+			COALESCE(h.project_id::text, ''),
+			h.status::text,
+			COALESCE(h.remark, '')
+		FROM graduation_handovers h
+		WHERE (
+			h.target_user_id::text = $2
+			OR h.receiver_user_id::text = $2
+			OR `+projectScopeSQL("h.project_id", "$1", "$2")+`
+		)
+		ORDER BY h.generated_at DESC
 		`,
+		isAdmin,
+		actorID,
 	)
 	if err != nil {
 		return nil, err

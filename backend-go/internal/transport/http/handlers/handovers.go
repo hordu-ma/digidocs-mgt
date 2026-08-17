@@ -43,7 +43,7 @@ func (h HandoverHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h HandoverHandler) List(w http.ResponseWriter, r *http.Request) {
-	items, err := h.service.List(r.Context())
+	items, err := h.service.List(r.Context(), scopeFrom(r))
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list handovers")
 		return
@@ -53,7 +53,8 @@ func (h HandoverHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h HandoverHandler) Get(w http.ResponseWriter, r *http.Request) {
-	item, err := h.service.Get(r.Context(), r.PathValue("handoverID"))
+	actorID, actorRole := actorFrom(r)
+	item, err := h.service.Get(r.Context(), r.PathValue("handoverID"), actorID, actorRole)
 	if err != nil {
 		writeServiceError(w, err, "handover not found", "failed to get handover")
 		return

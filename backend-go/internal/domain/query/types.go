@@ -183,6 +183,16 @@ type PaginationMeta struct {
 	Total    int `json:"total"`
 }
 
+// ActorScope narrows an aggregate/list query to the projects the acting user is
+// allowed to see. Aggregate endpoints (dashboard, audit log, handover list) have
+// no single resource id to authorize against, so instead of a per-row permission
+// check they push the actor down into the query and let the repository filter.
+// IsAdmin bypasses the narrowing entirely.
+type ActorScope struct {
+	ActorID string
+	IsAdmin bool
+}
+
 type AuditEventFilter struct {
 	ProjectID  string
 	DocumentID string
@@ -192,6 +202,7 @@ type AuditEventFilter struct {
 	DateTo     string
 	Page       int
 	PageSize   int
+	Scope      ActorScope
 }
 
 type ProjectMemberItem struct {
@@ -333,22 +344,22 @@ type DataAssetListItem struct {
 }
 
 type DataAssetDetail struct {
-	ID                   string `json:"id"`
-	TeamSpaceID          string `json:"team_space_id"`
-	ProjectID            string `json:"project_id"`
-	ProjectName          string `json:"project_name,omitempty"`
-	FolderID             string `json:"folder_id,omitempty"`
-	FolderName           string `json:"folder_name,omitempty"`
-	DisplayName          string `json:"display_name"`
-	FileName             string `json:"file_name"`
-	Description          string `json:"description,omitempty"`
-	MimeType             string `json:"mime_type,omitempty"`
-	FileSize             int64  `json:"file_size"`
-	StorageProvider      string `json:"storage_provider"`
-	StorageObjectKey     string `json:"storage_object_key,omitempty"`
-	CreatedByName        string `json:"created_by_name,omitempty"`
-	CreatedAt            string `json:"created_at"`
-	UpdatedAt            string `json:"updated_at"`
+	ID               string `json:"id"`
+	TeamSpaceID      string `json:"team_space_id"`
+	ProjectID        string `json:"project_id"`
+	ProjectName      string `json:"project_name,omitempty"`
+	FolderID         string `json:"folder_id,omitempty"`
+	FolderName       string `json:"folder_name,omitempty"`
+	DisplayName      string `json:"display_name"`
+	FileName         string `json:"file_name"`
+	Description      string `json:"description,omitempty"`
+	MimeType         string `json:"mime_type,omitempty"`
+	FileSize         int64  `json:"file_size"`
+	StorageProvider  string `json:"storage_provider"`
+	StorageObjectKey string `json:"storage_object_key,omitempty"`
+	CreatedByName    string `json:"created_by_name,omitempty"`
+	CreatedAt        string `json:"created_at"`
+	UpdatedAt        string `json:"updated_at"`
 }
 
 type DataAssetListFilter struct {

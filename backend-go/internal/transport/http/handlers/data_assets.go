@@ -119,7 +119,12 @@ func (h DataAssetHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // Upload  POST /api/v1/data-assets  (multipart/form-data)
 func (h DataAssetHandler) Upload(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(shared.MaxDataAssetMemoryBuffer); err != nil {
+	shared.LimitUploadBody(w, r, shared.MaxDataAssetUploadSize)
+	if err := r.ParseMultipartForm(shared.MaxMultipartMemory); err != nil {
+		if shared.IsBodyTooLarge(err) {
+			response.WriteError(w, http.StatusRequestEntityTooLarge, "payload_too_large", "文件超过 512 MB 上限")
+			return
+		}
 		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid multipart form")
 		return
 	}

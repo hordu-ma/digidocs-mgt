@@ -22,8 +22,9 @@ func (r AuditRepository) ListAuditEvents(
 	return []query.AuditEventItem{}, 0, nil
 }
 
-func (r AuditRepository) GetAuditSummary(ctx context.Context, projectID string) (query.AuditSummary, error) {
+func (r AuditRepository) GetAuditSummary(ctx context.Context, projectID string, scope query.ActorScope) (query.AuditSummary, error) {
 	_ = ctx
+	_ = scope
 
 	return query.AuditSummary{
 		ProjectID:      projectID,

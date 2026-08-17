@@ -774,14 +774,19 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 
+/* Both lines need an explicit tight line-height: at the inherited body value the
+   two rows are taller than the 44px button's content box and the role line was
+   drawn on top of the name on every page. */
 .user-name {
   font-size: 14px;
   font-weight: 750;
+  line-height: 1.25;
 }
 
 .user-role {
   color: var(--dd-muted);
   font-size: 12px;
+  line-height: 1.25;
 }
 
 .mobile-nav-panel {

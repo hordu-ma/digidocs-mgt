@@ -26,9 +26,17 @@ api.interceptors.response.use(
         if (status === 401 && !url.includes("/auth/login") && !url.includes("/auth/register")) {
             const auth = useAuthStore();
             if (auth.token) {
+                const current = router.currentRoute.value;
                 auth.logout();
-                if (router.currentRoute.value.name !== "login") {
-                    void router.push({ name: "login" });
+                if (current.name !== "login") {
+                    // Carry the page the session expired on so the user lands
+                    // back where they were instead of on the dashboard.
+                    void router.push({
+                        name: "login",
+                        query: current.fullPath && current.fullPath !== "/"
+                            ? { redirect: current.fullPath }
+                            : undefined,
+                    });
                 }
             }
         }

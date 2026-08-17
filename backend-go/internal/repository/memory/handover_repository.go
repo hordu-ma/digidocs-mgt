@@ -12,8 +12,9 @@ func NewHandoverRepository() HandoverRepository {
 	return HandoverRepository{}
 }
 
-func (r HandoverRepository) ListHandovers(ctx context.Context) ([]query.HandoverItem, error) {
+func (r HandoverRepository) ListHandovers(ctx context.Context, scope query.ActorScope) ([]query.HandoverItem, error) {
 	_ = ctx
+	_ = scope
 
 	return []query.HandoverItem{
 		{

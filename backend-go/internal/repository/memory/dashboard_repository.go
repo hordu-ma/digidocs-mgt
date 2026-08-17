@@ -12,9 +12,10 @@ func NewDashboardRepository() DashboardRepository {
 	return DashboardRepository{}
 }
 
-func (r DashboardRepository) GetOverview(ctx context.Context, projectID string) (query.DashboardOverview, error) {
+func (r DashboardRepository) GetOverview(ctx context.Context, projectID string, scope query.ActorScope) (query.DashboardOverview, error) {
 	_ = ctx
 	_ = projectID
+	_ = scope
 
 	return query.DashboardOverview{
 		DocumentTotal:        0,
@@ -27,9 +28,11 @@ func (r DashboardRepository) GetOverview(ctx context.Context, projectID string) 
 func (r DashboardRepository) ListRecentFlows(
 	ctx context.Context,
 	projectID string,
+	scope query.ActorScope,
 ) ([]query.RecentFlowItem, error) {
 	_ = ctx
 	_ = projectID
+	_ = scope
 
 	return []query.RecentFlowItem{}, nil
 }
@@ -37,9 +40,11 @@ func (r DashboardRepository) ListRecentFlows(
 func (r DashboardRepository) ListRiskDocuments(
 	ctx context.Context,
 	projectID string,
+	scope query.ActorScope,
 ) ([]query.RiskDocumentItem, error) {
 	_ = ctx
 	_ = projectID
+	_ = scope
 
 	return []query.RiskDocumentItem{}, nil
 }

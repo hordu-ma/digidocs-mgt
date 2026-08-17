@@ -29,6 +29,10 @@ func (s AuditQueryService) List(
 	return s.audits.ListAuditEvents(ctx, filter)
 }
 
-func (s AuditQueryService) Summary(ctx context.Context, projectID string) (query.AuditSummary, error) {
-	return s.audits.GetAuditSummary(ctx, projectID)
+func (s AuditQueryService) Summary(
+	ctx context.Context,
+	projectID string,
+	scope query.ActorScope,
+) (query.AuditSummary, error) {
+	return s.audits.GetAuditSummary(ctx, projectID, scope)
 }

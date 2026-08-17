@@ -8,6 +8,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 
+	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/service"
 )
 
@@ -61,10 +62,11 @@ func TestFlowAndHandoverRepositories(t *testing.T) {
 		t.Fatalf("ListFlows got %#v err=%v", flowItems, err)
 	}
 
-	mock.ExpectQuery("FROM graduation_handovers\\s+ORDER BY").
+	mock.ExpectQuery("FROM graduation_handovers h\\s+WHERE").
+		WithArgs(false, "u-9").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "target_user_id", "receiver_user_id", "project_id", "status", "remark"}).
 			AddRow("h-1", "u-1", "u-2", "p-1", "generated", "remark"))
-	handoverItems, err := handovers.ListHandovers(ctx)
+	handoverItems, err := handovers.ListHandovers(ctx, query.ActorScope{ActorID: "u-9"})
 	if err != nil || len(handoverItems) != 1 || handoverItems[0].Status != "generated" {
 		t.Fatalf("ListHandovers got %#v err=%v", handoverItems, err)
 	}

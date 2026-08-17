@@ -6,6 +6,29 @@
 
 ## 已完成
 
+- 完成**售卖前审阅 P0 + P1 整改**（2026-08-17）
+  - 起因：按「可售卖产品」标准做了一轮全栈审阅（代码 + 公网 `8.152.204.76` 实测 UI），结论是产品形态可演示，但存在一条已实测跑通的跨课题越权读取链。
+  - **P0-1 跨课题越权读取（已修复并部署验证）**
+    - 现象：`PermissionService` 建得完整，但只挂在部分 handler 上。`GET /documents/{id}` 正确 403，兄弟接口却完全不取调用者身份。
+    - 完整利用链（已实测）：`GET /audit-events` 无过滤返回全平台 `document_id` / `version_id` → 拿去 `GET /versions/{id}/download` → 非成员成功下载到 45,954 字节的真实 docx。叠加公网开放自助注册，起点是匿名互联网用户。
+    - 修复：
+      - 新增 `CanViewVersion` / `CanViewHandover` / `CanViewProject` 三条读规则（postgres + memory），并在 `version_query.go`(4)、`flows.go:List`、`handovers.go:Get`、`code_repositories.go:ListPushEvents` 补 actor 校验；
+      - 聚合类接口没有单一资源 ID 可校验，改为下推 `query.ActorScope` 在 SQL 层收敛（`repository/postgres/scope.go` 提供统一谓词），覆盖 dashboard 三个接口、`audit-events` 列表与汇总、`handovers` 列表；`admin` 不收敛。
+      - 顺带修正 `flows.go:List` 把 403 误映射成 500。
+    - 附带修好一个业务正确性问题：前端从不给 dashboard 传 `project_id`，因此成员此前看到的是**全平台**统计。收敛后成员看到的是自己课题的数字（实测该成员从 15 篇文档 / 12 风险 → 1 篇 / 0 风险）。
+    - 回归测试：`handlers/permission_test.go` 用「全拒绝」权限 reader 重建容器（memory 权限仓储恒返回 true，正是这个漏洞躲过既有测试的原因），对 9 个读接口断言 403，对 6 个聚合接口断言 scope 确实下推、且 admin 走 bypass；`permission_repository_sql_test.go` 补新增读规则的 SQL 断言。
+    - 部署验证：重新构建部署后逐条复跑当初的越权探针，全部 403 / 空集；admin 审计仍 55 条、该成员降为 3 条且只含自己课题。
+  - **P1 整改（已修复并部署验证）**
+    - 上传大小上限此前完全没生效——`ParseMultipartForm(32MB)` 的参数只是内存缓冲、超出部分落盘。改为入口处 `http.MaxBytesReader` 真实强制：文档版本 32 MB、数据资产 512 MB，超限返回可读 413；nginx `client_max_body_size` 同步提到 512m 作为外层边界。
+    - `git http-backend` 改为流式转发（原先 `cmd.Output()` 把整个 clone 缓进内存并丢失 sideband 进度）；`git archive` 同样改流式，并显式 `Wait()` 校验，避免 git 中途失败被记成同步成功。新增 `code_git_internal_test.go` 用真实 `git http-backend` 验证 smart-HTTP 前导、ref 广播完整性与 CGI 状态透传。
+    - 补 `POST /auth/change-password` 自助改密（此前自助注册账号只能找管理员重置）+ ProfileView 面板；服务层重新校验当前密码，不只认 JWT。
+    - 前端补兜底 404 路由（原先未知路径整页空白）+ 品牌化 `NotFoundView`；nginx 由「一条路由一个 `location =`」改为「带扩展名查文件、其余回 shell」，新增页面不必再同步改 nginx。`/api/` 必须用 `^~`，否则 `/api/v1/git/<slug>.git` 会被扩展名正则截胡。
+    - 登录跳转补 `redirect` 参数：`LoginView`/`RegisterView` 一直有读取逻辑，但守卫和 401 拦截器都没传，等于死代码，会话过期一律落回仪表盘。
+    - nginx 加 `server_tokens off` 与基础安全响应头（不加 HSTS，当前是纯 HTTP 入口）。
+    - 前端专业度：修顶栏用户名/角色文字重叠（行高溢出 44px 按钮内容盒）；总览页三组重复 KPI 收敛为一行（移动端页高 5052px → 4503px）；版本历史与 AI 建议卡不再直出英文枚举（`pending` → 未生成摘要，`DOCUMENT_SUMMARY` → 文档摘要）；个人信息页角色/状态/最后登录同样转中文。
+  - 验证：`go vet` + `go test ./...`（18 包全绿）、`pytest`（44）、`vitest`（9）、`npm run build`、`scripts/codex/smoke-local.sh`（含群晖端到端）全部通过；公网 UI 复跑无 console error、无失败请求。
+  - **未处理并已明确记录**：P0-2 演示环境默认口令、P0-3 公网 TLS、P1-6 演示库 smoke 残留数据，见下方「待办」。
+
 - 完成**未入组空状态 + 课题负责人成员/邀请**
   - 未加入任何课题的用户在总览/文档等业务页看到明确空状态：注册不等于入组，需邀请链接或负责人加入
   - 课题 `owner/manager` 可在「成员」页查看名单、添加已有账号、生成 7 天可复用邀请链接并撤销
@@ -563,6 +586,24 @@
   - 已通过 `STRICT_SMOKE=1 ASSISTANT_SMOKE_POLL_ATTEMPTS=45 ASSISTANT_SMOKE_POLL_INTERVAL=2 make smoke`
 
 ## 待办
+
+### 售卖前审阅遗留项（2026-08-17，按优先级）
+
+- [ ] **P0-2 演示环境仍在用种子默认口令** — `admin` / `admin123` 目前可直接登录公网演示环境，角色是平台管理员，明文与 bcrypt 哈希都公开写在 `backend-go/sql/seed.sql` 注释里；`maliguo` / `qiaoanqiang` / `wangzhao` / `liuzongyou` 同为 `admin123`。`docs/现场部署逐条清单.md` 早已要求「初始化后立即修改默认演示账号密码」，但线上没有执行。改口令属于线上账号操作，需由负责人执行。后续建议把 `seed.sql` 拆成「结构演示数据」与「账号」两部分，账号口令改为部署时随机生成并只打印一次。
+- [ ] **P0-3 公网入口无 TLS**（本轮明确暂不处理）— `https://8.152.204.76` 无监听，登录口令、JWT、git push token 全程明文过公网；代码页给用户的 git remote 就是 `http://`。原「运维/部署 P3 · 生产入口反向代理与 TLS 收口」的定级偏低：在开放自助注册的前提下这是 P0。落地 443 后需同步加回 HSTS。
+- [ ] **P1-6 演示库 smoke 残留数据** — 客户当前打开演示看到的是：《寒假特训营日志》v2–v25 全叫 `smoke-v2.txt`；助手页 12 个会话里 9 个标题是「请用一句话确认 smoke 已打通…」；成员名单里有「Smoke注册」「入组验证」两个账号；3 条创建时间相差 1 秒的邀请链接。属于销售场景的直接减分项。清理要删线上数据，需负责人确认后执行；根治办法是让 `make smoke` 只跑在独立数据库/独立项目上，并在演示前跑一次清理脚本。
+- [ ] **P2 演示环境自助注册无门槛** — 公网任何人可注册。演示期建议关闭 `/auth/register` 或改邀请码制。
+- [ ] **P3 改密不使旧 JWT 失效** — 无状态 JWT 无吊销名单，改密后旧令牌仍可用至 2 小时自然过期；前端已明确提示。要做到改密即登出需引入 token 版本号或黑名单。
+- [ ] **P3 `AuthenticatePush` 非常量时间比较** — `code_repository_service.go` 用 `==` 比较 push token，建议改 `subtle.ConstantTimeCompare`；同文件 `shortToken` 在 `rand.Read` 失败时返回固定字符串 `"token"`，应改为返回 error。
+- [ ] **P3 JWT `exp` 缺失时视为永不过期** — `token_service.go` 应在缺少 `exp` 时直接拒绝。
+- [ ] **P3 `body_limit.go` 用 `strings.Contains(path, "/internal/")` 判豁免** — 应改为对 `APIV1Prefix + "/internal/"` 的前缀匹配。
+- [ ] **P3 API 响应泄露宿主机内部路径** — 代码仓库详情返回 `repo_storage_path`（`/tmp/digidocs-code-repos/…`）。
+- [ ] **P3 生产容器 `SYNOLOGY_INSECURE_SKIP_VERIFY=true`** — 对群晖的 TLS 校验被关闭。
+- [ ] **P3 登录限流在公网链路下可能退化为全局单桶** — `middleware/rate_limit.go` 取 XFF 最后一段，该推导只在「nginx 是唯一前置代理」时成立。公网经 frp 隧道进来时该值是常量，10 次/分钟会摊到全体用户身上，既拦不住攻击者又误伤正常用户。需按实际公网链路复核一次。
+- [ ] **P2 `GET /users` 仍返回全量精简用户名录** — 本轮刻意未收敛：负责人「添加成员」需要检索尚未加入本课题的账号，收敛会直接破坏该功能。响应已不含联系方式。若要收敛需先给成员添加设计新的检索接口。
+
+### 原有待办
+
 - ~~跑通 Alembic 初始迁移~~ ✅ 已完成
 - ~~将占位 API 改为真实数据库读写~~ ✅ 已完成
 - ~~前端页面接入真实后端 API~~ ✅ 已完成
@@ -617,7 +658,11 @@
 - [ ] **拆分巨型视图组件** — 5 个 view 超 1000 行：`HandoversView`(1296)、`DataView`(1140)、`DocumentDetailView`(1131)、`AssistantView`(1083)、`DocumentsView`(1000)。按"对话框 / 表格 / 表单"拆子组件，数据请求抽 `composables/`（如 `useHandovers()`）。
 - [ ] **消除 `any`** — 全前端 48 处 `: any` / `as any`，结合已建的 `src/types` 逐步替换为具体类型（接口响应类型尤其值得补全）。
 - [ ] **前端组件级测试缺失** — 目前仅 `stores/auth`、`router` 有测试。为关键交互（登录、文档上传、流转动作、交接编辑）补 Vitest + Testing Library 组件测试。
-- [ ] **统一时间格式化** — 各 view 的 `formatTime/formatDate` 文案与精度不一（"-"/"暂无更新时间"/"尚未推送"…）。在 `utils/format.ts` 提供带 `fallback` 与精度参数的统一函数，按需迁移（保留各处文案语义）。
+- [ ] **统一时间格式化** — 各 view 的 `formatTime/formatDate` 文案与精度不一（"-"/"暂无更新时间"/"尚未推送"…）。在 `utils/format.ts` 提供带 `fallback` 与精度参数的统一函数，按需迁移（保留各处文案语义）。2026-08-17 复核补充：共 5 套实现，另有 `MembersView.vue` 直接裸调 `new Date(...).toLocaleString("zh-CN")`（输出 `2026/8/24 15:20:16`），与 DashboardView 的 `04/17 21:25`（无年份，跨年歧义）、CodeView 的 `2026-04-19 05:04` 并存。
+- [ ] **「工作流在线」是硬编码假状态** — `AppLayout.vue` 顶栏那枚绿色徽标是写死文案，不对应任何健康检查。演示时被追问「这个在线状态怎么算的」会很难看。要么接 `/healthz` + worker 心跳做成真状态，要么删掉。
+- [ ] **空值渲染口径不统一** — 同屏并存 `-`（更新时间）、`未挂接目录`、`暂无文档描述`，交接页还有 `时间待同步`；成员页对自助注册用户的「账号」列显示 `-`，负责人无法辨认「入组验证」到底是谁，应显示脱敏手机号/邮箱。建议随上面的 `format.ts` 收口一起统一成「暂无 XXX」句式。
+- [ ] **版本历史无分页/折叠** — 25 条已占满一屏且只会增长，建议默认展示最近 5 条 + 「展开全部」。
+- [ ] **登录/注册页缺品牌元素** — 大面积留白，无 logo、无版权与备案位；作为对外第一屏偏简陋。
 
 ### 后端架构与可维护性（P2）
 
@@ -627,12 +672,15 @@
 
 ### 测试与质量门禁（P2）
 
+> 2026-08-17 复核：**建议把「CI 流水线」上调为 P1**。P0-1 那种「新增读接口忘记挂权限」正是回归测试该拦住的问题，而当时既没有 CI 也没有对应断言。
+
 - [ ] **引入临时 PostgreSQL/testcontainer** — 覆盖真实迁移 schema 与复杂 SQL 写链（事务/action workflow），替代部分 sqlmock。
 - [ ] **CI 流水线** — 将 `make verify`（含三端）接入 `.github/workflows`，PR 自动跑；前端测试需固定 Node 版本（避免 Node 24 实验性 localStorage 覆盖 jsdom 的问题）。
 
 ### 安全（P2）
 
-- [ ] **JWT 存储方式评估** — 前端 token 存 `localStorage`（XSS 可窃取）。公网长期运行建议评估 httpOnly cookie 方案（需后端配合 set-cookie + CSRF 口径）。
+- [x] **读接口权限收口** — 见「已完成 · 售卖前审阅 P0 + P1 整改」P0-1（2026-08-17）。
+- [ ] **JWT 存储方式评估** — 前端 token 存 `localStorage`（XSS 可窃取）。公网长期运行建议评估 httpOnly cookie 方案（需后端配合 set-cookie + CSRF 口径）。注意：在 P0-1 修复前，XSS 的爆炸半径是全平台文档；现已收敛到调用者可见范围。
 - [ ] **CORS 白名单收敛** — 生产已强制非 `*`，但建议把允许来源做成显式可配置列表并文档化。
 - [ ] **清理残留 copilot 凭据（可选）** — 见 OpenClaw：`auth-profiles.json` 仍有失效的 `github-copilot:github` token；如需彻底废弃在 GitHub 侧吊销。
 

@@ -220,6 +220,64 @@ func (r PermissionRepository) CanViewDocument(ctx context.Context, actorID strin
 	return r.isProjectMemberForDocument(ctx, actorID, documentID)
 }
 
+// CanViewVersion resolves the version's owning document and reuses the document
+// read rule. Version ids leak through the audit log, so this must be checked on
+// every version read path (list/get/download/preview), not just on the document.
+func (r PermissionRepository) CanViewVersion(ctx context.Context, actorID string, actorRole string, versionID string) (bool, error) {
+	if isAdmin(actorRole) {
+		return true, nil
+	}
+	return r.exists(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM document_versions dv
+			JOIN documents d ON d.id = dv.document_id
+			JOIN projects p ON p.id = d.project_id
+			LEFT JOIN project_members pm
+			  ON pm.project_id = p.id
+			 AND pm.user_id::text = $2
+			WHERE dv.id::text = $1
+			  AND d.is_deleted = false
+			  AND (d.current_owner_id::text = $2 OR p.owner_id::text = $2 OR pm.id IS NOT NULL)
+		)
+	`, versionID, actorID)
+}
+
+// CanViewHandover allows the two parties named on the handover (the departing
+// member and the receiver) plus any member of the owning project.
+func (r PermissionRepository) CanViewHandover(ctx context.Context, actorID string, actorRole string, handoverID string) (bool, error) {
+	if isAdmin(actorRole) {
+		return true, nil
+	}
+	return r.exists(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM graduation_handovers h
+			LEFT JOIN projects p ON p.id = h.project_id
+			LEFT JOIN project_members pm
+			  ON pm.project_id = p.id
+			 AND pm.user_id::text = $2
+			WHERE h.id::text = $1
+			  AND (
+				h.target_user_id::text = $2
+				OR h.receiver_user_id::text = $2
+				OR p.owner_id::text = $2
+				OR pm.id IS NOT NULL
+			  )
+		)
+	`, handoverID, actorID)
+}
+
+func (r PermissionRepository) CanViewProject(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error) {
+	if isAdmin(actorRole) {
+		return true, nil
+	}
+	if projectID == "" {
+		return false, nil
+	}
+	return r.isProjectMember(ctx, actorID, projectID)
+}
+
 func (r PermissionRepository) CanViewDataAsset(ctx context.Context, actorID string, actorRole string, dataAssetID string) (bool, error) {
 	if isAdmin(actorRole) {
 		return true, nil

@@ -25,6 +25,9 @@ func TestPermissionRepositoryAdminShortCircuits(t *testing.T) {
 		func() (bool, error) { return repo.CanCreateCodeRepository(context.Background(), "u", "admin", "p") },
 		func() (bool, error) { return repo.CanManageCodeRepository(context.Background(), "u", "admin", "r") },
 		func() (bool, error) { return repo.CanPushCodeRepository(context.Background(), "u", "admin", "r") },
+		func() (bool, error) { return repo.CanViewVersion(context.Background(), "u", "admin", "v") },
+		func() (bool, error) { return repo.CanViewHandover(context.Background(), "u", "admin", "h") },
+		func() (bool, error) { return repo.CanViewProject(context.Background(), "u", "admin", "p") },
 		func() (bool, error) { return repo.CanViewProjectMembers(context.Background(), "u", "admin", "p") },
 		func() (bool, error) { return repo.CanManageProjectMembers(context.Background(), "u", "admin", "p") },
 	}
@@ -127,5 +130,49 @@ func TestPermissionRepositoryPropagatesDBError(t *testing.T) {
 	if ok, err := repo.CanCreateDocument(context.Background(), "u-1", "member", "p-1"); ok || !errors.Is(err, dbErr) {
 		t.Fatalf("ok=%v err=%v, want false db down", ok, err)
 	}
+	assertExpectations(t, mock)
+}
+
+// TestPermissionRepositoryViewChecks covers the read rules added to close the
+// cross-project leak: version reads resolve through the owning document, and
+// handovers are additionally visible to the two members named on the record.
+func TestPermissionRepositoryViewChecks(t *testing.T) {
+	ctx := context.Background()
+	db, mock := newMockDB(t)
+	repo := NewPermissionRepository(db)
+
+	mock.ExpectQuery("FROM document_versions dv").
+		WithArgs("v-1", "u-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	if ok, err := repo.CanViewVersion(ctx, "u-1", "member", "v-1"); err != nil || !ok {
+		t.Fatalf("CanViewVersion ok=%v err=%v, want true nil", ok, err)
+	}
+
+	mock.ExpectQuery("FROM document_versions dv").
+		WithArgs("v-2", "u-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+	if ok, err := repo.CanViewVersion(ctx, "u-1", "member", "v-2"); err != nil || ok {
+		t.Fatalf("CanViewVersion ok=%v err=%v, want false nil for an outsider", ok, err)
+	}
+
+	mock.ExpectQuery("FROM graduation_handovers h").
+		WithArgs("h-1", "u-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	if ok, err := repo.CanViewHandover(ctx, "u-1", "member", "h-1"); err != nil || !ok {
+		t.Fatalf("CanViewHandover ok=%v err=%v, want true nil", ok, err)
+	}
+
+	mock.ExpectQuery("FROM projects p").
+		WithArgs("p-1", "u-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	if ok, err := repo.CanViewProject(ctx, "u-1", "member", "p-1"); err != nil || !ok {
+		t.Fatalf("CanViewProject ok=%v err=%v, want true nil", ok, err)
+	}
+
+	// An empty project id must never widen to "all projects".
+	if ok, err := repo.CanViewProject(ctx, "u-1", "member", ""); err != nil || ok {
+		t.Fatalf("CanViewProject(\"\") ok=%v err=%v, want false nil", ok, err)
+	}
+
 	assertExpectations(t, mock)
 }

@@ -52,6 +52,18 @@ const statusClass: Record<string, string> = {
   archived: "status-archived",
 };
 
+const activeDocumentCount = computed(
+  () =>
+    (overview.value.status_counts?.draft ?? 0) +
+    (overview.value.status_counts?.in_progress ?? 0) +
+    (overview.value.status_counts?.pending_handover ?? 0),
+);
+
+// One KPI row, not three. The page previously stacked `focusCards`, the status
+// strip and these tiles, so "风险文档" and "处理中" each appeared three times with
+// the same number — on mobile that pushed the actual content below three screens
+// of repeated figures. The focus cards' only unique contribution was navigation,
+// so each tile now carries its own target.
 const summaryItems = computed(() => [
   {
     label: "文档总量",
@@ -59,20 +71,23 @@ const summaryItems = computed(() => [
     hint: "纳入团队空间的文档资产",
     icon: DocumentChecked,
     tone: "primary",
+    to: "/documents",
   },
   {
     label: "处理中",
-    value: overview.value.status_counts?.in_progress ?? 0,
-    hint: "仍在责任人处理中的文档",
+    value: activeDocumentCount.value,
+    hint: "仍处于草稿、处理中和待交接状态",
     icon: Timer,
     tone: "blue",
+    to: "/documents",
   },
   {
     label: "待交接",
     value: overview.value.handover_pending_count,
-    hint: "需要负责人继续推进",
+    hint: "需要负责人继续确认接收与闭环",
     icon: Connection,
     tone: "amber",
+    to: "/handovers",
   },
   {
     label: "风险文档",
@@ -80,6 +95,7 @@ const summaryItems = computed(() => [
     hint: "长期未更新或交接异常",
     icon: WarningFilled,
     tone: "red",
+    to: "/documents",
   },
 ]);
 
@@ -91,37 +107,6 @@ const statusEntries = computed(() =>
     className: statusClass[key],
   })),
 );
-
-const activeDocumentCount = computed(
-  () =>
-    (overview.value.status_counts?.draft ?? 0) +
-    (overview.value.status_counts?.in_progress ?? 0) +
-    (overview.value.status_counts?.pending_handover ?? 0),
-);
-
-const focusCards = computed(() => [
-  {
-    title: "待负责人推进",
-    count: overview.value.handover_pending_count,
-    caption: "需要继续确认接收与交接闭环",
-    actionLabel: "打开交接工作台",
-    action: () => router.push("/handovers"),
-  },
-  {
-    title: "风险文档",
-    count: overview.value.risk_document_count,
-    caption: "优先处理长期未更新或交接异常文档",
-    actionLabel: "查看文档资产库",
-    action: () => router.push("/documents"),
-  },
-  {
-    title: "处理中资产",
-    count: activeDocumentCount.value,
-    caption: "仍处于草稿、处理中和待交接状态",
-    actionLabel: "进入文档工作台",
-    action: () => router.push("/documents"),
-  },
-]);
 
 function formatTime(value?: string) {
   if (!value) return "-";
@@ -156,28 +141,6 @@ onMounted(async () => {
         </div>
       </div>
 
-      <section class="action-card-grid focus-grid">
-        <button
-          v-for="item in focusCards"
-          :key="item.title"
-          class="action-card focus-card"
-          type="button"
-          @click="item.action()"
-        >
-          <div class="action-card-head">
-            <div>
-              <div class="focus-label">{{ item.title }}</div>
-              <div class="focus-value">{{ item.count }}</div>
-            </div>
-            <span class="action-card-icon">
-              <ElIcon :size="18"><ArrowRight /></ElIcon>
-            </span>
-          </div>
-          <p class="focus-note">{{ item.caption }}</p>
-          <span class="focus-action">{{ item.actionLabel }}</span>
-        </button>
-      </section>
-
       <section class="command-strip page-card">
         <div class="command-copy">
           <div class="section-title">今日关注</div>
@@ -198,21 +161,24 @@ onMounted(async () => {
       </section>
 
       <section class="kpi-grid dashboard-kpis">
-        <div
+        <button
           v-for="item in summaryItems"
           :key="item.label"
           class="metric-tile page-card"
           :class="`metric-${item.tone}`"
+          type="button"
+          @click="router.push(item.to)"
         >
           <div class="metric-icon">
             <ElIcon :size="20"><component :is="item.icon" /></ElIcon>
           </div>
-          <div>
+          <div class="metric-body">
             <div class="kpi-label">{{ item.label }}</div>
             <div class="kpi-value">{{ item.value }}</div>
             <div class="metric-hint">{{ item.hint }}</div>
           </div>
-        </div>
+          <ElIcon class="metric-arrow"><ArrowRight /></ElIcon>
+        </button>
       </section>
 
       <div class="dashboard-grid">
@@ -290,49 +256,36 @@ onMounted(async () => {
   margin-bottom: 16px;
 }
 
-.focus-grid {
-  margin-bottom: 18px;
-}
-
-.focus-card {
-  cursor: pointer;
+/* The KPI tiles are buttons now, so they need the affordances the removed
+   focus cards used to carry. */
+.metric-tile {
+  width: 100%;
+  border: 1px solid var(--dd-line);
   text-align: left;
+  cursor: pointer;
   transition:
     border-color 0.16s ease,
     box-shadow 0.16s ease,
     transform 0.16s ease;
 }
 
-.focus-card:hover {
+.metric-tile:hover {
   border-color: #bfd5ed;
   transform: translateY(-1px);
   box-shadow: var(--dd-shadow-sm);
 }
 
-.focus-label {
-  color: var(--dd-muted);
-  font-size: 13px;
-  font-weight: 700;
+.metric-body {
+  min-width: 0;
 }
 
-.focus-value {
-  margin-top: 6px;
-  color: var(--dd-ink);
-  font-size: 32px;
-  font-weight: 800;
-}
-
-.focus-note {
-  margin: 0;
-  color: var(--dd-muted);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.focus-action {
-  color: var(--dd-primary);
-  font-size: 13px;
-  font-weight: 700;
+/* Positioned rather than a flex item: as a third column it squeezed the hint
+   text into awkward mid-word wraps at narrow tile widths. */
+.metric-arrow {
+  position: absolute;
+  top: 18px;
+  right: 14px;
+  color: var(--dd-subtle);
 }
 
 .status-distribution {
@@ -361,10 +314,11 @@ onMounted(async () => {
 }
 
 .metric-tile {
+  position: relative;
   display: flex;
   gap: 14px;
   min-height: 128px;
-  padding: 18px;
+  padding: 18px 34px 18px 18px;
   border-left: 4px solid var(--dd-primary);
 }
 
