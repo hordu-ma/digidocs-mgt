@@ -233,6 +233,8 @@ docker compose up -d postgres
 
 当前阶段已进入 交付闭环收口与部署验收准备阶段：
 
+- 已完成用户注册登录改造：开放手机号/邮箱自助注册（注册即激活、角色固定 `member`），登录支持用户名/手机号/邮箱三选一，现有用户名测试账号不受影响
+
 - 已完成 `versions` 事务上传工作流
 - 已完成 `audit-events` Go 查询接口与 summary 聚合骨架
 - 已完成 `flow / handover` 写链的首轮事务化与审计联动

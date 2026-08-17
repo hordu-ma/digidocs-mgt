@@ -116,7 +116,7 @@ SQL
 login_token() {
   curl_api --max-time 30 -fsS \
     -H "Content-Type: application/json" \
-    -d "{\"username\":\"$ADMIN_USERNAME\",\"password\":\"$ADMIN_PASSWORD\"}" \
+    -d "{\"identifier\":\"$ADMIN_USERNAME\",\"password\":\"$ADMIN_PASSWORD\"}" \
     "$API_BASE/auth/login" \
     | jq -r ".data.access_token"
 }

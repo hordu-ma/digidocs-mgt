@@ -99,7 +99,7 @@ onMounted(loadProfile);
           <div class="readonly-list">
             <div class="readonly-item">
               <span>登录账号</span>
-              <strong>{{ profile?.username ?? "-" }}</strong>
+              <strong>{{ profile?.username || profile?.email || profile?.phone || "-" }}</strong>
             </div>
             <div class="readonly-item">
               <span>全局角色</span>

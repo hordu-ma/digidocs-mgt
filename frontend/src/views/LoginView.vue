@@ -11,34 +11,33 @@ const router = useRouter();
 const auth = useAuthStore();
 const loading = ref(false);
 const form = reactive({
-  username: "admin",
+  identifier: "",
   password: "",
 });
 
 async function submit() {
-  if (!form.username || !form.password) {
-    ElMessage.error("请输入用户名和密码");
+  if (!form.identifier || !form.password) {
+    ElMessage.error("请输入账号和密码");
     return;
   }
 
   loading.value = true;
   try {
     const res = await axios.post("/api/v1/auth/login", {
-      username: form.username,
+      identifier: form.identifier,
       password: form.password,
     });
     const data = res.data?.data;
     auth.login({
       token: data.access_token,
       id: data.user.id,
-      username: data.user.username,
+      username: data.user.username ?? "",
       displayName: data.user.display_name,
       role: data.user.role,
     });
     void router.push("/dashboard");
-  } catch (err: any) {
-    const msg = extractError(err, "登录失败，请检查用户名和密码");
-    ElMessage.error(msg);
+  } catch (err: unknown) {
+    ElMessage.error(extractError(err, "登录失败，请检查账号和密码"));
   } finally {
     loading.value = false;
   }
@@ -53,16 +52,20 @@ async function submit() {
         成员协作、交接沉淀、负责人总览、OpenClaw 助手
       </div>
       <ElForm label-position="top" @submit.prevent="submit">
-        <ElFormItem label="用户名">
-          <ElInput v-model="form.username" />
+        <ElFormItem label="账号（用户名 / 手机号 / 邮箱）">
+          <ElInput v-model="form.identifier" placeholder="用户名、手机号或邮箱" />
         </ElFormItem>
         <ElFormItem label="密码">
           <ElInput v-model="form.password" show-password type="password" />
         </ElFormItem>
-        <ElButton type="primary" style="width: 100%" @click="submit"
-          >登录</ElButton
-        >
+        <ElButton type="primary" style="width: 100%" :loading="loading" @click="submit">
+          登录
+        </ElButton>
       </ElForm>
+      <div class="auth-switch">
+        没有账号？
+        <RouterLink to="/register">去注册</RouterLink>
+      </div>
     </ElCard>
   </div>
 </template>
@@ -89,5 +92,16 @@ async function submit() {
 .login-subtitle {
   margin-bottom: 24px;
   color: #61748d;
+}
+
+.auth-switch {
+  margin-top: 16px;
+  text-align: center;
+  color: #61748d;
+}
+
+.auth-switch a {
+  color: var(--dd-primary, #124b87);
+  font-weight: 600;
 }
 </style>

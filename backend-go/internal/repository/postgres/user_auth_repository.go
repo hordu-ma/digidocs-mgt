@@ -4,9 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+
+	"github.com/lib/pq"
 
 	"digidocs-mgt/backend-go/internal/domain/auth"
 	"digidocs-mgt/backend-go/internal/service"
+)
+
+const (
+	usersEmailUniqueIndex = "idx_users_email_unique"
+	usersPhoneUniqueIndex = "idx_users_phone_unique"
 )
 
 type UserAuthRepository struct {
@@ -17,18 +25,18 @@ func NewUserAuthRepository(db *sql.DB) UserAuthRepository {
 	return UserAuthRepository{db: db}
 }
 
-func (r UserAuthRepository) FindUserByUsername(ctx context.Context, username string) (*auth.UserRecord, error) {
+func (r UserAuthRepository) FindUserByIdentifier(ctx context.Context, identifier string) (*auth.UserRecord, error) {
 	var record auth.UserRecord
 	if err := r.db.QueryRowContext(
 		ctx,
 		`
-		SELECT id::text, password_hash, display_name, role::text
+		SELECT id::text, COALESCE(username, ''), password_hash, display_name, role::text
 		FROM users
-		WHERE username = $1
+		WHERE (username = $1 OR email = $1 OR phone = $1)
 		  AND status = 'active'
 		`,
-		username,
-	).Scan(&record.ID, &record.PasswordHash, &record.DisplayName, &record.Role); err != nil {
+		identifier,
+	).Scan(&record.ID, &record.Username, &record.PasswordHash, &record.DisplayName, &record.Role); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, service.ErrNotFound
 		}
@@ -36,6 +44,44 @@ func (r UserAuthRepository) FindUserByUsername(ctx context.Context, username str
 	}
 
 	return &record, nil
+}
+
+func (r UserAuthRepository) RegisterUser(ctx context.Context, input auth.RegisterUserInput) (*auth.UserRecord, error) {
+	var record auth.UserRecord
+	err := r.db.QueryRowContext(
+		ctx,
+		`
+		INSERT INTO users (id, username, password_hash, display_name, role, email, phone, status)
+		VALUES (gen_random_uuid(), NULL, $1, $2, 'member'::user_role, NULLIF($3, ''), NULLIF($4, ''), 'active')
+		RETURNING id::text, COALESCE(username, ''), password_hash, display_name, role::text
+		`,
+		input.PasswordHash,
+		input.DisplayName,
+		input.Email,
+		input.Phone,
+	).Scan(&record.ID, &record.Username, &record.PasswordHash, &record.DisplayName, &record.Role)
+	if err != nil {
+		if conflict := uniqueIndexConflict(err); conflict != nil {
+			return nil, conflict
+		}
+		return nil, err
+	}
+	return &record, nil
+}
+
+func uniqueIndexConflict(err error) error {
+	var pqErr *pq.Error
+	if !errors.As(err, &pqErr) || pqErr.Code != "23505" {
+		return nil
+	}
+	switch pqErr.Constraint {
+	case usersEmailUniqueIndex:
+		return fmt.Errorf("%w: 该邮箱已被注册", service.ErrConflict)
+	case usersPhoneUniqueIndex:
+		return fmt.Errorf("%w: 该手机号已被注册", service.ErrConflict)
+	default:
+		return service.ErrConflict
+	}
 }
 
 func (r UserAuthRepository) GetUserProfile(ctx context.Context, userID string) (*auth.UserProfile, error) {
@@ -46,7 +92,7 @@ func (r UserAuthRepository) GetUserProfile(ctx context.Context, userID string) (
 		`
 		SELECT
 			id::text,
-			username,
+			COALESCE(username, ''),
 			display_name,
 			role::text,
 			COALESCE(email, ''),
@@ -100,7 +146,7 @@ func (r UserAuthRepository) UpdateUserProfile(ctx context.Context, userID string
 		  AND status = 'active'
 		RETURNING
 			id::text,
-			username,
+			COALESCE(username, ''),
 			display_name,
 			role::text,
 			COALESCE(email, ''),
@@ -127,6 +173,9 @@ func (r UserAuthRepository) UpdateUserProfile(ctx context.Context, userID string
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, service.ErrNotFound
+		}
+		if conflict := uniqueIndexConflict(err); conflict != nil {
+			return nil, conflict
 		}
 		return nil, err
 	}

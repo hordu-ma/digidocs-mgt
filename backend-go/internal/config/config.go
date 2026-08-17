@@ -31,6 +31,8 @@ type Config struct {
 
 	// LoginRateLimitPerMin caps login attempts per client IP per minute (0 disables).
 	LoginRateLimitPerMin int
+	// RegisterRateLimitPerMin caps registration attempts per client IP per minute (0 disables).
+	RegisterRateLimitPerMin int
 }
 
 func Load() Config {
@@ -57,6 +59,7 @@ func Load() Config {
 		SynologySharePath:          getEnv("SYNOLOGY_SHARE_PATH", "/DigiDocs"),
 		CodeRepoRoot:               getEnv("CODE_REPO_ROOT", "/tmp/digidocs-code-repos"),
 		LoginRateLimitPerMin:       getEnvInt("LOGIN_RATE_LIMIT_PER_MIN", 10),
+		RegisterRateLimitPerMin:    getEnvInt("REGISTER_RATE_LIMIT_PER_MIN", 5),
 	}
 
 	if cfg.AppEnv == "production" {

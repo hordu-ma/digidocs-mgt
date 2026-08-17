@@ -27,21 +27,41 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if payload.Username == "" || payload.Password == "" {
-		response.WriteError(w, http.StatusBadRequest, "bad_request", "username and password are required")
+	if payload.Identifier == "" || payload.Password == "" {
+		response.WriteError(w, http.StatusBadRequest, "bad_request", "identifier and password are required")
 		return
 	}
 
-	token, claims, err := h.authService.Login(r.Context(), payload.Username, payload.Password)
+	token, claims, err := h.authService.Login(r.Context(), payload.Identifier, payload.Password)
 	if err != nil {
 		if errors.Is(err, service.ErrUnauthorized) {
-			response.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid username or password")
+			response.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid account or password")
 			return
 		}
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "login failed")
 		return
 	}
 
+	writeAuthSession(w, token, claims)
+}
+
+func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	var payload request.RegisterRequest
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid request body")
+		return
+	}
+
+	token, claims, err := h.authService.Register(r.Context(), payload.Email, payload.Phone, payload.Password, payload.DisplayName)
+	if err != nil {
+		writeServiceError(w, err, "user not found", "registration failed")
+		return
+	}
+
+	writeAuthSession(w, token, claims)
+}
+
+func writeAuthSession(w http.ResponseWriter, token string, claims auth.Claims) {
 	response.WriteData(w, http.StatusOK, map[string]any{
 		"access_token": token,
 		"token_type":   "Bearer",
@@ -112,6 +132,8 @@ func (h AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 			response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid profile data")
 		case errors.Is(err, service.ErrNotFound):
 			response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found")
+		case errors.Is(err, service.ErrConflict):
+			writeServiceError(w, err, "user not found", "failed to update current user")
 		default:
 			response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update current user")
 		}

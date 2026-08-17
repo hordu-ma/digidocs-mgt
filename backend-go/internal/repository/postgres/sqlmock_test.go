@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/lib/pq"
 
 	"digidocs-mgt/backend-go/internal/domain/auth"
 	"digidocs-mgt/backend-go/internal/service"
@@ -125,7 +127,7 @@ func TestAdminRepository_UserAndMemberMethods(t *testing.T) {
 	mock.ExpectQuery("INSERT INTO project_members").
 		WithArgs("p-1", "u-2", "contributor").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("pm-2"))
-	mock.ExpectQuery("SELECT display_name, username FROM users").
+	mock.ExpectQuery("SELECT display_name, COALESCE\\(username").
 		WithArgs("u-2").
 		WillReturnRows(sqlmock.NewRows([]string{"display_name", "username"}).AddRow("李四", "lisi"))
 	added, err := repo.AddProjectMember(ctx, "p-1", "u-2", "contributor")
@@ -136,7 +138,7 @@ func TestAdminRepository_UserAndMemberMethods(t *testing.T) {
 	mock.ExpectQuery("UPDATE project_members SET").
 		WithArgs("pm-2", "viewer").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "project_role"}).AddRow("pm-2", "u-2", "viewer"))
-	mock.ExpectQuery("SELECT display_name, username FROM users").
+	mock.ExpectQuery("SELECT display_name, COALESCE\\(username").
 		WithArgs("u-2").
 		WillReturnRows(sqlmock.NewRows([]string{"display_name", "username"}).AddRow("李四", "lisi"))
 	member, err := repo.UpdateProjectMember(ctx, "pm-2", "viewer")
@@ -174,16 +176,16 @@ func TestUserAuthRepositoryMethods(t *testing.T) {
 	ctx := context.Background()
 	db, mock := newMockDB(t)
 	repo := NewUserAuthRepository(db)
-	mock.ExpectQuery("FROM users\\s+WHERE username").
+	mock.ExpectQuery("username = \\$1 OR email = \\$1 OR phone = \\$1").
 		WithArgs("zhangsan").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "password_hash", "display_name", "role"}).AddRow("u-1", "hash", "张三", "member"))
-	record, err := repo.FindUserByUsername(ctx, "zhangsan")
-	if err != nil || record.ID != "u-1" || record.PasswordHash != "hash" {
-		t.Fatalf("FindUserByUsername got %#v err=%v", record, err)
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "display_name", "role"}).AddRow("u-1", "zhangsan", "hash", "张三", "member"))
+	record, err := repo.FindUserByIdentifier(ctx, "zhangsan")
+	if err != nil || record.ID != "u-1" || record.PasswordHash != "hash" || record.Username != "zhangsan" {
+		t.Fatalf("FindUserByIdentifier got %#v err=%v", record, err)
 	}
 
 	loginAt := time.Date(2026, 5, 1, 1, 2, 3, 0, time.UTC)
-	mock.ExpectQuery("SELECT\\s+id::text,\\s+username,\\s+display_name").
+	mock.ExpectQuery("SELECT\\s+id::text,\\s+COALESCE\\(username").
 		WithArgs("u-1").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "display_name", "role", "email", "phone", "wechat", "status", "last_login_at"}).
 			AddRow("u-1", "zhangsan", "张三", "member", "z@example.com", "", "wx", "active", loginAt))
@@ -207,17 +209,51 @@ func TestUserAuthRepositoryNotFound(t *testing.T) {
 	ctx := context.Background()
 	db, mock := newMockDB(t)
 	repo := NewUserAuthRepository(db)
-	mock.ExpectQuery("FROM users\\s+WHERE username").WillReturnError(sql.ErrNoRows)
-	if _, err := repo.FindUserByUsername(ctx, "missing"); !errors.Is(err, service.ErrNotFound) {
-		t.Fatalf("FindUserByUsername err=%v, want ErrNotFound", err)
+	mock.ExpectQuery("username = \\$1 OR email = \\$1 OR phone = \\$1").WillReturnError(sql.ErrNoRows)
+	if _, err := repo.FindUserByIdentifier(ctx, "missing"); !errors.Is(err, service.ErrNotFound) {
+		t.Fatalf("FindUserByIdentifier err=%v, want ErrNotFound", err)
 	}
-	mock.ExpectQuery("SELECT\\s+id::text,\\s+username").WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("SELECT\\s+id::text,\\s+COALESCE\\(username").WillReturnError(sql.ErrNoRows)
 	if _, err := repo.GetUserProfile(ctx, "missing"); !errors.Is(err, service.ErrNotFound) {
 		t.Fatalf("GetUserProfile err=%v, want ErrNotFound", err)
 	}
 	mock.ExpectQuery("UPDATE users").WillReturnError(sql.ErrNoRows)
 	if _, err := repo.UpdateUserProfile(ctx, "missing", auth.ProfileUpdateInput{}); !errors.Is(err, service.ErrNotFound) {
 		t.Fatalf("UpdateUserProfile err=%v, want ErrNotFound", err)
+	}
+	assertExpectations(t, mock)
+}
+
+func TestUserAuthRepositoryRegisterUser(t *testing.T) {
+	ctx := context.Background()
+	db, mock := newMockDB(t)
+	repo := NewUserAuthRepository(db)
+
+	input := auth.RegisterUserInput{
+		Email:        "user@example.com",
+		Phone:        "13800138000",
+		PasswordHash: "hash",
+		DisplayName:  "新用户",
+	}
+	mock.ExpectQuery("INSERT INTO users").
+		WithArgs("hash", "新用户", "user@example.com", "13800138000").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "display_name", "role"}).
+			AddRow("u-new", "", "hash", "新用户", "member"))
+	created, err := repo.RegisterUser(ctx, input)
+	if err != nil || created.ID != "u-new" || created.Username != "" || created.Role != "member" {
+		t.Fatalf("RegisterUser got %#v err=%v", created, err)
+	}
+
+	mock.ExpectQuery("INSERT INTO users").
+		WillReturnError(&pq.Error{Code: "23505", Constraint: "idx_users_email_unique"})
+	if _, err := repo.RegisterUser(ctx, input); !errors.Is(err, service.ErrConflict) || !strings.Contains(err.Error(), "该邮箱已被注册") {
+		t.Fatalf("email conflict err=%v", err)
+	}
+
+	mock.ExpectQuery("INSERT INTO users").
+		WillReturnError(&pq.Error{Code: "23505", Constraint: "idx_users_phone_unique"})
+	if _, err := repo.RegisterUser(ctx, input); !errors.Is(err, service.ErrConflict) || !strings.Contains(err.Error(), "该手机号已被注册") {
+		t.Fatalf("phone conflict err=%v", err)
 	}
 	assertExpectations(t, mock)
 }

@@ -90,7 +90,8 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| `frontend/src/views/LoginView.vue` | 登录页，提交用户名密码到 `/auth/login`，成功后写入 auth store 并跳转仪表盘。 |
+| `frontend/src/views/LoginView.vue` | 登录页，提交账号（用户名/手机号/邮箱）和密码到 `/auth/login`，成功后写入 auth store 并跳转仪表盘。 |
+| `frontend/src/views/RegisterView.vue` | 自助注册页，提交手机号或邮箱、密码和显示姓名到 `/auth/register`，成功后直接落地登录态并跳转仪表盘。 |
 | `frontend/src/views/DashboardView.vue` | 仪表盘页面，读取 `/dashboard/overview`、`/dashboard/recent-flows`、`/dashboard/risk-documents` 三组数据，展示 KPI、近期流转和风险提示。 |
 | `frontend/src/views/DocumentsView.vue` | 文档列表页，支持分页、关键词搜索和“新建文档”弹窗。 |
 | `frontend/src/views/DocumentDetailView.vue` | 文档详情页，是前端业务最复杂的页面，负责展示基本信息、版本历史、流转历史、AI 建议，并支持编辑、删除/恢复、上传新版本、执行流转动作、触发摘要。 |
@@ -103,7 +104,11 @@
 
 `LoginView.vue` 对应后端：
 
-- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/login`（`identifier` + `password`）
+
+`RegisterView.vue` 对应后端：
+
+- `POST /api/v1/auth/register`
 
 作用：
 

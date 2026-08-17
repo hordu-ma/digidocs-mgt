@@ -23,7 +23,7 @@ api.interceptors.response.use(
     (error) => {
         const status = error?.response?.status;
         const url = String(error?.config?.url ?? "");
-        if (status === 401 && !url.includes("/auth/login")) {
+        if (status === 401 && !url.includes("/auth/login") && !url.includes("/auth/register")) {
             const auth = useAuthStore();
             if (auth.token) {
                 auth.logout();

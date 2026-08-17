@@ -9,12 +9,14 @@ const DocumentDetailView = () => import("@/views/DocumentDetailView.vue");
 const DocumentsView = () => import("@/views/DocumentsView.vue");
 const HandoversView = () => import("@/views/HandoversView.vue");
 const LoginView = () => import("@/views/LoginView.vue");
+const RegisterView = () => import("@/views/RegisterView.vue");
 const ProfileView = () => import("@/views/ProfileView.vue");
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/login", name: "login", component: LoginView },
+    { path: "/register", name: "register", component: RegisterView },
     { path: "/", redirect: "/dashboard" },
     { path: "/dashboard", name: "dashboard", component: DashboardView, meta: { requiresAuth: true } },
     { path: "/documents", name: "documents", component: DocumentsView, meta: { requiresAuth: true } },

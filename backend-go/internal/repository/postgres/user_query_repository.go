@@ -20,7 +20,7 @@ func (r UserQueryRepository) ListUsers(ctx context.Context) ([]query.UserOption,
 		`
 		SELECT
 			id::text,
-			username,
+			COALESCE(username, ''),
 			display_name,
 			role::text,
 			COALESCE(email, ''),

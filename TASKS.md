@@ -6,6 +6,13 @@
 
 ## 已完成
 
+- 完成**用户注册登录改造（手机号/邮箱 + 密码）**
+  - 新增迁移 `010_self_registration.sql`：`users.username` 可空，`email` / `phone` 部分唯一索引
+  - 新增公开接口 `POST /api/v1/auth/register`：注册即激活、角色强制 `member`、成功即签发 JWT；独立限流 `REGISTER_RATE_LIMIT_PER_MIN`
+  - `/auth/login` 请求字段改为 `identifier`，支持用户名 / 手机号 / 邮箱三选一；JWT `username` 改用数据库真实值
+  - 前端新增 `/register` 页，登录页改为账号三选一并增加注册入口；nginx 补齐 SPA 路由
+  - `make smoke` 增加「注册新账号 → 自动登录 → 访问受保护接口」检查
+  - 已同步 `docs/API设计.md`、`docs/数据库设计.md`、`docs/用户使用说明.md`
 - 完成**安全与健壮性修复轮（P0+P1）**：基于一次全仓库代码审阅（Go 后端 / Python Worker / 前端三路并行）识别问题后的集中修复
   - P0（高危，已修复）
     - 存储路径穿越：文档 / 版本 / 数据资产上传时，客户端提供的文件名不再直接拼进 ObjectKey，新增 `shared.SanitizeStoredFileName()` 剥离目录分量与 `..`；`storage/synology/provider.go` 的 `absPath()` 增加 `path.Clean` 兜底，双层防护
@@ -552,7 +559,6 @@
   - 已通过 `STRICT_SMOKE=1 ASSISTANT_SMOKE_POLL_ATTEMPTS=45 ASSISTANT_SMOKE_POLL_INTERVAL=2 make smoke`
 
 ## 待办
-
 - ~~跑通 Alembic 初始迁移~~ ✅ 已完成
 - ~~将占位 API 改为真实数据库读写~~ ✅ 已完成
 - ~~前端页面接入真实后端 API~~ ✅ 已完成

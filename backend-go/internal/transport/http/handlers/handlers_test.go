@@ -128,8 +128,8 @@ func TestAuth_LoginLogoutAndErrorBranches(t *testing.T) {
 
 	login := httptest.NewRecorder()
 	handler.ServeHTTP(login, httptest.NewRequest("POST", "/api/v1/auth/login", jsonBody(map[string]string{
-		"username": "admin",
-		"password": "admin123",
+		"identifier": "admin",
+		"password":   "admin123",
 	})))
 	if login.Code != http.StatusOK {
 		t.Fatalf("login status = %d, want 200; body = %s", login.Code, login.Body.String())
@@ -142,7 +142,7 @@ func TestAuth_LoginLogoutAndErrorBranches(t *testing.T) {
 
 	missing := httptest.NewRecorder()
 	handler.ServeHTTP(missing, httptest.NewRequest("POST", "/api/v1/auth/login", jsonBody(map[string]string{
-		"username": "admin",
+		"identifier": "admin",
 	})))
 	if missing.Code != http.StatusBadRequest {
 		t.Fatalf("missing password status = %d, want 400; body = %s", missing.Code, missing.Body.String())
@@ -150,8 +150,8 @@ func TestAuth_LoginLogoutAndErrorBranches(t *testing.T) {
 
 	invalid := httptest.NewRecorder()
 	handler.ServeHTTP(invalid, httptest.NewRequest("POST", "/api/v1/auth/login", jsonBody(map[string]string{
-		"username": "admin",
-		"password": "wrong",
+		"identifier": "admin",
+		"password":   "wrong",
 	})))
 	if invalid.Code != http.StatusUnauthorized {
 		t.Fatalf("invalid password status = %d, want 401; body = %s", invalid.Code, invalid.Body.String())
@@ -167,6 +167,73 @@ func TestAuth_LoginLogoutAndErrorBranches(t *testing.T) {
 	handler.ServeHTTP(logout, authedRequest("POST", "/api/v1/auth/logout", nil, token))
 	if logout.Code != http.StatusOK {
 		t.Fatalf("logout status = %d, want 200; body = %s", logout.Code, logout.Body.String())
+	}
+}
+
+func TestAuth_RegisterAndLoginByContact(t *testing.T) {
+	handler, _ := testServer(t)
+
+	missingContact := httptest.NewRecorder()
+	handler.ServeHTTP(missingContact, httptest.NewRequest("POST", "/api/v1/auth/register", jsonBody(map[string]string{
+		"password":     "password1",
+		"display_name": "新用户",
+	})))
+	if missingContact.Code != http.StatusBadRequest {
+		t.Fatalf("missing contact status = %d, want 400; body = %s", missingContact.Code, missingContact.Body.String())
+	}
+
+	created := httptest.NewRecorder()
+	handler.ServeHTTP(created, httptest.NewRequest("POST", "/api/v1/auth/register", jsonBody(map[string]string{
+		"email":        "member@example.com",
+		"phone":        "13900139000",
+		"password":     "password1",
+		"display_name": "自助用户",
+	})))
+	if created.Code != http.StatusOK {
+		t.Fatalf("register status = %d, want 200; body = %s", created.Code, created.Body.String())
+	}
+	createdData, _ := parseResponse(t, created)["data"].(map[string]any)
+	if createdData["access_token"] == "" {
+		t.Fatalf("expected register to return access_token, got %#v", createdData)
+	}
+	user, _ := createdData["user"].(map[string]any)
+	if user["role"] != "member" || user["display_name"] != "自助用户" {
+		t.Fatalf("unexpected registered user: %#v", user)
+	}
+
+	conflict := httptest.NewRecorder()
+	handler.ServeHTTP(conflict, httptest.NewRequest("POST", "/api/v1/auth/register", jsonBody(map[string]string{
+		"email":        "member@example.com",
+		"password":     "password1",
+		"display_name": "重复邮箱",
+	})))
+	if conflict.Code != http.StatusConflict {
+		t.Fatalf("duplicate email status = %d, want 409; body = %s", conflict.Code, conflict.Body.String())
+	}
+
+	emailLogin := httptest.NewRecorder()
+	handler.ServeHTTP(emailLogin, httptest.NewRequest("POST", "/api/v1/auth/login", jsonBody(map[string]string{
+		"identifier": "member@example.com",
+		"password":   "password1",
+	})))
+	if emailLogin.Code != http.StatusOK {
+		t.Fatalf("email login status = %d, want 200; body = %s", emailLogin.Code, emailLogin.Body.String())
+	}
+
+	phoneLogin := httptest.NewRecorder()
+	handler.ServeHTTP(phoneLogin, httptest.NewRequest("POST", "/api/v1/auth/login", jsonBody(map[string]string{
+		"identifier": "13900139000",
+		"password":   "password1",
+	})))
+	if phoneLogin.Code != http.StatusOK {
+		t.Fatalf("phone login status = %d, want 200; body = %s", phoneLogin.Code, phoneLogin.Body.String())
+	}
+
+	me := httptest.NewRecorder()
+	token, _ := createdData["access_token"].(string)
+	handler.ServeHTTP(me, authedRequest("GET", "/api/v1/auth/me", nil, token))
+	if me.Code != http.StatusOK {
+		t.Fatalf("me status = %d, want 200; body = %s", me.Code, me.Body.String())
 	}
 }
 

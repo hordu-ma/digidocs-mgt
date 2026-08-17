@@ -3,6 +3,7 @@ package postgres_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,9 +13,11 @@ import (
 	_ "github.com/lib/pq"
 
 	"digidocs-mgt/backend-go/internal/db"
+	"digidocs-mgt/backend-go/internal/domain/auth"
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 	pgrepo "digidocs-mgt/backend-go/internal/repository/postgres"
+	"digidocs-mgt/backend-go/internal/service"
 )
 
 const (
@@ -126,6 +129,76 @@ func TestPostgresIntegrationMigrationsAndRepositoryFlows(t *testing.T) {
 	}
 	if assetTotal != 1 || len(assets) != 1 || assets[0].ID != asset["id"] {
 		t.Fatalf("ListDataAssets items=%#v total=%d, want created asset", assets, assetTotal)
+	}
+}
+
+func TestPostgresIntegrationSelfRegistration(t *testing.T) {
+	ctx := context.Background()
+	database := openIntegrationDB(t)
+	seedIntegrationBaseRows(t, ctx, database)
+
+	var nullable string
+	if err := database.QueryRowContext(ctx, `
+		SELECT is_nullable
+		FROM information_schema.columns
+		WHERE table_schema = current_schema()
+		  AND table_name = 'users'
+		  AND column_name = 'username'
+	`).Scan(&nullable); err != nil {
+		t.Fatalf("username nullability: %v", err)
+	}
+	if nullable != "YES" {
+		t.Fatalf("users.username is_nullable = %q, want YES after migration 010", nullable)
+	}
+
+	repo := pgrepo.NewUserAuthRepository(database)
+	created, err := repo.RegisterUser(ctx, auth.RegisterUserInput{
+		Email:        "self@example.com",
+		Phone:        "13900139001",
+		PasswordHash: "hash",
+		DisplayName:  "自助用户",
+	})
+	if err != nil {
+		t.Fatalf("RegisterUser: %v", err)
+	}
+	if created.Username != "" || created.Role != "member" {
+		t.Fatalf("created user = %#v, want empty username and member role", created)
+	}
+
+	if _, err := repo.RegisterUser(ctx, auth.RegisterUserInput{
+		Email:        "self@example.com",
+		Phone:        "13900139002",
+		PasswordHash: "hash",
+		DisplayName:  "重复邮箱",
+	}); !errors.Is(err, service.ErrConflict) {
+		t.Fatalf("duplicate email err=%v, want ErrConflict", err)
+	}
+	if _, err := repo.RegisterUser(ctx, auth.RegisterUserInput{
+		Email:        "other@example.com",
+		Phone:        "13900139001",
+		PasswordHash: "hash",
+		DisplayName:  "重复手机号",
+	}); !errors.Is(err, service.ErrConflict) {
+		t.Fatalf("duplicate phone err=%v, want ErrConflict", err)
+	}
+
+	byEmail, err := repo.FindUserByIdentifier(ctx, "self@example.com")
+	if err != nil || byEmail.ID != created.ID {
+		t.Fatalf("FindUserByIdentifier email got %#v err=%v", byEmail, err)
+	}
+	byPhone, err := repo.FindUserByIdentifier(ctx, "13900139001")
+	if err != nil || byPhone.ID != created.ID {
+		t.Fatalf("FindUserByIdentifier phone got %#v err=%v", byPhone, err)
+	}
+
+	legacy, err := repo.FindUserByIdentifier(ctx, "integration-user")
+	if err != nil || legacy.ID != integrationUserID {
+		t.Fatalf("legacy username login got %#v err=%v", legacy, err)
+	}
+
+	profile, err := repo.GetUserProfile(ctx, created.ID)
+	if err != nil || profile.Username != "" || profile.Email != "self@example.com" {
+		t.Fatalf("GetUserProfile for self-registered user got %#v err=%v", profile, err)
 	}
 }
 

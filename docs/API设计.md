@@ -33,16 +33,20 @@
 
 ### 2.1 登录
 
-`POST /api/v1/auth/login`
+`POST /api/v1/auth/login`（公开路由，独立登录限流）
+
+同一入口支持用户名、手机号或邮箱三选一登录。老测试账号只有用户名、自助注册账号只有手机号/邮箱，均可使用本接口。
 
 请求体：
 
 ```json
 {
-  "username": "zhangsan",
+  "identifier": "zhangsan",
   "password": "******"
 }
 ```
+
+`identifier` 会按 `username = $1 OR email = $1 OR phone = $1` 精确匹配，命中任一即可。
 
 响应体：
 
@@ -56,6 +60,50 @@
       "id": "uuid",
       "username": "zhangsan",
       "display_name": "张三",
+      "role": "member"
+    }
+  }
+}
+```
+
+JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名时，该字段为空字符串，不会把手机号或邮箱误写入 claims。
+
+### 2.1.1 自助注册
+
+`POST /api/v1/auth/register`（公开路由，独立注册限流，默认 5 次/分钟/IP，`REGISTER_RATE_LIMIT_PER_MIN` 可配）
+
+完全开放注册，不做短信/邮箱验证码；注册即激活，角色由服务端强制写为 `member`。请求体不接受 `role`。
+
+请求体：
+
+```json
+{
+  "email": "user@example.com",
+  "phone": "13800138000",
+  "password": "至少8位",
+  "display_name": "显示姓名"
+}
+```
+
+- `email`、`phone` 至少填一项，可都填；
+- 手机号仅支持中国大陆号段 `^1[3-9]\\d{9}$`；
+- 密码 8–72 字节（与 bcrypt 上限对齐）；
+- `display_name` 必填，最长 64 字符；
+- 校验失败返回 `400 validation_error`；
+- `email` / `phone` 已被占用返回 `409 conflict`，错误信息区分「该邮箱已被注册」/「该手机号已被注册」。
+
+成功响应与登录接口同构，注册成功即签发 JWT 并自动登录：
+
+```json
+{
+  "data": {
+    "access_token": "jwt-token",
+    "token_type": "Bearer",
+    "expires_in": 7200,
+    "user": {
+      "id": "uuid",
+      "username": "",
+      "display_name": "显示姓名",
       "role": "member"
     }
   }

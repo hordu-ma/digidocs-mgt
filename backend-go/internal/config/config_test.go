@@ -5,6 +5,8 @@ import "testing"
 func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("APP_ENV", "")
 	t.Setenv("SYNOLOGY_PORT", "")
+	t.Setenv("LOGIN_RATE_LIMIT_PER_MIN", "")
+	t.Setenv("REGISTER_RATE_LIMIT_PER_MIN", "")
 
 	cfg := Load()
 
@@ -22,6 +24,12 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if cfg.StorageBackend != "memory" {
 		t.Fatalf("unexpected storage backend: %s", cfg.StorageBackend)
+	}
+	if cfg.LoginRateLimitPerMin != 10 {
+		t.Fatalf("unexpected login rate limit: %d", cfg.LoginRateLimitPerMin)
+	}
+	if cfg.RegisterRateLimitPerMin != 5 {
+		t.Fatalf("unexpected register rate limit: %d", cfg.RegisterRateLimitPerMin)
 	}
 }
 
@@ -44,6 +52,8 @@ func TestLoadUsesEnvironment(t *testing.T) {
 	t.Setenv("SYNOLOGY_PASSWORD", "pass")
 	t.Setenv("SYNOLOGY_SHARE_PATH", "/Research")
 	t.Setenv("CODE_REPO_ROOT", "/srv/repos")
+	t.Setenv("LOGIN_RATE_LIMIT_PER_MIN", "20")
+	t.Setenv("REGISTER_RATE_LIMIT_PER_MIN", "3")
 
 	cfg := Load()
 
@@ -70,6 +80,9 @@ func TestLoadUsesEnvironment(t *testing.T) {
 	}
 	if cfg.CodeRepoRoot != "/srv/repos" {
 		t.Fatalf("unexpected code repo root: %s", cfg.CodeRepoRoot)
+	}
+	if cfg.LoginRateLimitPerMin != 20 || cfg.RegisterRateLimitPerMin != 3 {
+		t.Fatalf("rate limit env values not applied: %+v", cfg)
 	}
 }
 

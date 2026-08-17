@@ -52,7 +52,9 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.HandleFunc("GET /healthz", systemHandler.Healthz)
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/system/info", systemHandler.Info)
 	loginLimiter := middleware.NewRateLimiter(cfg.LoginRateLimitPerMin, time.Minute)
+	registerLimiter := middleware.NewRateLimiter(cfg.RegisterRateLimitPerMin, time.Minute)
 	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/login", loginLimiter.Limit(authHandler.Login))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/register", registerLimiter.Limit(authHandler.Register))
 	// Worker callback uses its own shared-secret token, not user JWT.
 	mux.HandleFunc("POST "+cfg.APIV1Prefix+"/internal/worker-results", internalWorkerHandler.ReceiveResult)
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/poll-tasks", internalWorkerHandler.PollTasks)

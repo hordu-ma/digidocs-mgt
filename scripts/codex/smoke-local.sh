@@ -173,8 +173,27 @@ if [[ "$backend_ready" == "1" ]]; then
   # Login and get a token
   login_resp=$(smoke_curl -sS --max-time 5 -X POST "$backend_url/api/v1/auth/login" \
     -H 'Content-Type: application/json' \
-    -d '{"username":"admin","password":"admin123"}' 2>/dev/null || true)
+    -d '{"identifier":"admin","password":"admin123"}' 2>/dev/null || true)
   token=$(echo "$login_resp" | extract_json_string access_token)
+
+  smoke_stamp=$(date +%s)
+  smoke_phone="139$(printf '%08d' $((smoke_stamp % 100000000)))"
+  register_resp=$(smoke_curl -sS --max-time 8 -X POST "$backend_url/api/v1/auth/register" \
+    -H 'Content-Type: application/json' \
+    -d "{\"email\":\"smoke-reg-${smoke_stamp}@digidocs.test\",\"phone\":\"${smoke_phone}\",\"password\":\"SmokeReg1\",\"display_name\":\"Smoke注册\"}" 2>/dev/null || true)
+  register_token=$(echo "$register_resp" | extract_json_string access_token)
+  if [[ -n "$register_token" ]]; then
+    echo "[OK] auth/register returned token"
+    me_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+      -H "Authorization: Bearer $register_token" "$backend_url/api/v1/auth/me" 2>/dev/null)
+    if [[ "$me_status" == "200" ]]; then
+      echo "[OK] registered user can access /auth/me -> $me_status"
+    else
+      require_or_skip "registered user GET /auth/me -> $me_status (expected 200)"
+    fi
+  else
+    require_or_skip "auth/register did not return a token"
+  fi
 
   if [[ -n "$token" ]]; then
     echo "[OK] auth/login returned token"

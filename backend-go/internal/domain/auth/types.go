@@ -29,7 +29,17 @@ type ProfileUpdateInput struct {
 // UserRecord is the minimal user data fetched for authentication.
 type UserRecord struct {
 	ID           string
+	Username     string
 	PasswordHash string
 	DisplayName  string
 	Role         string
+}
+
+// RegisterUserInput is the persistence payload for self-service registration.
+// Username is intentionally omitted: self-registered accounts have no username.
+type RegisterUserInput struct {
+	Email        string
+	Phone        string
+	PasswordHash string
+	DisplayName  string
 }
