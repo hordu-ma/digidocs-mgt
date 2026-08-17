@@ -1,50 +1,64 @@
 #!/usr/bin/env bash
+#
+# 端到端烟测：拉起隔离栈 → 灌种子数据 → 跑接口烟测 → 销毁。
+#
+# 此前本脚本直接 `docker compose --profile app up -d` 演示栈，并把 seed.sql 灌进
+# 演示库，等于每跑一次就重置演示账号并写入一批测试数据。现在改为在
+# docker-compose.smoke.yml 定义的隔离栈上执行，演示环境完全不受影响。
+#
+# 用法：
+#   scripts/codex/smoke-e2e.sh              # 起栈 → 烟测 → 销毁
+#   KEEP_SMOKE_STACK=1 scripts/codex/smoke-e2e.sh   # 跑完保留栈便于排查
+#   RUN_ASSISTANT_SMOKE=1 scripts/codex/smoke-e2e.sh  # 连带 worker / OpenClaw 链路
+
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-backend_url="${BACKEND_BASE_URL:-http://127.0.0.1:18081}"
-frontend_url="${FRONTEND_BASE_URL:-http://127.0.0.1:18080}"
+backend_url="${SMOKE_BACKEND_URL:-http://127.0.0.1:18083}"
+frontend_url="${SMOKE_FRONTEND_URL:-http://127.0.0.1:18082}"
 assistant_smoke="${RUN_ASSISTANT_SMOKE:-0}"
+keep_stack="${KEEP_SMOKE_STACK:-0}"
 
-echo '== e2e compose up =='
-if [[ "$assistant_smoke" == "1" || "$assistant_smoke" == "true" || "$assistant_smoke" == "TRUE" ]]; then
-  docker compose --profile app up -d postgres backend-go backend-py-worker frontend
-else
-  docker compose --profile app up -d postgres backend-go frontend
-fi
+is_truthy() {
+  case "${1:-}" in
+    1|true|TRUE|True|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
-echo '== wait backend =='
-backend_ready=0
-for _ in $(seq 1 60); do
-  if curl -fsS --max-time 2 "$backend_url/healthz" >/dev/null 2>&1; then
-    backend_ready=1
-    break
+cleanup() {
+  local rc=$?
+  if is_truthy "$keep_stack"; then
+    echo
+    echo "[KEEP] KEEP_SMOKE_STACK=1，保留烟测栈；用完执行 scripts/codex/smoke-stack.sh down"
+  else
+    echo
+    ./scripts/codex/smoke-stack.sh down || true
   fi
-  sleep 2
-done
-if [[ "$backend_ready" != "1" ]]; then
-  echo "[MISS] $backend_url/healthz is unreachable after waiting"
-  exit 1
+  exit "$rc"
+}
+trap cleanup EXIT
+
+if is_truthy "$assistant_smoke"; then
+  ./scripts/codex/smoke-stack.sh up --with-worker
+else
+  ./scripts/codex/smoke-stack.sh up
 fi
-echo "[OK] $backend_url/healthz"
 
-echo '== load seed data =='
-docker exec -i digidocs-postgres psql \
-  -v ON_ERROR_STOP=1 \
-  -U "${POSTGRES_USER:-postgres}" \
-  -d "${POSTGRES_DB:-digidocs_mgt}" \
-  < backend-go/sql/seed.sql >/dev/null
-echo '[OK] backend-go/sql/seed.sql loaded'
-
-echo '== frontend health =='
+echo
+echo '== 前端健康检查 =='
 if curl -fsS --max-time 5 "$frontend_url/" >/dev/null; then
   echo "[OK] $frontend_url/"
 else
-  echo "[MISS] $frontend_url/ is unreachable"
+  echo "[MISS] $frontend_url/ 不可达"
   exit 1
 fi
 
-echo '== api smoke =='
-STRICT_SMOKE="${STRICT_SMOKE:-1}" RUN_ASSISTANT_SMOKE="$assistant_smoke" BACKEND_BASE_URL="$backend_url" ./scripts/codex/smoke-local.sh
+echo
+echo '== 接口烟测 =='
+STRICT_SMOKE="${STRICT_SMOKE:-1}" \
+RUN_ASSISTANT_SMOKE="$assistant_smoke" \
+BACKEND_BASE_URL="$backend_url" \
+  ./scripts/codex/smoke-local.sh

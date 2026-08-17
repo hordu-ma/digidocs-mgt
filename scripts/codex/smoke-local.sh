@@ -24,7 +24,7 @@ if [[ -f .env ]]; then
 fi
 
 strict="${STRICT_SMOKE:-0}"
-backend_url="${BACKEND_BASE_URL:-http://127.0.0.1:18081}"
+backend_url="${BACKEND_BASE_URL:-http://127.0.0.1:18083}"
 status=0
 backend_ready=0
 tmp_files=()
@@ -33,7 +33,15 @@ docker_network_name=""
 assistant_poll_interval="${ASSISTANT_SMOKE_POLL_INTERVAL:-2}"
 assistant_poll_attempts="${ASSISTANT_SMOKE_POLL_ATTEMPTS:-20}"
 version_smoke_timeout="${VERSION_SMOKE_TIMEOUT:-20}"
-run_assistant_smoke="${RUN_ASSISTANT_SMOKE:-1}"
+run_assistant_smoke="${RUN_ASSISTANT_SMOKE:-0}"
+# 隔离栈与演示栈的容器名不同；按目标端口推断，可用 SMOKE_* 覆盖。
+if [[ "$backend_url" == *":18081"* ]]; then
+  backend_container="${SMOKE_BACKEND_CONTAINER:-digidocs-backend-go}"
+  worker_container="${SMOKE_WORKER_CONTAINER:-digidocs-backend-py-worker}"
+else
+  backend_container="${SMOKE_BACKEND_CONTAINER:-digidocs-smoke-backend-go}"
+  worker_container="${SMOKE_WORKER_CONTAINER:-digidocs-smoke-backend-py-worker}"
+fi
 
 is_truthy() {
   case "${1:-}" in
@@ -149,21 +157,57 @@ for container in digidocs-backend-go; do
   fi
 done
 if is_truthy "$run_assistant_smoke"; then
-  if container_running "digidocs-backend-py-worker"; then
-    echo "[OK] digidocs-backend-py-worker running"
+  if container_running "$worker_container"; then
+    echo "[OK] $worker_container running"
   else
-    require_or_skip "digidocs-backend-py-worker is not running; start with docker compose --profile app up -d backend-py-worker"
+    require_or_skip "$worker_container is not running; start it with scripts/codex/smoke-stack.sh up --with-worker"
   fi
 else
   echo "[SKIP] assistant worker container check disabled by RUN_ASSISTANT_SMOKE=$run_assistant_smoke"
 fi
 
+# ---------------------------------------------------------------------------
+# 环境护栏
+#
+# 本脚本会往目标库写入一次性数据（smoke 版本、smoke 会话、@digidocs.test 账号、
+# 邀请链接）。它此前默认打 127.0.0.1:18081——也就是演示后端，于是每跑一次烟测
+# 客户演示环境就多一批测试垃圾。
+#
+# 现在默认打隔离栈（18083），并在真正写数据之前确认对端 APP_ENV=smoke。打到别的
+# 环境一律拒绝执行，除非调用方明确 ALLOW_SMOKE_ON_SHARED=1 表示自己知道后果。
+# ---------------------------------------------------------------------------
+allow_shared="${ALLOW_SMOKE_ON_SHARED:-0}"
+
+assert_smoke_target() {
+  local info env_value
+  info=$(smoke_curl -sS --max-time 3 "$backend_url/api/v1/system/info" 2>/dev/null || true)
+  env_value=$(echo "$info" | extract_json_string env)
+
+  if [[ "$env_value" == "smoke" ]]; then
+    echo "[OK] 目标是隔离烟测栈（APP_ENV=smoke）"
+    return 0
+  fi
+
+  if is_truthy "$allow_shared"; then
+    echo "[WARN] 目标 APP_ENV=${env_value:-unknown}，不是隔离烟测栈；"
+    echo "[WARN] 因 ALLOW_SMOKE_ON_SHARED=1 继续执行——本次会往该环境写入测试数据。"
+    echo "[WARN] 跑完记得执行 make clean-demo-data-apply 清理。"
+    return 0
+  fi
+
+  echo "[ABORT] 拒绝对非烟测环境执行：$backend_url（APP_ENV=${env_value:-unknown}）"
+  echo "[ABORT] 本脚本会写入测试数据，打到演示/生产库会污染客户演示内容。"
+  echo "[ABORT] 请改用隔离栈： scripts/codex/smoke-stack.sh up && make smoke"
+  echo "[ABORT] 确实要打当前环境时： ALLOW_SMOKE_ON_SHARED=1 make smoke"
+  exit 1
+}
+
 echo '== backend healthz =='
 if smoke_curl -fsS --max-time 3 "$backend_url/healthz" >/dev/null 2>&1; then
   echo "[OK] $backend_url/healthz"
   backend_ready=1
-elif container_running "digidocs-backend-go"; then
-  docker_network_name=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' digidocs-backend-go 2>/dev/null || true)
+elif container_running "$backend_container"; then
+  docker_network_name=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$backend_container" 2>/dev/null || true)
   if [[ -n "$docker_network_name" ]]; then
     backend_url="http://backend-go:8080"
     use_docker_curl=1
@@ -175,6 +219,19 @@ if [[ "$use_docker_curl" == "1" ]] && smoke_curl -fsS --max-time 3 "$backend_url
   backend_ready=1
 elif [[ "$backend_ready" != "1" ]]; then
   require_or_skip "$backend_url/healthz is unreachable"
+  # 非 strict 模式下上面只是 SKIP，整轮仍会「通过」。默认目标是隔离烟测栈，
+  # 而它是按需拉起的，所以这里明确说清楚该怎么做，避免把「栈没起」误读成
+  # 「烟测通过」。
+  if [[ "$backend_url" == *":18083"* ]]; then
+    echo "[HINT] 默认目标是隔离烟测栈，它需要先拉起："
+    echo "[HINT]   scripts/codex/smoke-stack.sh up   # 起栈并灌种子数据"
+    echo "[HINT]   make smoke                        # 再跑本脚本"
+    echo "[HINT] 或者用一条命令跑完整流程（自动起栈、跑完销毁）： make smoke-e2e"
+  fi
+fi
+
+if [[ "$backend_ready" == "1" ]]; then
+  assert_smoke_target
 fi
 
 echo '== business endpoint smoke =='

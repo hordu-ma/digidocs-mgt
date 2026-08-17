@@ -1,4 +1,4 @@
-.PHONY: doctor verify verify-go coverage-go verify-worker coverage-worker verify-frontend coverage-frontend integration-postgres check-doc-sync install-project-skills install-hooks install-persistent-routing smoke smoke-e2e status clean-demo-data
+.PHONY: doctor verify verify-go coverage-go verify-worker coverage-worker verify-frontend coverage-frontend integration-postgres check-doc-sync install-project-skills install-hooks install-persistent-routing smoke smoke-e2e smoke-stack-up smoke-stack-down smoke-stack-status status clean-demo-data clean-demo-data-apply
 
 doctor:
 	./scripts/codex/doctor.sh
@@ -9,19 +9,31 @@ check-doc-sync:
 status:
 	./scripts/codex/report.sh
 
+# 烟测默认打隔离栈（127.0.0.1:18083），不再碰演示环境。
+# 打非烟测环境会被脚本拒绝，除非显式 ALLOW_SMOKE_ON_SHARED=1。
 smoke:
 	./scripts/codex/smoke-local.sh
 
-# smoke 会往目标库写入一次性数据（版本 / 会话 / 注册账号 / 邀请链接）。
-# 对着演示库跑过之后，用这个把残留清掉再给客户演示。
+# 一条命令跑完整流程：起隔离栈 → 灌种子 → 跑烟测 → 销毁。
+smoke-e2e:
+	./scripts/codex/smoke-e2e.sh
+
+# 需要保留栈反复调试时，手动管理生命周期。
+smoke-stack-up:
+	./scripts/codex/smoke-stack.sh up
+
+smoke-stack-down:
+	./scripts/codex/smoke-stack.sh down
+
+smoke-stack-status:
+	./scripts/codex/smoke-stack.sh status
+
+# 兜底清理：万一有人用 ALLOW_SMOKE_ON_SHARED=1 对着演示库跑过烟测。
 clean-demo-data:
 	./scripts/codex/clean-demo-data.sh --dry-run
 
 clean-demo-data-apply:
 	./scripts/codex/clean-demo-data.sh --apply
-
-smoke-e2e:
-	./scripts/codex/smoke-e2e.sh
 
 integration-postgres:
 	./scripts/codex/postgres-integration.sh

@@ -592,10 +592,16 @@
 - [ ] **P0-2 演示环境仍在用种子默认口令** — `admin` / `admin123` 目前可直接登录公网演示环境，角色是平台管理员，明文与 bcrypt 哈希都公开写在 `backend-go/sql/seed.sql` 注释里；`maliguo` / `qiaoanqiang` / `wangzhao` / `liuzongyou` 同为 `admin123`。`docs/现场部署逐条清单.md` 早已要求「初始化后立即修改默认演示账号密码」，但线上没有执行。改口令属于线上账号操作，需由负责人执行。后续建议把 `seed.sql` 拆成「结构演示数据」与「账号」两部分，账号口令改为部署时随机生成并只打印一次。
 - [ ] **P0-3 公网入口无 TLS**（本轮明确暂不处理）— `https://8.152.204.76` 无监听，登录口令、JWT、git push token 全程明文过公网；代码页给用户的 git remote 就是 `http://`。原「运维/部署 P3 · 生产入口反向代理与 TLS 收口」的定级偏低：在开放自助注册的前提下这是 P0。落地 443 后需同步加回 HSTS。
 - [x] **P1-6 演示库 smoke 残留数据** — ✅ 已清理（2026-08-17）。新增 `scripts/codex/clean-demo-data.sh`（`make clean-demo-data` 预览 / `make clean-demo-data-apply` 执行），按稳定标记而非时间窗判定 smoke 产物：`@digidocs.test` 账号、`smoke%` 版本文件名、smoke 固定会话标题。本轮清掉 25 个 smoke 版本 + 25 条关联审计事件、28 个 smoke 会话 + 56 条消息 + 28 条请求、5 个测试账号 + 3 条成员关系、5 条 smoke 邀请链接；真实数据（8 个账号、16 篇文档、8 个人工会话）零损失，《寒假特训营日志》回到唯一真实版本 v1。执行前自动 `pg_dump` 备份到 `~/ops/digidocs-backups/`。
-  - 尚未根治：`smoke-local.sh` 的 `BACKEND_BASE_URL` 默认就是演示后端 `127.0.0.1:18081`，**每跑一次 `make smoke` 都会重新污染演示库**。已在脚本顶部加醒目提示，并把清理做成一条 make 目标；真正的解法是给 smoke 单独起一套 compose/数据库，见下条。
-- [ ] **让 smoke 跑在独立数据库上** — 当前 `make smoke` / `make smoke-e2e` 直接打演示环境。应提供独立的 compose profile 或 `BACKEND_BASE_URL` 约定，让烟测有自己的库，从根上消除「测完要记得清理」这个人肉步骤。
-- [ ] **清理群晖上的孤儿对象** — 25 个 smoke 版本共用同一个对象键 `documents/963680e3-620e-4065-8387-9cf29eccb9af/smoke-v2.txt`，数据库行删除后该文件成为孤儿（不在任何页面可见，仅占空间）。更普遍的问题是：删除版本/文档时没有联动清理存储对象，长期会累积孤儿文件，值得补一个对账任务。
-- [ ] **演示库里仍有一条英文测试味会话** — 助手页保留了一条标题为 `What can you do for me, ...` 的会话。它是人工输入而非 smoke 产物，所以清理脚本没有动它；但对中文客户演示来说观感偏测试痕迹，是否删除请负责人定夺。
+- [x] **让 smoke 跑在独立数据库上（根治）** — ✅ 已完成（2026-08-17）。新增 `docker-compose.smoke.yml` + `scripts/codex/smoke-stack.sh`：
+  - 独立 compose project `digidocs-smoke` → 容器 / 卷 / 网络全部独立，`down -v` 彻底清除
+  - 独立容器名、端口（pg 15433 / 后端 18083 / 前端 18082）、数据库 `digidocs_smoke`、网段 `172.30.0.0/24`
+  - `STORAGE_BACKEND=memory`：烟测上传不再往客户群晖 `/DigiDocs` 写文件（此前每轮都会留下 `documents/<id>/smoke-v2.txt`，正是孤儿对象的来源）
+  - `smoke-local.sh` 默认目标改为 18083，并在**写任何数据之前**校验对端 `APP_ENV=smoke`；打到演示/生产环境直接 abort，确需如此要显式 `ALLOW_SMOKE_ON_SHARED=1`
+  - `smoke-e2e.sh` 重写为「起隔离栈 → 灌种子 → 跑烟测 → 销毁」，不再对演示栈执行 `compose up` 和 `seed.sql`（此前会重置演示账号）
+  - 栈未启动时 `make smoke` 会打印明确的起栈指引，避免把「栈没起」误读成「烟测通过」
+  - 验收：护栏对 18081 正确 abort；隔离栈上跑完整轮 e2e（注册/邀请/文档/看板/审计/版本上传下载/预览）全绿；**演示库六张表计数跑前跑后完全一致**，`clean-demo-data --dry-run` 残留全 0
+- [ ] **清理群晖上的孤儿对象** — 25 个 smoke 版本共用同一个对象键 `documents/963680e3-620e-4065-8387-9cf29eccb9af/smoke-v2.txt`，数据库行删除后该文件成为孤儿（不在任何页面可见，仅占空间）。新增文件已不会再产生（烟测改用 memory 存储），但历史遗留的这一个仍需手动删。更普遍的问题是：删除版本/文档时没有联动清理存储对象，长期会累积孤儿文件，值得补一个对账任务。
+- [x] **演示库里的英文测试味会话** — ✅ 已按负责人要求删除（2026-08-17）。`What can you do for me, ...` 及其 2 条请求、4 条消息已清除；助手页现存 7 条会话全部为中文真实内容。该会话是人工输入而非 smoke 产物，因此不纳入 `clean-demo-data.sh` 的自动判定。
 - [ ] **P2 演示环境自助注册无门槛** — 公网任何人可注册。演示期建议关闭 `/auth/register` 或改邀请码制。
 - [ ] **P3 改密不使旧 JWT 失效** — 无状态 JWT 无吊销名单，改密后旧令牌仍可用至 2 小时自然过期；前端已明确提示。要做到改密即登出需引入 token 版本号或黑名单。
 - [ ] **P3 `AuthenticatePush` 非常量时间比较** — `code_repository_service.go` 用 `==` 比较 push token，建议改 `subtle.ConstantTimeCompare`；同文件 `shortToken` 在 `rand.Read` 失败时返回固定字符串 `"token"`，应改为返回 error。
