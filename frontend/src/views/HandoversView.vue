@@ -27,6 +27,8 @@ type DocumentOption = {
 
 type HandoverLine = {
   document_id: string;
+  title?: string;
+  current_status?: string;
   selected: boolean;
   note: string;
 };
@@ -321,8 +323,12 @@ function buildEditableItems(detail: HandoverDetail, documents: DocumentOption[])
         document_id: item.document_id,
         selected: item.selected,
         note: item.note,
-        title: documentTitle(item.document_id),
-        current_status: "",
+        // Prefer the title the backend already resolved (works regardless of
+        // project scope, archival status, or the loaded-documents page size);
+        // documentTitle()'s lookup against the possibly-filtered
+        // projectDocuments list is only a defensive fallback.
+        title: item.title || documentTitle(item.document_id),
+        current_status: item.current_status || "",
       });
     }
   }

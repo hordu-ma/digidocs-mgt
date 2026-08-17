@@ -51,10 +51,15 @@ class BackendContextClient:
             _, _, raw = fetch(req, timeout=10, label=f"context {path}")
             parsed = cast(object, json.loads(raw))
         except Exception as exc:
-            logger.warning("assistant context fetch failed path=%s", path)
+            # This dict is embedded verbatim into the prompt sent to
+            # OpenClaw/the upstream model (see WorkerDispatcher._build_context
+            # + OpenClawClient), so the raw exception text — which can contain
+            # internal hostnames/ports from a failed connection — must stay
+            # out of it. The real exception goes to the local log only.
+            logger.warning("assistant context fetch failed path=%s", path, exc_info=exc)
             return {
                 "available": False,
-                "error": str(exc),
+                "error": "context unavailable",
                 "path": path,
             }
 

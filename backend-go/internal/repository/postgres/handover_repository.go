@@ -91,12 +91,15 @@ func (r HandoverRepository) GetHandover(ctx context.Context, handoverID string) 
 		ctx,
 		`
 		SELECT
-			document_id::text,
-			selected,
-			COALESCE(note, '')
-		FROM graduation_handover_items
-		WHERE handover_id::text = $1
-		ORDER BY created_at ASC
+			ghi.document_id::text,
+			COALESCE(d.title, ''),
+			COALESCE(d.current_status::text, ''),
+			ghi.selected,
+			COALESCE(ghi.note, '')
+		FROM graduation_handover_items ghi
+		LEFT JOIN documents d ON d.id = ghi.document_id
+		WHERE ghi.handover_id::text = $1
+		ORDER BY ghi.created_at ASC
 		`,
 		handoverID,
 	)
@@ -108,7 +111,7 @@ func (r HandoverRepository) GetHandover(ctx context.Context, handoverID string) 
 	item.Items = make([]query.HandoverLine, 0)
 	for rows.Next() {
 		var line query.HandoverLine
-		if err := rows.Scan(&line.DocumentID, &line.Selected, &line.Note); err != nil {
+		if err := rows.Scan(&line.DocumentID, &line.Title, &line.CurrentStatus, &line.Selected, &line.Note); err != nil {
 			return nil, err
 		}
 		item.Items = append(item.Items, line)

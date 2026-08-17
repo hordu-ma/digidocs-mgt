@@ -13,6 +13,7 @@ def main() -> None:
     dispatcher = WorkerDispatcher()
     if settings.worker_mode == "once":
         dispatcher.describe_startup()
+        dispatcher.poll_once()
         return
 
     dispatcher.run_forever()

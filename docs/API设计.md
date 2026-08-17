@@ -719,26 +719,24 @@
   "data": {
     "id": "uuid",
     "status": "pending_confirm",
-    "target_user": {
-      "id": "uuid",
-      "display_name": "王五"
-    },
-    "receiver_user": {
-      "id": "uuid",
-      "display_name": "赵六"
-    },
+    "target_user_id": "uuid",
+    "receiver_user_id": "uuid",
+    "project_id": "uuid",
+    "remark": "备注",
     "items": [
       {
         "document_id": "uuid",
         "title": "实验记录",
+        "current_status": "in_progress",
         "selected": true,
-        "current_status": "in_progress"
+        "note": ""
       }
-    ],
-    "ai_summary": "该成员主要遗留实验记录、汇报PPT和数据分析表。"
+    ]
   }
 }
 ```
+
+`items[].title` / `items[].current_status`由后端 JOIN `documents` 表解析，不依赖前端已加载的文档列表，因此不受课题范围、归档状态或分页大小影响。当前响应不包含 `ai_summary` 字段（AI 摘要写入 `graduation_handovers.ai_summary`，尚未在本接口透出，如需展示需前端另行查询）。
 
 ### 7.4 更新交接项
 

@@ -72,7 +72,13 @@ const filteredAssets = computed(() => {
 
 // ─────────────────────────── fetch list ──────────────────────────
 
+// Guards against rapidly switching project/folder filters before an earlier
+// fetch resolves: without this, a slower request for a previous filter could
+// resolve after a newer one and silently overwrite the list with stale data.
+let fetchAssetsSeq = 0;
+
 async function fetchAssets() {
+  const mySeq = ++fetchAssetsSeq;
   const res = await api.get("/data-assets", {
     params: {
       keyword: keyword.value || undefined,
@@ -82,6 +88,7 @@ async function fetchAssets() {
       page_size: 200,
     },
   });
+  if (mySeq !== fetchAssetsSeq) return;
   assets.value = res.data?.data?.items ?? [];
   total.value = res.data?.data?.total ?? 0;
 }
@@ -455,7 +462,11 @@ function inferAssetFileType(fileName: string): string {
 }
 
 function getFileExt(fileName: string): string {
-  const ext = fileName?.split(".").pop()?.toUpperCase() ?? "FILE";
+  const dotIndex = fileName?.lastIndexOf(".") ?? -1;
+  // No dot, or a leading dot (dotfile like ".gitignore") — there is no real
+  // extension, so fall back rather than showing the whole filename.
+  const ext = dotIndex > 0 ? fileName.slice(dotIndex + 1).toUpperCase() : "FILE";
+  if (!ext) return "FILE";
   return ext.length > 5 ? ext.slice(0, 4) + "…" : ext;
 }
 

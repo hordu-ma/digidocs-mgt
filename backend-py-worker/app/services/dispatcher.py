@@ -1,6 +1,8 @@
 import logging
 import re
+import signal
 import time
+from types import FrameType
 from typing import cast
 
 from ..clients.backend_context_client import BackendContextClient
@@ -27,16 +29,42 @@ class WorkerDispatcher:
         self.callback_client: CallbackClient = CallbackClient()
         self.poller: TaskPollerClient = TaskPollerClient()
         self.skill_adapter: WorkerSkillAdapter = WorkerSkillAdapter(self.openclaw_client)
+        self._stop_requested = False
 
     def describe_startup(self) -> None:
         print(
             f"worker={settings.worker_name} mode={settings.worker_mode} openclaw={settings.openclaw_base_url}"
         )
 
+    def _handle_stop_signal(self, signum: int, _frame: FrameType | None) -> None:
+        logger.info("received signal %s, will stop after the in-flight batch", signum)
+        self._stop_requested = True
+
+    def poll_once(self) -> None:
+        """Poll and process exactly one batch, then return. Used by
+        WORKER_MODE=once so that mode actually does what its name implies,
+        instead of only printing startup info and exiting immediately."""
+        try:
+            tasks = self.poller.poll()
+        except Exception:
+            logger.exception("poll failed")
+            tasks = []
+        for task in tasks:
+            self._process_one(task)
+
     def run_forever(self) -> None:
         self.describe_startup()
         logger.info("entering poll loop (interval=%ds)", settings.poll_interval)
-        while True:
+        # Docker's default `docker stop` sends SIGTERM and only escalates to
+        # SIGKILL after a grace period; without a handler, a redeploy/restart
+        # can kill the process mid-task, leaving it stuck in `running` until
+        # the backend's ~10 minute stuck-task recovery kicks in. Checking the
+        # flag at the loop boundary (below) lets an in-flight batch finish
+        # and skips starting a new one, at the cost of up to poll_interval
+        # seconds of shutdown latency.
+        signal.signal(signal.SIGTERM, self._handle_stop_signal)
+        signal.signal(signal.SIGINT, self._handle_stop_signal)
+        while not self._stop_requested:
             try:
                 tasks = self.poller.poll()
             except Exception:
@@ -45,7 +73,10 @@ class WorkerDispatcher:
             # Isolate each task: one task crashing must not skip its siblings.
             for task in tasks:
                 self._process_one(task)
+            if self._stop_requested:
+                break
             time.sleep(settings.poll_interval)
+        logger.info("poll loop stopped")
 
     def _process_one(self, task: WorkerTask) -> None:
         started_at = time.perf_counter()

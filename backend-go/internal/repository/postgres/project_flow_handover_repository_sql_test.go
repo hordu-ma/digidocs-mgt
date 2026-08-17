@@ -75,9 +75,10 @@ func TestFlowAndHandoverRepositories(t *testing.T) {
 			AddRow("h-1", "u-1", "u-2", "p-1", "generated", "remark"))
 	mock.ExpectQuery("FROM graduation_handover_items").
 		WithArgs("h-1").
-		WillReturnRows(sqlmock.NewRows([]string{"document_id", "selected", "note"}).AddRow("doc-1", true, "keep"))
+		WillReturnRows(sqlmock.NewRows([]string{"document_id", "title", "current_status", "selected", "note"}).
+			AddRow("doc-1", "实验记录", "in_progress", true, "keep"))
 	handover, err := handovers.GetHandover(ctx, "h-1")
-	if err != nil || handover.ID != "h-1" || len(handover.Items) != 1 {
+	if err != nil || handover.ID != "h-1" || len(handover.Items) != 1 || handover.Items[0].Title != "实验记录" {
 		t.Fatalf("GetHandover got %#v err=%v", handover, err)
 	}
 

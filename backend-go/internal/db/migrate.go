@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -51,12 +52,44 @@ func RunMigrations(db *sql.DB, migrationsDir string) error {
 		}
 
 		log.Printf("[migrate] applying %s ...", name)
-		if _, err := db.Exec(string(content)); err != nil {
+		if err := execMigration(db, string(content)); err != nil {
 			return fmt.Errorf("apply %s: %w", name, err)
 		}
 		log.Printf("[migrate] applied %s", name)
 	}
 
+	return nil
+}
+
+// execMigration runs a migration script (which wraps itself in an explicit
+// BEGIN/COMMIT) on a single dedicated connection.
+//
+// This matters because of how PostgreSQL's simple query protocol handles a
+// multi-statement string: if any statement fails, the server stops executing
+// the rest of the string — including the migration file's own trailing
+// COMMIT — and leaves the session's transaction in an aborted state. Verified
+// against a real PostgreSQL 17 instance: a failed statement partway through
+// such a script left the connection permanently returning "current
+// transaction is aborted, commands ignored until end of transaction block"
+// for every subsequent query on it. Since database/sql pools connections,
+// that one poisoned connection would keep getting handed out to unrelated
+// requests (intermittently, depending on pool size) until it happened to be
+// cycled out by ConnMaxLifetime. Explicitly issuing ROLLBACK on the same
+// connection before releasing it back to the pool prevents that.
+func execMigration(db *sql.DB, script string) error {
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if _, err := conn.ExecContext(ctx, script); err != nil {
+		if _, rbErr := conn.ExecContext(ctx, "ROLLBACK"); rbErr != nil {
+			log.Printf("[migrate] rollback after failed migration also failed: %v", rbErr)
+		}
+		return err
+	}
 	return nil
 }
 

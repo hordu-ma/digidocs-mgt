@@ -402,5 +402,10 @@ docker compose up -d postgres
   - P0：修复文档/版本/数据资产上传文件名可致存储路径穿越；修复数据资产与文档 List/Get 缺少项目成员权限校验导致的越权访问（IDOR）；Worker 正文抽取子进程（pdftotext/pdftoppm/tesseract）补齐超时，避免单文件卡死整个 Worker；Worker 任务轮询对鉴权失败等异常从静默降级为明确日志
   - P1：新增 `assistant_requests.started_at` 字段（迁移 009）修正任务卡死恢复误判；Worker 回调失败不再伪装成功，改为可观测的异常路径；登录限流改为信任 XFF 链路末位，堵住伪造请求头绕过限流的漏洞；代码仓库模块补齐与文档/数据资产一致的项目成员权限校验；前端 AdminView 改用统一 API 客户端并补齐失败提示；DataView 删除操作补齐错误提示；群晖 provider 的 GetObject/PutObject 补齐会话过期自动重登
   - 验证：Go/Worker/前端全量测试通过，新增 PostgreSQL 集成测试与生产库真实数据抽查验证权限过滤语义，已重建三容器并在本机验证环境跑通 `STRICT_SMOKE=1 make smoke`
+- 已完成**安全与健壮性修复轮 P2（低危/体验类）**：同一轮审阅发现的剩余问题集中修复
+  - 修复迁移执行失败后连接被以"事务已中止"状态归还连接池的问题（新增真实 PostgreSQL 回归测试锁定）；交接单详情补齐文档标题/状态，不再依赖前端本地文档列表；内部回调 token 比较改为常量时间
+  - Worker 补齐 SIGTERM 优雅退出与 `WORKER_MODE=once` 真实单轮执行；异常信息不再泄漏进发给 OpenClaw 的 prompt
+  - 前端修复 AssistantView 会话切换竞态与轮询无上限、DataView 筛选竞态、文件大小/扩展名显示边界问题
+  - 验证：三端全量测试通过，已重建三容器并跑通 `STRICT_SMOKE=1 make smoke`，生产库真实数据抽查确认交接单标题正确显示
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

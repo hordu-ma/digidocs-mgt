@@ -36,8 +36,10 @@ func (r HandoverRepository) GetHandover(ctx context.Context, handoverID string) 
 		Status:         "generated",
 		Items: []query.HandoverLine{
 			{
-				DocumentID: "00000000-0000-0000-0000-000000000100",
-				Selected:   true,
+				DocumentID:    "00000000-0000-0000-0000-000000000100",
+				Title:         "示例文档",
+				CurrentStatus: "in_progress",
+				Selected:      true,
 			},
 		},
 	}, nil

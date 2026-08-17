@@ -74,6 +74,12 @@ const messages = ref<AssistantConversationMessageItem[]>([]);
 const activeConversationID = ref("");
 const activeRequestID = ref("");
 let pollTimer: number | null = null;
+let pollAttempts = 0;
+const POLL_INTERVAL_MS = 2000;
+// ~4 minutes: generous enough to cover a slow OpenClaw response (Worker's own
+// upstream timeout defaults to 180s), but bounded so a stuck/lost request
+// does not poll silently forever if the component stays mounted.
+const MAX_POLL_ATTEMPTS = 120;
 
 /* ---------- computed ---------- */
 
@@ -120,6 +126,7 @@ function stopPolling() {
     window.clearTimeout(pollTimer);
     pollTimer = null;
   }
+  pollAttempts = 0;
 }
 
 function escapeHtml(value: string) {
@@ -308,7 +315,15 @@ async function fetchMessages(conversationID: string) {
   }
 }
 
-function openConversation(item: AssistantConversationItem) {
+// Guards against a race when the user clicks through conversations from
+// different projects faster than loadDocuments() resolves: without a
+// per-call token, a slow-to-resolve earlier click's pending `watch(documents)`
+// callback could still fire after a later click and overwrite
+// selectedDocumentID with the wrong (stale) conversation's document.
+let conversationSwitchSeq = 0;
+
+async function openConversation(item: AssistantConversationItem) {
+  const mySeq = ++conversationSwitchSeq;
   activeConversationID.value = item.id;
   // sync selectors from conversation scope
   const projId =
@@ -321,16 +336,15 @@ function openConversation(item: AssistantConversationItem) {
       : "";
   if (projId && projId !== selectedProjectID.value) {
     selectedProjectID.value = projId;
-    // loadDocuments will fire via watcher, then set document
+    await loadDocuments(projId);
+    if (mySeq !== conversationSwitchSeq) return; // superseded by a newer click
     if (docId) {
-      const unwatch = watch(documents, () => {
-        selectedDocumentID.value = docId;
-        unwatch();
-      });
+      selectedDocumentID.value = docId;
     }
   } else if (docId) {
     selectedDocumentID.value = docId;
   }
+  if (mySeq !== conversationSwitchSeq) return;
   void fetchMessages(item.id);
 }
 
@@ -352,9 +366,16 @@ async function pollRequest(requestID: string) {
       }
       return;
     }
+    pollAttempts += 1;
+    if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+      stopPolling();
+      thinking.value = false;
+      ElMessage.warning("AI 仍在处理，已等待较久，请稍后在会话中查看结果");
+      return;
+    }
     pollTimer = window.setTimeout(() => {
       void pollRequest(requestID);
-    }, 2000);
+    }, POLL_INTERVAL_MS);
   } catch (err: any) {
     stopPolling();
     thinking.value = false;

@@ -21,6 +21,20 @@
     - 前端 DataView 的 `deleteAsset`/`deleteFolder` 失败被静默吞掉：补齐 try/catch 与 `ElMessage.error` 提示
     - 群晖 Synology provider 会话过期后 `GetObject`/`PutObject` 不会自动重登：补齐与 `callAPI` 一致的 105/106 探测与重登重试（上传场景对已缓冲的 multipart body 做安全重试），新增回归测试锁定行为
   - 验证：`go build`/`vet`/`test ./...` 全通过；新增 PostgreSQL 集成测试与手工 SQL 对拍验证权限过滤语义（含生产库真实用户/项目数据抽查）；Worker `ruff` + `pytest`(43) 全通过；前端 `vue-tsc`/`vite build`/`vitest` 全通过；已重建 `backend-go`/`backend-py-worker`/`frontend` 三容器并在本机验证环境跑通 `STRICT_SMOKE=1 make smoke`（含 Synology 前置验收）
+- 完成**安全与健壮性修复轮 P2（低危/体验类）**：同一轮审阅发现的剩余问题集中修复
+  - Go 后端
+    - `db.RunMigrations` 迁移文件执行失败时补充显式 `ROLLBACK`：验证到 PostgreSQL 的简单查询协议在多语句字符串中途出错时会中断后续语句（含迁移文件自带的 `COMMIT;`），导致连接被以"事务已中止"状态归还连接池、被其他请求复用后持续报错；新增 `execMigration()` 用独立连接执行并在失败时显式回滚，新增真实 PostgreSQL 回归测试锁定该行为
+    - `graduation_handover_items` 查询补充 JOIN `documents` 返回 `title`/`current_status`：修复前端 `HandoversView.documentTitle()` 因文档不在已加载的（受分页/归档过滤影响的）文档列表中而显示裸 UUID 的问题，同时把 `docs/API设计.md` 交接详情响应示例与真实实现对齐
+    - 内部 worker 回调 token 比较改为 `crypto/subtle.ConstantTimeCompare`，消除时序侧信道
+  - Python Worker
+    - `run_forever` 新增 `SIGTERM`/`SIGINT` 优雅退出：`docker stop` 默认发送 SIGTERM，此前无处理会在任务处理中途被直接杀死；新增 `poll_once()` 让 `WORKER_MODE=once` 真正执行一轮而不是只打印启动信息后退出
+    - `backend_context_client._fetch` 网络异常不再把原始异常文本（可能含内部主机名/端口）塞进发给 OpenClaw 的 prompt 上下文，改为固定文案，真实异常仅记录到本地日志
+  - 前端
+    - `AssistantView.openConversation` 补充请求序号防护：修复快速切换不同课题的会话时，旧的 `watch(documents)` 回调可能在新会话点击之后才触发、把文档范围选错的竞态
+    - `AssistantView` 轮询新增 `MAX_POLL_ATTEMPTS`（约 4 分钟）上限，避免请求长期卡 pending 时无限轮询
+    - `DataView.fetchAssets` 补充请求序号防护，修复快速切换课题/文件夹筛选时旧请求覆盖新结果的竞态
+    - `formatFileSize` 不再把合法的 0 字节文件当 falsy 显示成 `"-"`；`DataView.getFileExt` 修复无扩展名文件（如 `README`）被整个文件名当扩展名截断显示的问题
+  - 验证：Go `build`/`vet`/`test ./...` 全通过（含新增真实 PostgreSQL 回归测试）；Worker `ruff` + `pytest`(44) 全通过；前端 `vue-tsc`/`vite build`/`vitest` 全通过；已重建三容器并在本机验证环境跑通 `STRICT_SMOKE=1 make smoke`；生产库真实数据抽查确认交接单详情正确返回文档标题
 
 - 完成项目定义文档正式版
 - 完成数据库设计文档正式版

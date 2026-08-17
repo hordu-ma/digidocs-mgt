@@ -107,9 +107,11 @@ type HandoverItem struct {
 }
 
 type HandoverLine struct {
-	DocumentID string `json:"document_id"`
-	Selected   bool   `json:"selected"`
-	Note       string `json:"note,omitempty"`
+	DocumentID    string `json:"document_id"`
+	Title         string `json:"title,omitempty"`
+	CurrentStatus string `json:"current_status,omitempty"`
+	Selected      bool   `json:"selected"`
+	Note          string `json:"note,omitempty"`
 }
 
 type DashboardOverview struct {

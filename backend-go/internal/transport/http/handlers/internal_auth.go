@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"crypto/subtle"
 	"net/http"
 	"strings"
 
@@ -14,5 +15,12 @@ func workerAuthorized(r *http.Request, cfg config.Config) bool {
 	}
 
 	token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer"))
-	return token == cfg.WorkerCallbackToken
+	// Constant-time comparison: this token gates the internal worker-results
+	// callback and task-poll endpoints, so a timing side channel could in
+	// principle help an attacker on the same network guess it byte-by-byte.
+	expected := cfg.WorkerCallbackToken
+	if len(token) != len(expected) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(token), []byte(expected)) == 1
 }

@@ -52,6 +52,25 @@ def test_backend_context_fetch_success_and_invalid_response(monkeypatch) -> None
     }
 
 
+def test_backend_context_fetch_transport_error_hides_exception_text(monkeypatch) -> None:
+    # The dict this returns is embedded verbatim into the prompt sent to
+    # OpenClaw, so a transport failure (e.g. connection refused to
+    # internal-host:18081) must not leak internal hostnames/ports into it.
+    client = BackendContextClient()
+
+    def fake_urlopen(request, timeout):
+        raise OSError("[Errno 111] Connection refused: internal-host:18081")
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    context = client.get_document_context("doc-1")
+
+    assert context["available"] is False
+    assert context["error"] == "context unavailable"
+    assert "18081" not in str(context["error"])
+    assert "internal-host" not in str(context["error"])
+
+
 def test_backend_context_download_version_file(monkeypatch) -> None:
     client = BackendContextClient()
 
