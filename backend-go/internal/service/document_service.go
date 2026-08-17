@@ -8,6 +8,7 @@ import (
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/repository"
+	"digidocs-mgt/backend-go/internal/shared"
 	"digidocs-mgt/backend-go/internal/storage"
 )
 
@@ -43,7 +44,10 @@ func (s DocumentService) ListDocuments(ctx context.Context, filter query.Documen
 	return s.reader.ListDocuments(ctx, filter)
 }
 
-func (s DocumentService) GetDocument(ctx context.Context, documentID string) (*query.DocumentDetail, error) {
+func (s DocumentService) GetDocument(ctx context.Context, documentID string, actorID string, actorRole string) (*query.DocumentDetail, error) {
+	if err := s.permissions.EnsureViewDocument(ctx, actorID, actorRole, documentID); err != nil {
+		return nil, err
+	}
 	return s.reader.GetDocument(ctx, documentID)
 }
 
@@ -121,7 +125,7 @@ func (s DocumentService) CreateWithFirstVersion(
 
 	documentID, _ := docData["id"].(string)
 
-	objectKey := fmt.Sprintf("documents/%s/%s", documentID, fileName)
+	objectKey := fmt.Sprintf("documents/%s/%s", documentID, shared.SanitizeStoredFileName(fileName))
 	uploadResult, err := s.storage.PutObject(ctx, storage.PutObjectInput{
 		ObjectKey:   objectKey,
 		Reader:      file,

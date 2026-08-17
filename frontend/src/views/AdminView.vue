@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Setting, User, OfficeBuilding, FolderOpened } from "@element-plus/icons-vue";
-import { useAuthStore } from "@/stores/auth";
 import AppLayout from "@/components/AppLayout.vue";
+import api from "@/api";
+import { extractError } from "@/utils/error";
 
-const auth = useAuthStore();
-const API = "/api/v1";
-const headers = computed(() => ({ Authorization: `Bearer ${auth.token}` }));
 const activeTab = ref("team-spaces");
 
 // ───── Team Spaces ─────
@@ -20,9 +18,10 @@ const tsSubmitting = ref(false);
 async function loadTeamSpaces() {
   tsLoading.value = true;
   try {
-    const res = await fetch(`${API}/team-spaces`, { headers: headers.value });
-    const json = await res.json();
-    teamSpaces.value = json.data ?? [];
+    const res = await api.get("/team-spaces");
+    teamSpaces.value = res.data?.data ?? [];
+  } catch (err) {
+    ElMessage.error(extractError(err, "加载团队空间失败"));
   } finally {
     tsLoading.value = false;
   }
@@ -31,20 +30,13 @@ async function loadTeamSpaces() {
 async function createTeamSpace() {
   tsSubmitting.value = true;
   try {
-    const res = await fetch(`${API}/admin/team-spaces`, {
-      method: "POST",
-      headers: { ...headers.value, "Content-Type": "application/json" },
-      body: JSON.stringify(tsForm.value),
-    });
-    if (!res.ok) {
-      const json = await res.json();
-      ElMessage.error(json.message || "创建失败");
-      return;
-    }
+    await api.post("/admin/team-spaces", tsForm.value);
     ElMessage.success("团队空间创建成功");
     tsDialogVisible.value = false;
     tsForm.value = { name: "", code: "", description: "" };
     await loadTeamSpaces();
+  } catch (err) {
+    ElMessage.error(extractError(err, "创建失败"));
   } finally {
     tsSubmitting.value = false;
   }
@@ -60,9 +52,10 @@ const projSubmitting = ref(false);
 async function loadProjects() {
   projLoading.value = true;
   try {
-    const res = await fetch(`${API}/projects`, { headers: headers.value });
-    const json = await res.json();
-    projects.value = json.data ?? [];
+    const res = await api.get("/projects");
+    projects.value = res.data?.data ?? [];
+  } catch (err) {
+    ElMessage.error(extractError(err, "加载项目失败"));
   } finally {
     projLoading.value = false;
   }
@@ -71,20 +64,13 @@ async function loadProjects() {
 async function createProject() {
   projSubmitting.value = true;
   try {
-    const res = await fetch(`${API}/admin/projects`, {
-      method: "POST",
-      headers: { ...headers.value, "Content-Type": "application/json" },
-      body: JSON.stringify(projForm.value),
-    });
-    if (!res.ok) {
-      const json = await res.json();
-      ElMessage.error(json.message || "创建失败");
-      return;
-    }
+    await api.post("/admin/projects", projForm.value);
     ElMessage.success("项目创建成功");
     projDialogVisible.value = false;
     projForm.value = { team_space_id: "", name: "", code: "", owner_id: "", description: "" };
     await loadProjects();
+  } catch (err) {
+    ElMessage.error(extractError(err, "创建失败"));
   } finally {
     projSubmitting.value = false;
   }
@@ -101,9 +87,10 @@ const userSubmitting = ref(false);
 async function loadUsers() {
   userLoading.value = true;
   try {
-    const res = await fetch(`${API}/admin/users`, { headers: headers.value });
-    const json = await res.json();
-    users.value = json.data ?? [];
+    const res = await api.get("/admin/users");
+    users.value = res.data?.data ?? [];
+  } catch (err) {
+    ElMessage.error(extractError(err, "加载用户失败"));
   } finally {
     userLoading.value = false;
   }
@@ -136,33 +123,25 @@ async function submitUser() {
       if (userForm.value.email !== undefined) body.email = userForm.value.email;
       if (userForm.value.phone !== undefined) body.phone = userForm.value.phone;
       if (userForm.value.password) body.password = userForm.value.password;
-      const res = await fetch(`${API}/admin/users/${userForm.value.id}`, {
-        method: "PATCH",
-        headers: { ...headers.value, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const json = await res.json();
-        ElMessage.error(json.message || "更新失败");
+      try {
+        await api.patch(`/admin/users/${userForm.value.id}`, body);
+      } catch (err) {
+        ElMessage.error(extractError(err, "更新失败"));
         return;
       }
       ElMessage.success(userForm.value.password ? "用户更新成功，密码已重置" : "用户更新成功");
     } else {
-      const res = await fetch(`${API}/admin/users`, {
-        method: "POST",
-        headers: { ...headers.value, "Content-Type": "application/json" },
-        body: JSON.stringify({
+      try {
+        await api.post("/admin/users", {
           username: userForm.value.username,
           password: userForm.value.password,
           display_name: userForm.value.display_name,
           role: userForm.value.role,
           email: userForm.value.email,
           phone: userForm.value.phone,
-        }),
-      });
-      if (!res.ok) {
-        const json = await res.json();
-        ElMessage.error(json.message || "创建失败");
+        });
+      } catch (err) {
+        ElMessage.error(extractError(err, "创建失败"));
         return;
       }
       ElMessage.success("用户创建成功");
@@ -189,9 +168,10 @@ async function loadMembers() {
   if (!memberProjectId.value) return;
   memberLoading.value = true;
   try {
-    const res = await fetch(`${API}/admin/projects/${memberProjectId.value}/members`, { headers: headers.value });
-    const json = await res.json();
-    members.value = json.data ?? [];
+    const res = await api.get(`/admin/projects/${memberProjectId.value}/members`);
+    members.value = res.data?.data ?? [];
+  } catch (err) {
+    ElMessage.error(extractError(err, "加载成员失败"));
   } finally {
     memberLoading.value = false;
   }
@@ -202,42 +182,40 @@ watch(memberProjectId, () => loadMembers());
 async function addMember() {
   memberSubmitting.value = true;
   try {
-    const res = await fetch(`${API}/admin/projects/${memberProjectId.value}/members`, {
-      method: "POST",
-      headers: { ...headers.value, "Content-Type": "application/json" },
-      body: JSON.stringify(memberForm.value),
-    });
-    if (!res.ok) {
-      const json = await res.json();
-      ElMessage.error(json.message || "添加失败");
-      return;
-    }
+    await api.post(`/admin/projects/${memberProjectId.value}/members`, memberForm.value);
     ElMessage.success("成员添加成功");
     memberDialogVisible.value = false;
     memberForm.value = { user_id: "", project_role: "contributor" };
     await loadMembers();
+  } catch (err) {
+    ElMessage.error(extractError(err, "添加失败"));
   } finally {
     memberSubmitting.value = false;
   }
 }
 
 async function updateMemberRole(m: any, newRole: string) {
-  await fetch(`${API}/admin/projects/${memberProjectId.value}/members/${m.id}`, {
-    method: "PATCH",
-    headers: { ...headers.value, "Content-Type": "application/json" },
-    body: JSON.stringify({ project_role: newRole }),
-  });
-  await loadMembers();
+  try {
+    await api.patch(`/admin/projects/${memberProjectId.value}/members/${m.id}`, { project_role: newRole });
+    await loadMembers();
+  } catch (err) {
+    ElMessage.error(extractError(err, "更新成员角色失败"));
+  }
 }
 
 async function removeMember(m: any) {
-  await ElMessageBox.confirm(`确定移除成员 ${m.display_name}？`, "确认", { type: "warning" });
-  await fetch(`${API}/admin/projects/${memberProjectId.value}/members/${m.id}`, {
-    method: "DELETE",
-    headers: headers.value,
-  });
-  ElMessage.success("已移除");
-  await loadMembers();
+  try {
+    await ElMessageBox.confirm(`确定移除成员 ${m.display_name}？`, "确认", { type: "warning" });
+  } catch {
+    return;
+  }
+  try {
+    await api.delete(`/admin/projects/${memberProjectId.value}/members/${m.id}`);
+    ElMessage.success("已移除");
+    await loadMembers();
+  } catch (err) {
+    ElMessage.error(extractError(err, "移除成员失败"));
+  }
 }
 
 const projRoleLabel: Record<string, string> = { owner: "负责人", manager: "管理者", contributor: "贡献者", viewer: "查看者" };

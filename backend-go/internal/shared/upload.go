@@ -41,3 +41,18 @@ func ValidateFileName(fileName string) bool {
 func ValidateDataAssetFileName(fileName string) bool {
 	return strings.TrimSpace(fileName) != ""
 }
+
+// SanitizeStoredFileName strips any directory components and path traversal
+// sequences from a client-supplied filename before it is used to build a
+// storage object key. Callers must never interpolate the raw upload filename
+// into an object key: multipart headers are fully attacker-controlled and a
+// name like "../../../etc/passwd" would otherwise escape the intended
+// storage prefix (documents/<id>/..., data/<project>/...).
+func SanitizeStoredFileName(fileName string) string {
+	name := strings.ReplaceAll(fileName, "\\", "/")
+	name = filepath.Base(name)
+	if name == "" || name == "." || name == ".." || name == string(filepath.Separator) {
+		return "file"
+	}
+	return name
+}

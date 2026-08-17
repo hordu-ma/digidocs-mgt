@@ -118,6 +118,8 @@ func (h DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 		IncludeArchived: r.URL.Query().Get("include_archived") == "true",
 		Page:            parseIntOrDefault(r.URL.Query().Get("page"), 1),
 		PageSize:        parsePageSize(r.URL.Query().Get("page_size")),
+		ActorID:         middleware.UserIDFromContext(r.Context()),
+		ActorRole:       middleware.UserRoleFromContext(r.Context()),
 	}
 
 	items, total, err := h.service.ListDocuments(r.Context(), filter)
@@ -134,7 +136,9 @@ func (h DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
-	item, err := h.service.GetDocument(r.Context(), r.PathValue("documentID"))
+	actorID := middleware.UserIDFromContext(r.Context())
+	actorRole := middleware.UserRoleFromContext(r.Context())
+	item, err := h.service.GetDocument(r.Context(), r.PathValue("documentID"), actorID, actorRole)
 	if err != nil {
 		writeServiceError(w, err, "document not found", "failed to get document")
 		return

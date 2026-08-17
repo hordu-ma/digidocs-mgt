@@ -66,6 +66,7 @@ func TestPostgresIntegrationMigrationsAndRepositoryFlows(t *testing.T) {
 		ProjectID: integrationProjectID,
 		Page:      1,
 		PageSize:  10,
+		ActorRole: "admin",
 	})
 	if err != nil {
 		t.Fatalf("ListDocuments: %v", err)
@@ -118,6 +119,7 @@ func TestPostgresIntegrationMigrationsAndRepositoryFlows(t *testing.T) {
 		FolderID:  folder.ID,
 		Page:      1,
 		PageSize:  10,
+		ActorRole: "admin",
 	})
 	if err != nil {
 		t.Fatalf("ListDataAssets: %v", err)

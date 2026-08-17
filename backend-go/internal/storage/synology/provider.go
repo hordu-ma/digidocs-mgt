@@ -319,7 +319,11 @@ func (p *Provider) callAPI(ctx context.Context, params url.Values) (_ *dsmRespon
 
 // absPath converts an objectKey to the absolute Synology path.
 func (p *Provider) absPath(objectKey string) string {
-	cleaned := strings.Trim(strings.TrimSpace(objectKey), "/")
+	// Prefixing with "/" before path.Clean neutralizes any leading "../"
+	// segments in objectKey: Clean treats the path as rooted and collapses
+	// ".." that would otherwise ascend above sharePath, instead of letting
+	// it escape into an unrelated DSM directory.
+	cleaned := strings.TrimPrefix(path.Clean("/"+strings.TrimSpace(objectKey)), "/")
 	if cleaned == "" || cleaned == "." {
 		return p.sharePath
 	}
@@ -341,7 +345,8 @@ func (p *Provider) PutObject(ctx context.Context, input storage.PutObjectInput) 
 		overwrite = "true"
 	}
 
-	// build multipart form
+	// build multipart form once, buffered, so it can be resent unchanged if a
+	// session-expired retry (below) needs a second request.
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	_ = writer.WriteField("api", "SYNO.FileStation.Upload")
@@ -365,23 +370,25 @@ func (p *Provider) PutObject(ctx context.Context, input storage.PutObjectInput) 
 		}
 	}
 	writer.Close()
+	contentType := writer.FormDataContentType()
+	bodyBytes := body.Bytes()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		p.baseURL+"/webapi/entry.cgi?_sid="+url.QueryEscape(p.getSID()), &body)
+	dr, err := p.uploadOnce(ctx, contentType, bodyBytes)
 	if err != nil {
 		return storage.PutObjectResult{}, err
 	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return storage.PutObjectResult{}, fmt.Errorf("synology upload: %w", err)
-	}
-	defer resp.Body.Close()
-
-	var dr dsmResponse
-	if err := json.NewDecoder(resp.Body).Decode(&dr); err != nil {
-		return storage.PutObjectResult{}, fmt.Errorf("synology upload decode: %w", err)
+	// The cached sid can be stale even though it is non-empty (ensureSession
+	// only checks presence, not validity): re-authenticate once on session
+	// expired (105/106) and retry with the buffered multipart body, mirroring
+	// callAPI's retry-on-105/106 behavior which PutObject previously lacked.
+	if !dr.Success && dr.Error != nil && (dr.Error.Code == 105 || dr.Error.Code == 106) {
+		if err := p.login(ctx); err != nil {
+			return storage.PutObjectResult{}, err
+		}
+		dr, err = p.uploadOnce(ctx, contentType, bodyBytes)
+		if err != nil {
+			return storage.PutObjectResult{}, err
+		}
 	}
 	if !dr.Success {
 		return storage.PutObjectResult{}, fmt.Errorf("synology upload failed: %v", dr.Error)
@@ -393,11 +400,56 @@ func (p *Provider) PutObject(ctx context.Context, input storage.PutObjectInput) 
 	}, nil
 }
 
+func (p *Provider) uploadOnce(ctx context.Context, contentType string, bodyBytes []byte) (*dsmResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		p.baseURL+"/webapi/entry.cgi?_sid="+url.QueryEscape(p.getSID()), bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", contentType)
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("synology upload: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var dr dsmResponse
+	if err := json.NewDecoder(resp.Body).Decode(&dr); err != nil {
+		return nil, fmt.Errorf("synology upload decode: %w", err)
+	}
+	return &dr, nil
+}
+
 func (p *Provider) GetObject(ctx context.Context, objectKey string) (*storage.GetObjectOutput, error) {
 	if err := p.ensureSession(ctx); err != nil {
 		return nil, err
 	}
 
+	out, expired, err := p.downloadOnce(ctx, objectKey)
+	if err != nil {
+		return nil, err
+	}
+	if expired {
+		// The cached sid can be stale even though it is non-empty
+		// (ensureSession only checks presence, not validity): re-authenticate
+		// once on session expired (105/106) and retry, mirroring callAPI's
+		// retry-on-105/106 behavior which GetObject previously lacked.
+		if err := p.login(ctx); err != nil {
+			return nil, err
+		}
+		out, _, err = p.downloadOnce(ctx, objectKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// downloadOnce issues a single download attempt. expired=true means the
+// response was a JSON session-expired (105/106) error, distinct from other
+// JSON error bodies which are returned as err.
+func (p *Provider) downloadOnce(ctx context.Context, objectKey string) (out *storage.GetObjectOutput, expired bool, err error) {
 	params := url.Values{
 		"api":     {"SYNO.FileStation.Download"},
 		"version": {"2"},
@@ -410,7 +462,7 @@ func (p *Provider) GetObject(ctx context.Context, objectKey string) (*storage.Ge
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		p.baseURL+"/webapi/entry.cgi?"+params.Encode(), nil)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	// Download is an idempotent read, so transient transport errors are safe
@@ -427,7 +479,7 @@ func (p *Provider) GetObject(ctx context.Context, objectKey string) (*storage.Ge
 		}
 	}
 	if err != nil {
-		return nil, fmt.Errorf("synology download: %w", err)
+		return nil, false, fmt.Errorf("synology download: %w", err)
 	}
 
 	// if response is JSON, it's an error
@@ -436,14 +488,17 @@ func (p *Provider) GetObject(ctx context.Context, objectKey string) (*storage.Ge
 		defer resp.Body.Close()
 		var dr dsmResponse
 		_ = json.NewDecoder(resp.Body).Decode(&dr)
-		return nil, fmt.Errorf("synology download failed: %v", dr.Error)
+		if dr.Error != nil && (dr.Error.Code == 105 || dr.Error.Code == 106) {
+			return nil, true, nil
+		}
+		return nil, false, fmt.Errorf("synology download failed: %v", dr.Error)
 	}
 
 	return &storage.GetObjectOutput{
 		Reader:      resp.Body,
 		ContentType: ct,
 		Size:        resp.ContentLength,
-	}, nil
+	}, false, nil
 }
 
 func (p *Provider) DeleteObject(ctx context.Context, objectKey string) error {

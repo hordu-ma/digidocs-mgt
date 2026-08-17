@@ -17,7 +17,7 @@ def test_extract_text_pdf_uses_pdftotext(monkeypatch) -> None:
             return "/usr/bin/pdftotext"
         return None
 
-    def fake_run(args: list[str], check: bool, capture_output: bool, text: bool):
+    def fake_run(args: list[str], check: bool, capture_output: bool, text: bool, timeout: float | None = None):
         assert args[0] == "/usr/bin/pdftotext"
         Path(args[-1]).write_text("PDF 正文", encoding="utf-8")
         return subprocess.CompletedProcess(args, 0, "", "")
@@ -36,7 +36,7 @@ def test_extract_text_image_uses_tesseract(monkeypatch) -> None:
             return "/usr/bin/tesseract"
         return None
 
-    def fake_run(args: list[str], check: bool, capture_output: bool, text: bool):
+    def fake_run(args: list[str], check: bool, capture_output: bool, text: bool, timeout: float | None = None):
         assert args[0] == "/usr/bin/tesseract"
         return subprocess.CompletedProcess(args, 0, "图片识别结果\n", "")
 
@@ -54,7 +54,7 @@ def test_extract_text_scanned_pdf_requires_ocr_dependencies(monkeypatch) -> None
             return "/usr/bin/pdftotext"
         return None
 
-    def fake_run(args: list[str], check: bool, capture_output: bool, text: bool):
+    def fake_run(args: list[str], check: bool, capture_output: bool, text: bool, timeout: float | None = None):
         Path(args[-1]).write_text("", encoding="utf-8")
         return subprocess.CompletedProcess(args, 0, "", "")
 

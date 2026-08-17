@@ -186,11 +186,11 @@ func TestCodeRepositoryService_GetUpdateListAndAuthenticate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create unexpected error: %v", err)
 	}
-	got, err := svc.Get(context.Background(), created.ID)
+	got, err := svc.Get(context.Background(), created.ID, "u-1", "member")
 	if err != nil || got.ID != created.ID {
 		t.Fatalf("Get got %#v err %v, want created repo", got, err)
 	}
-	if _, err := svc.Get(context.Background(), ""); err == nil {
+	if _, err := svc.Get(context.Background(), "", "u-1", "member"); err == nil {
 		t.Fatal("Get empty id got nil error, want validation error")
 	}
 	if _, err := svc.GetBySlug(context.Background(), ""); err == nil {

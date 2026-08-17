@@ -37,6 +37,8 @@ func (h CodeRepositoryHandler) List(w http.ResponseWriter, r *http.Request) {
 		Keyword:   r.URL.Query().Get("keyword"),
 		Page:      page,
 		PageSize:  pageSize,
+		ActorID:   middleware.UserIDFromContext(r.Context()),
+		ActorRole: middleware.UserRoleFromContext(r.Context()),
 	})
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list code repositories")
@@ -46,7 +48,9 @@ func (h CodeRepositoryHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h CodeRepositoryHandler) Get(w http.ResponseWriter, r *http.Request) {
-	item, err := h.service.Get(r.Context(), r.PathValue("id"))
+	actorID := middleware.UserIDFromContext(r.Context())
+	actorRole := middleware.UserRoleFromContext(r.Context())
+	item, err := h.service.Get(r.Context(), r.PathValue("id"), actorID, actorRole)
 	if err != nil {
 		writeServiceError(w, err, "code repository not found", "failed to get code repository")
 		return

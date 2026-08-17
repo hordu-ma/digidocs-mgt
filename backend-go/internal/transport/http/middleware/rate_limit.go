@@ -79,10 +79,21 @@ func (r *RateLimiter) Limit(next http.HandlerFunc) http.Handler {
 	})
 }
 
+// clientIP resolves the caller's address for rate-limit keying.
+//
+// backend-go is only ever reachable through the frontend nginx reverse proxy
+// (docker-compose binds backend-go to 127.0.0.1, not the LAN interface), and
+// that proxy sets X-Forwarded-For via nginx's $proxy_add_x_forwarded_for,
+// which APPENDS $remote_addr to whatever X-Forwarded-For the client already
+// sent rather than replacing it. That means the LAST entry is the address
+// nginx actually observed on the TCP connection (unspoofable), while the
+// FIRST entry is attacker-controlled request data. Reading the first entry
+// (the previous behavior) let anyone bypass the login rate limiter by
+// sending a fresh X-Forwarded-For value on every request.
 func clientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if i := strings.IndexByte(xff, ','); i >= 0 {
-			return strings.TrimSpace(xff[:i])
+		if i := strings.LastIndexByte(xff, ','); i >= 0 {
+			return strings.TrimSpace(xff[i+1:])
 		}
 		return strings.TrimSpace(xff)
 	}

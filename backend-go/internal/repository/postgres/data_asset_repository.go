@@ -147,6 +147,8 @@ func (r DataAssetRepository) ListDataAssets(ctx context.Context, filter query.Da
 		pageSize = 30
 	}
 
+	isAdmin := filter.ActorRole == "admin"
+
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT
 			da.id::text,
@@ -164,13 +166,15 @@ func (r DataAssetRepository) ListDataAssets(ctx context.Context, filter query.Da
 		LEFT JOIN projects p ON p.id = da.project_id
 		LEFT JOIN data_folders df ON df.id = da.folder_id
 		LEFT JOIN users u ON u.id = da.created_by
+		LEFT JOIN project_members pm ON pm.project_id = da.project_id AND pm.user_id::text = $6
 		WHERE da.is_deleted = false
 		  AND ($1 = '' OR da.project_id::text = $1)
 		  AND ($2 = '' OR da.folder_id::text = $2)
 		  AND ($3 = '' OR da.display_name ILIKE '%' || $3 || '%' OR da.file_name ILIKE '%' || $3 || '%')
+		  AND ($7 = true OR p.owner_id::text = $6 OR pm.id IS NOT NULL)
 		ORDER BY da.created_at DESC
 		LIMIT $4 OFFSET $5
-	`, filter.ProjectID, filter.FolderID, filter.Keyword, pageSize, (page-1)*pageSize)
+	`, filter.ProjectID, filter.FolderID, filter.Keyword, pageSize, (page-1)*pageSize, filter.ActorID, isAdmin)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -198,11 +202,14 @@ func (r DataAssetRepository) ListDataAssets(ctx context.Context, filter query.Da
 	if err := r.db.QueryRowContext(ctx, `
 		SELECT COUNT(*)
 		FROM data_assets da
+		LEFT JOIN projects p ON p.id = da.project_id
+		LEFT JOIN project_members pm ON pm.project_id = da.project_id AND pm.user_id::text = $4
 		WHERE da.is_deleted = false
 		  AND ($1 = '' OR da.project_id::text = $1)
 		  AND ($2 = '' OR da.folder_id::text = $2)
 		  AND ($3 = '' OR da.display_name ILIKE '%' || $3 || '%' OR da.file_name ILIKE '%' || $3 || '%')
-	`, filter.ProjectID, filter.FolderID, filter.Keyword).Scan(&total); err != nil {
+		  AND ($5 = true OR p.owner_id::text = $4 OR pm.id IS NOT NULL)
+	`, filter.ProjectID, filter.FolderID, filter.Keyword, filter.ActorID, isAdmin).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 

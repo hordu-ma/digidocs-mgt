@@ -81,8 +81,8 @@ func TestCodeRepositoryRepositoryMethods(t *testing.T) {
 		return sqlmock.NewRows([]string{"id", "team_space_id", "project_id", "project_name", "name", "slug", "description", "default_branch", "target_folder_path", "repo_storage_path", "last_commit_sha", "last_pushed_at", "status", "created_by_name", "created_at", "updated_at"}).
 			AddRow("r-1", "ts-1", "p-1", "Project", "Repo", "repo", "Desc", "main", "/target", "/tmp/repo.git", "abc", "2026-05-01T00:00:00Z", "active", "张三", "2026-05-01T00:00:00Z", "2026-05-01T00:00:00Z")
 	}
-	mock.ExpectQuery("FROM code_repositories cr").WithArgs("p-1", "repo", 10, 0).WillReturnRows(codeRows())
-	mock.ExpectQuery("SELECT COUNT\\(\\*\\)\\s+FROM code_repositories").WithArgs("p-1", "repo").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("FROM code_repositories cr").WithArgs("p-1", "repo", 10, 0, "", false).WillReturnRows(codeRows())
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\)\\s+FROM code_repositories").WithArgs("p-1", "repo", "", false).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	items, total, err := repo.ListCodeRepositories(ctx, query.CodeRepositoryListFilter{ProjectID: "p-1", Keyword: "repo", Page: 1, PageSize: 10})
 	if err != nil || total != 1 || len(items) != 1 || items[0].Slug != "repo" {
 		t.Fatalf("ListCodeRepositories got %#v total=%d err=%v", items, total, err)

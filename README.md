@@ -398,5 +398,9 @@ docker compose up -d postgres
   - 后端：新增 `middleware/rate_limit.go` 登录限流（per-IP 固定窗口，默认 10/min，超限 429），`LOGIN_RATE_LIMIT_PER_MIN` 可配
   - 后端：群晖 `callAPI` 失败日志（操作+耗时）、只读下载加传输错误重试；`code_repository` git 操作失败补结构化日志
   - 验证：Go `build`/`vet`/`test`、Worker `ruff` + `pytest`(43)、新增 http_util/限流测试全部通过
+- 已完成**安全与健壮性修复轮（P0+P1）**：基于全仓库代码审阅发现的问题集中修复
+  - P0：修复文档/版本/数据资产上传文件名可致存储路径穿越；修复数据资产与文档 List/Get 缺少项目成员权限校验导致的越权访问（IDOR）；Worker 正文抽取子进程（pdftotext/pdftoppm/tesseract）补齐超时，避免单文件卡死整个 Worker；Worker 任务轮询对鉴权失败等异常从静默降级为明确日志
+  - P1：新增 `assistant_requests.started_at` 字段（迁移 009）修正任务卡死恢复误判；Worker 回调失败不再伪装成功，改为可观测的异常路径；登录限流改为信任 XFF 链路末位，堵住伪造请求头绕过限流的漏洞；代码仓库模块补齐与文档/数据资产一致的项目成员权限校验；前端 AdminView 改用统一 API 客户端并补齐失败提示；DataView 删除操作补齐错误提示；群晖 provider 的 GetObject/PutObject 补齐会话过期自动重登
+  - 验证：Go/Worker/前端全量测试通过，新增 PostgreSQL 集成测试与生产库真实数据抽查验证权限过滤语义，已重建三容器并在本机验证环境跑通 `STRICT_SMOKE=1 make smoke`
 
 详细任务状态持续维护在 [TASKS.md](TASKS.md)。

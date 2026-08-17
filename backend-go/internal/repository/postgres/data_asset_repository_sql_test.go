@@ -83,13 +83,13 @@ func TestDataAssetRepositoryAssetMethods(t *testing.T) {
 	repo := NewDataAssetRepository(db)
 
 	mock.ExpectQuery("FROM data_assets da").
-		WithArgs("p-1", "folder-1", "dataset", 2, 2).
+		WithArgs("p-1", "folder-1", "dataset", 2, 2, "", false).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "project_id", "project_name", "folder_id", "folder_name",
 			"display_name", "file_name", "mime_type", "file_size", "created_by_name", "created_at",
 		}).AddRow("asset-1", "p-1", "Project", "folder-1", "Raw", "Dataset", "dataset.csv", "text/csv", int64(12), "张三", "2026-05-01T00:00:00Z"))
 	mock.ExpectQuery("SELECT COUNT\\(\\*\\)").
-		WithArgs("p-1", "folder-1", "dataset").
+		WithArgs("p-1", "folder-1", "dataset", "", false).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(5))
 	items, total, err := repo.ListDataAssets(ctx, commandToDataAssetFilter("p-1", "folder-1", "dataset", 2, 2))
 	if err != nil || total != 5 || len(items) != 1 || items[0].DisplayName != "Dataset" {

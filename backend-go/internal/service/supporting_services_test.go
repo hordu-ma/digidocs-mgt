@@ -121,6 +121,15 @@ func (m mockPermissionReader) CanUploadDataAsset(context.Context, string, string
 func (m mockPermissionReader) CanManageDataAsset(context.Context, string, string, string) (bool, error) {
 	return m.ok, m.err
 }
+func (m mockPermissionReader) CanViewDocument(context.Context, string, string, string) (bool, error) {
+	return m.ok, m.err
+}
+func (m mockPermissionReader) CanViewDataAsset(context.Context, string, string, string) (bool, error) {
+	return m.ok, m.err
+}
+func (m mockPermissionReader) CanViewCodeRepository(context.Context, string, string, string) (bool, error) {
+	return m.ok, m.err
+}
 func (m mockPermissionReader) CanCreateCodeRepository(context.Context, string, string, string) (bool, error) {
 	return m.ok, m.err
 }
@@ -259,7 +268,7 @@ func TestDataAssetServiceUploadDownloadAndMutations(t *testing.T) {
 	if err := svc.DeleteDataAsset(context.Background(), command.DataAssetDeleteInput{DataAssetID: "asset-1"}); err != nil {
 		t.Fatalf("DeleteDataAsset unexpected err=%v", err)
 	}
-	out, asset, err := svc.DownloadDataAsset(context.Background(), "asset-1")
+	out, asset, err := svc.DownloadDataAsset(context.Background(), "asset-1", "user-1", "member")
 	if err != nil || asset.ID != "asset-1" || out.Size != 5 {
 		t.Fatalf("DownloadDataAsset out=%#v asset=%#v err=%v", out, asset, err)
 	}

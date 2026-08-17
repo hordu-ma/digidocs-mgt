@@ -9,7 +9,7 @@ from typing import cast
 
 from ..core.config import settings
 from ..tasks.contracts import TaskType, WorkerTask
-from .http_util import fetch
+from .http_util import HttpError, fetch
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +30,22 @@ class TaskPollerClient:
         try:
             _, _, raw = fetch(req, timeout=10, label="poll-tasks")
             parsed = cast(object, json.loads(raw))
-        except Exception:
-            logger.debug("poll failed (backend may be offline)")
+        except HttpError as exc:
+            if exc.status in (401, 403):
+                # Not a transient outage: CALLBACK_TOKEN is wrong/expired, and
+                # the worker will silently process zero tasks forever until an
+                # operator notices. Must be loud even at default INFO level.
+                logger.error(
+                    "poll-tasks rejected with HTTP %d: CALLBACK_TOKEN is likely "
+                    "invalid or expired; worker will not receive any tasks "
+                    "until this is fixed",
+                    exc.status,
+                )
+            else:
+                logger.warning("poll-tasks failed with HTTP %d", exc.status)
+            return []
+        except Exception as exc:
+            logger.warning("poll failed (backend may be offline): %s", exc)
             return []
 
         body = _as_object_dict(parsed)

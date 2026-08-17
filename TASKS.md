@@ -6,6 +6,22 @@
 
 ## 已完成
 
+- 完成**安全与健壮性修复轮（P0+P1）**：基于一次全仓库代码审阅（Go 后端 / Python Worker / 前端三路并行）识别问题后的集中修复
+  - P0（高危，已修复）
+    - 存储路径穿越：文档 / 版本 / 数据资产上传时，客户端提供的文件名不再直接拼进 ObjectKey，新增 `shared.SanitizeStoredFileName()` 剥离目录分量与 `..`；`storage/synology/provider.go` 的 `absPath()` 增加 `path.Clean` 兜底，双层防护
+    - 数据资产与文档越权访问（IDOR）：`ListDataAssets`/`GetDataAsset`/`DownloadDataAsset` 与 `ListDocuments`/`GetDocument` 此前完全没有项目成员校验，省略或伪造 `project_id` 即可看到/下载其他课题的数据；新增 `CanViewDocument`/`CanViewDataAsset` 权限检查与项目成员范围过滤（非 admin 只能看到自己拥有或所属项目的数据），已用真实 PostgreSQL（含生产库真实数据）验证
+    - Worker 正文抽取子进程无超时：`pdftotext`/`pdftoppm`/`tesseract` 新增 `SUBPROCESS_TIMEOUT_SECONDS`（默认 120s，`DOCUMENT_EXTRACTION_TIMEOUT_SECONDS` 可配），避免单个损坏/超大文件把单线程严格串行的 Worker 永久卡死
+    - Worker 任务轮询吞异常：`task_poller.poll()` 对 401/403 改为 `logger.error` 明确提示 CALLBACK_TOKEN 失效，其余错误也从 `debug` 提升到 `warning`，此前会在默认 INFO 日志级别下完全不可见
+  - P1（中危，已修复）
+    - 任务卡死恢复误判：新增迁移 `009_assistant_requests_started_at.sql`，队列卡死恢复判定从 `created_at`（排队开始）改为 `started_at`（真正进入 running），避免正常处理中的任务被误判卡死、重复领取
+    - Worker 回调失败被静默伪装成功：`callback_client.submit_result()` 重试耗尽后不再返回伪造的 `callback_failed` 字典，改为直接抛出异常，交由 `WorkerDispatcher._process_one` 既有的 crash 处理路径记录明确日志
+    - 登录限流可被伪造 `X-Forwarded-For` 绕过：`clientIP()` 改为取 XFF 链路的最后一段（nginx `$proxy_add_x_forwarded_for` 追加的真实上游地址），不再信任客户端可控的第一段
+    - 代码仓库越权查看：`code-repositories` 的 List/Get 补齐与文档/数据资产一致的项目成员范围过滤与 `CanViewCodeRepository` 权限检查（`push_token` 仅创建时一次性返回、GET 系列本就不回显，评估后确认设计合理未改动）
+    - 前端 AdminView 全部裸 `fetch()` 绕过统一 401 拦截器，且 `updateMemberRole`/`removeMember` 不检查响应状态、失败仍提示成功：整体改用 `@/api` + `extractError`，`removeMember` 的确认弹窗补齐取消分支
+    - 前端 DataView 的 `deleteAsset`/`deleteFolder` 失败被静默吞掉：补齐 try/catch 与 `ElMessage.error` 提示
+    - 群晖 Synology provider 会话过期后 `GetObject`/`PutObject` 不会自动重登：补齐与 `callAPI` 一致的 105/106 探测与重登重试（上传场景对已缓冲的 multipart body 做安全重试），新增回归测试锁定行为
+  - 验证：`go build`/`vet`/`test ./...` 全通过；新增 PostgreSQL 集成测试与手工 SQL 对拍验证权限过滤语义（含生产库真实用户/项目数据抽查）；Worker `ruff` + `pytest`(43) 全通过；前端 `vue-tsc`/`vite build`/`vitest` 全通过；已重建 `backend-go`/`backend-py-worker`/`frontend` 三容器并在本机验证环境跑通 `STRICT_SMOKE=1 make smoke`（含 Synology 前置验收）
+
 - 完成项目定义文档正式版
 - 完成数据库设计文档正式版
 - 完成 API 设计文档正式版

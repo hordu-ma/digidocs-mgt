@@ -19,7 +19,7 @@ func TestDocumentRepositoryListDocumentsDefaultsAndScans(t *testing.T) {
 	repo := NewDocumentRepository(db)
 
 	mock.ExpectQuery("FROM documents d\\s+LEFT JOIN projects").
-		WithArgs("", "", "", "", "", "", false, 20, 0).
+		WithArgs("", "", "", "", "", "", false, "", false, 20, 0).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id",
 			"title",
@@ -42,7 +42,7 @@ func TestDocumentRepositoryListDocumentsDefaultsAndScans(t *testing.T) {
 			"2026-05-01T00:00:00Z",
 		))
 	mock.ExpectQuery("SELECT COUNT\\(1\\)").
-		WithArgs("", "", "", "", "", "", false).
+		WithArgs("", "", "", "", "", "", false, "", false).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
 	items, total, err := repo.ListDocuments(ctx, query.DocumentListFilter{})

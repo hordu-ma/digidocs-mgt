@@ -25,12 +25,17 @@ func (c Consumer) Poll(ctx context.Context, limit int) []task.Message {
 	}
 
 	// Recover tasks stuck in 'running' for more than 10 minutes (e.g. worker crash).
+	// Gated on started_at (when the task actually entered running), not
+	// created_at: a task that merely sat pending for a while before being
+	// claimed must not be treated as stuck the instant it starts running,
+	// or it gets reset to pending and picked up a second time concurrently.
+	// started_at IS NULL covers rows written before this column existed.
 	_, recoverErr := c.db.ExecContext(
 		ctx,
 		`UPDATE assistant_requests
 		 SET status = 'pending'
 		 WHERE status = 'running'
-		   AND created_at < NOW() - INTERVAL '10 minutes'`,
+		   AND (started_at IS NULL OR started_at < NOW() - INTERVAL '10 minutes')`,
 	)
 	if recoverErr != nil {
 		log.Printf("postgres-queue recover-running failed: %v", recoverErr)
@@ -103,7 +108,7 @@ func (c Consumer) Poll(ctx context.Context, limit int) []task.Message {
 		ctx,
 		`
 		UPDATE assistant_requests
-		SET status = 'running'
+		SET status = 'running', started_at = NOW()
 		WHERE id::text = ANY($1)
 		`,
 		pq.Array(ids),

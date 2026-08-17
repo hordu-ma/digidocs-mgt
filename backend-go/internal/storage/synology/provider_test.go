@@ -182,6 +182,124 @@ func TestProviderGetObjectReturnsStream(t *testing.T) {
 	}
 }
 
+func TestProviderGetObjectReauthsOnExpiredSession(t *testing.T) {
+	loginCount := 0
+	provider := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/webapi/query.cgi":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"SYNO.API.Auth":{"path":"webapi/entry.cgi"}}}`))
+		case r.URL.Path == "/webapi/entry.cgi" && r.URL.Query().Get("api") == "SYNO.API.Auth":
+			loginCount++
+			sid := "sid-1"
+			if loginCount > 1 {
+				sid = "sid-2"
+			}
+			_, _ = w.Write([]byte(`{"success":true,"data":{"sid":"` + sid + `"}}`))
+		case r.URL.Path == "/webapi/entry.cgi" && r.URL.Query().Get("api") == "SYNO.FileStation.Download":
+			sid := r.URL.Query().Get("_sid")
+			if sid == "sid-1" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"success":false,"error":{"code":106}}`))
+				return
+			}
+			if sid != "sid-2" {
+				t.Fatalf("retry sid = %s, want sid-2", sid)
+			}
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			_, _ = w.Write([]byte("downloaded payload"))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	// Prime the cached sid so ensureSession() short-circuits and the only way
+	// GetObject can recover is by detecting the 106 response and re-logging in.
+	if err := provider.login(context.Background()); err != nil {
+		t.Fatalf("prime login: %v", err)
+	}
+	loginCount = 1
+
+	obj, err := provider.GetObject(context.Background(), "folder/report.txt")
+	if err != nil {
+		t.Fatalf("GetObject error: %v", err)
+	}
+	defer obj.Reader.Close()
+
+	body, err := io.ReadAll(obj.Reader)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	if string(body) != "downloaded payload" {
+		t.Fatalf("body = %q, want downloaded payload", string(body))
+	}
+	if loginCount != 2 {
+		t.Fatalf("login count = %d, want 2", loginCount)
+	}
+}
+
+func TestProviderPutObjectReauthsOnExpiredSession(t *testing.T) {
+	loginCount := 0
+	provider := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/webapi/query.cgi":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"SYNO.API.Auth":{"path":"webapi/entry.cgi"}}}`))
+		case r.URL.Path == "/webapi/entry.cgi" && r.Method == http.MethodGet && r.URL.Query().Get("api") == "SYNO.API.Auth":
+			loginCount++
+			sid := "sid-1"
+			if loginCount > 1 {
+				sid = "sid-2"
+			}
+			_, _ = w.Write([]byte(`{"success":true,"data":{"sid":"` + sid + `"}}`))
+		case r.URL.Path == "/webapi/entry.cgi" && r.Method == http.MethodPost:
+			if err := r.ParseMultipartForm(1 << 20); err != nil {
+				t.Fatalf("parse multipart form: %v", err)
+			}
+			sid := r.URL.Query().Get("_sid")
+			if sid == "sid-1" {
+				_, _ = w.Write([]byte(`{"success":false,"error":{"code":105}}`))
+				return
+			}
+			if sid != "sid-2" {
+				t.Fatalf("retry sid = %s, want sid-2", sid)
+			}
+			file, _, err := r.FormFile("file")
+			if err != nil {
+				t.Fatalf("form file: %v", err)
+			}
+			defer file.Close()
+			content, err := io.ReadAll(file)
+			if err != nil {
+				t.Fatalf("read upload file: %v", err)
+			}
+			if string(content) != "hello synology" {
+				t.Fatalf("upload content = %q, want hello synology (body must survive the retry)", string(content))
+			}
+			_, _ = w.Write([]byte(`{"success":true}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	if err := provider.login(context.Background()); err != nil {
+		t.Fatalf("prime login: %v", err)
+	}
+	loginCount = 1
+
+	result, err := provider.PutObject(context.Background(), storage.PutObjectInput{
+		ObjectKey: "nested/report.txt",
+		Reader:    strings.NewReader("hello synology"),
+	})
+	if err != nil {
+		t.Fatalf("PutObject error: %v", err)
+	}
+	if result.ObjectKey != "nested/report.txt" {
+		t.Fatalf("object key = %s, want nested/report.txt", result.ObjectKey)
+	}
+	if loginCount != 2 {
+		t.Fatalf("login count = %d, want 2", loginCount)
+	}
+}
+
 func TestProviderCreateShareLinkParsesExpireDate(t *testing.T) {
 	provider := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {

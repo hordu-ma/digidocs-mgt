@@ -30,6 +30,10 @@ type CodeRepositoryListFilter struct {
 	Keyword   string
 	Page      int
 	PageSize  int
+	// ActorID/ActorRole scope the result to projects the actor can see.
+	// Set by the handler from the authenticated request context.
+	ActorID   string
+	ActorRole string
 }
 
 type CodePushEventItem struct {

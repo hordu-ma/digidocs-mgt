@@ -33,6 +33,8 @@ func (r DocumentRepository) ListDocuments(
 		pageSize = 20
 	}
 
+	isAdmin := filter.ActorRole == "admin"
+
 	rows, err := r.db.QueryContext(
 		ctx,
 		`
@@ -51,6 +53,7 @@ func (r DocumentRepository) ListDocuments(
 		LEFT JOIN folders f ON f.id = d.folder_id
 		LEFT JOIN users u ON u.id = d.current_owner_id
 		LEFT JOIN document_versions dv ON dv.id = d.current_version_id
+		LEFT JOIN project_members pm ON pm.project_id = d.project_id AND pm.user_id::text = $8
 		WHERE ($1 = '' OR d.team_space_id::text = $1)
 		  AND ($2 = '' OR d.project_id::text = $2)
 		  AND ($3 = '' OR d.folder_id::text = $3)
@@ -58,9 +61,10 @@ func (r DocumentRepository) ListDocuments(
 		  AND ($5 = '' OR d.current_status::text = $5)
 		  AND ($6 = '' OR d.title ILIKE '%' || $6 || '%')
 		  AND ($7 = true OR d.is_archived = false)
+		  AND ($9 = true OR p.owner_id::text = $8 OR pm.id IS NOT NULL)
 		  AND d.is_deleted = false
 		ORDER BY d.updated_at DESC
-		LIMIT $8 OFFSET $9
+		LIMIT $10 OFFSET $11
 		`,
 		filter.TeamSpaceID,
 		filter.ProjectID,
@@ -69,6 +73,8 @@ func (r DocumentRepository) ListDocuments(
 		filter.Status,
 		filter.Keyword,
 		filter.IncludeArchived,
+		filter.ActorID,
+		isAdmin,
 		pageSize,
 		(page-1)*pageSize,
 	)
@@ -114,6 +120,8 @@ func (r DocumentRepository) ListDocuments(
 		`
 		SELECT COUNT(1)
 		FROM documents d
+		LEFT JOIN projects p ON p.id = d.project_id
+		LEFT JOIN project_members pm ON pm.project_id = d.project_id AND pm.user_id::text = $8
 		WHERE ($1 = '' OR d.team_space_id::text = $1)
 		  AND ($2 = '' OR d.project_id::text = $2)
 		  AND ($3 = '' OR d.folder_id::text = $3)
@@ -121,6 +129,7 @@ func (r DocumentRepository) ListDocuments(
 		  AND ($5 = '' OR d.current_status::text = $5)
 		  AND ($6 = '' OR d.title ILIKE '%' || $6 || '%')
 		  AND ($7 = true OR d.is_archived = false)
+		  AND ($9 = true OR p.owner_id::text = $8 OR pm.id IS NOT NULL)
 		  AND d.is_deleted = false
 		`,
 		filter.TeamSpaceID,
@@ -130,6 +139,8 @@ func (r DocumentRepository) ListDocuments(
 		filter.Status,
 		filter.Keyword,
 		filter.IncludeArchived,
+		filter.ActorID,
+		isAdmin,
 	).Scan(&total); err != nil {
 		return nil, 0, err
 	}

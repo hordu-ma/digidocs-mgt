@@ -10,7 +10,7 @@ class Settings:
     openclaw_api_key: str = "replace-me"
     openclaw_model: str = "openclaw/default"
     openclaw_backend_model: str = ""
-    openclaw_timeout_seconds: int = 60
+    openclaw_timeout_seconds: int = 180
     openclaw_skills_assistant_ask: str = "answer_with_context"
     openclaw_skills_document_summarize: str = "document_summary"
     openclaw_skills_handover_summarize: str = "handover_summary"

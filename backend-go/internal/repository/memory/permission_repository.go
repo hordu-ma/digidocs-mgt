@@ -48,6 +48,18 @@ func (r PermissionRepository) CanManageDataAsset(context.Context, string, string
 	return true, nil
 }
 
+func (r PermissionRepository) CanViewDocument(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+
+func (r PermissionRepository) CanViewDataAsset(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+
+func (r PermissionRepository) CanViewCodeRepository(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+
 func (r PermissionRepository) CanCreateCodeRepository(context.Context, string, string, string) (bool, error) {
 	return true, nil
 }

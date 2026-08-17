@@ -14,6 +14,7 @@ import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
 import { useAuthStore } from "@/stores/auth";
 import { formatFileSize } from "@/utils/format";
+import { extractError } from "@/utils/error";
 import type { ProjectOption, TeamSpaceOption } from "@/types";
 
 // ─────────────────────────── types ───────────────────────────────
@@ -352,14 +353,22 @@ function downloadAsset(row: DataAsset) {
 // ─────────────────────────── delete ──────────────────────────────
 
 async function deleteAsset(row: DataAsset) {
-  await ElMessageBox.confirm(
-    `确认删除文件 "${row.display_name}"？此操作不可撤销。`,
-    "删除数据文件",
-    { confirmButtonText: "删除", cancelButtonText: "取消", type: "warning" },
-  );
-  await api.delete(`/data-assets/${row.id}`);
-  ElMessage.success("已删除");
-  fetchAssets();
+  try {
+    await ElMessageBox.confirm(
+      `确认删除文件 "${row.display_name}"？此操作不可撤销。`,
+      "删除数据文件",
+      { confirmButtonText: "删除", cancelButtonText: "取消", type: "warning" },
+    );
+  } catch {
+    return;
+  }
+  try {
+    await api.delete(`/data-assets/${row.id}`);
+    ElMessage.success("已删除");
+    fetchAssets();
+  } catch (err) {
+    ElMessage.error(extractError(err, "删除失败"));
+  }
 }
 
 // ─────────────────────────── folder management ───────────────────
@@ -409,14 +418,22 @@ async function submitNewFolder() {
 }
 
 async function deleteFolder(node: FolderItem) {
-  await ElMessageBox.confirm(
-    `确认删除文件夹 "${node.name}"？文件夹必须为空才可删除。`,
-    "删除文件夹",
-    { confirmButtonText: "删除", cancelButtonText: "取消", type: "warning" },
-  );
-  await api.delete(`/data-folders/${node.id}`);
-  ElMessage.success("文件夹已删除");
-  await fetchFolders(filterProjectID.value);
+  try {
+    await ElMessageBox.confirm(
+      `确认删除文件夹 "${node.name}"？文件夹必须为空才可删除。`,
+      "删除文件夹",
+      { confirmButtonText: "删除", cancelButtonText: "取消", type: "warning" },
+    );
+  } catch {
+    return;
+  }
+  try {
+    await api.delete(`/data-folders/${node.id}`);
+    ElMessage.success("文件夹已删除");
+    await fetchFolders(filterProjectID.value);
+  } catch (err) {
+    ElMessage.error(extractError(err, "删除文件夹失败"));
+  }
 }
 
 // ─────────────────────────── utils ───────────────────────────────

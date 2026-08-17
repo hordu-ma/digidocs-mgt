@@ -47,7 +47,10 @@ func (h InternalAssistantContextHandler) GetDocumentContext(w http.ResponseWrite
 	}
 
 	documentID := r.PathValue("documentID")
-	document, err := h.documents.GetDocument(r.Context(), documentID)
+	// This endpoint is gated by the worker shared-secret token above, not a
+	// per-user JWT, so there is no "acting user" to scope project membership
+	// against; pass the admin role to bypass the view-permission check.
+	document, err := h.documents.GetDocument(r.Context(), documentID, "", "admin")
 	if err != nil {
 		writeServiceError(w, err, "document not found", "failed to load document context")
 		return

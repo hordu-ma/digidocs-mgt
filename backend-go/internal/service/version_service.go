@@ -8,6 +8,7 @@ import (
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/repository"
+	"digidocs-mgt/backend-go/internal/shared"
 	"digidocs-mgt/backend-go/internal/storage"
 )
 
@@ -58,7 +59,7 @@ func (s VersionService) UploadAndCreateVersion(
 		return nil, err
 	}
 
-	objectKey := fmt.Sprintf("documents/%s/%s", documentID, fileName)
+	objectKey := fmt.Sprintf("documents/%s/%s", documentID, shared.SanitizeStoredFileName(fileName))
 	result, err := s.storage.PutObject(ctx, storage.PutObjectInput{
 		ObjectKey:   objectKey,
 		Reader:      reader,

@@ -213,6 +213,73 @@ func (r PermissionRepository) CanManageDataAsset(ctx context.Context, actorID st
 	`, dataAssetID, actorID)
 }
 
+func (r PermissionRepository) CanViewDocument(ctx context.Context, actorID string, actorRole string, documentID string) (bool, error) {
+	if isAdmin(actorRole) {
+		return true, nil
+	}
+	return r.isProjectMemberForDocument(ctx, actorID, documentID)
+}
+
+func (r PermissionRepository) CanViewDataAsset(ctx context.Context, actorID string, actorRole string, dataAssetID string) (bool, error) {
+	if isAdmin(actorRole) {
+		return true, nil
+	}
+	return r.isProjectMemberForDataAsset(ctx, actorID, dataAssetID)
+}
+
+// isProjectMemberForDocument allows any project role (including viewer),
+// unlike isProjectManagerOrCurrentOwner which is restricted to write access.
+func (r PermissionRepository) isProjectMemberForDocument(ctx context.Context, actorID string, documentID string) (bool, error) {
+	return r.exists(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM documents d
+			JOIN projects p ON p.id = d.project_id
+			LEFT JOIN project_members pm
+			  ON pm.project_id = p.id
+			 AND pm.user_id::text = $2
+			WHERE d.id::text = $1
+			  AND d.is_deleted = false
+			  AND (d.current_owner_id::text = $2 OR p.owner_id::text = $2 OR pm.id IS NOT NULL)
+		)
+	`, documentID, actorID)
+}
+
+func (r PermissionRepository) isProjectMemberForDataAsset(ctx context.Context, actorID string, dataAssetID string) (bool, error) {
+	return r.exists(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM data_assets da
+			JOIN projects p ON p.id = da.project_id
+			LEFT JOIN project_members pm
+			  ON pm.project_id = p.id
+			 AND pm.user_id::text = $2
+			WHERE da.id::text = $1
+			  AND da.is_deleted = false
+			  AND (da.created_by::text = $2 OR p.owner_id::text = $2 OR pm.id IS NOT NULL)
+		)
+	`, dataAssetID, actorID)
+}
+
+func (r PermissionRepository) CanViewCodeRepository(ctx context.Context, actorID string, actorRole string, repositoryID string) (bool, error) {
+	if isAdmin(actorRole) {
+		return true, nil
+	}
+	return r.exists(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM code_repositories cr
+			JOIN projects p ON p.id = cr.project_id
+			LEFT JOIN project_members pm
+			  ON pm.project_id = p.id
+			 AND pm.user_id::text = $2
+			WHERE cr.id::text = $1
+			  AND cr.is_deleted = false
+			  AND (p.owner_id::text = $2 OR pm.id IS NOT NULL)
+		)
+	`, repositoryID, actorID)
+}
+
 func (r PermissionRepository) CanCreateCodeRepository(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error) {
 	if isAdmin(actorRole) {
 		return true, nil

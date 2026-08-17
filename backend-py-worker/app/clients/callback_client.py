@@ -25,6 +25,16 @@ class CallbackClient:
         self.token = settings.callback_token
 
     def submit_result(self, result: TaskResult) -> ObjectDict:
+        """Post the task result back to the Go backend.
+
+        Raises on failure after retries are exhausted (via fetch()) instead of
+        swallowing the error and returning a synthetic "callback_failed" dict:
+        the request is already stuck in Go's `running` state and will only be
+        recovered ~10 minutes later and reprocessed from scratch (duplicate
+        OpenClaw call), so a swallowed failure here previously vanished with
+        no trace. Raising lets the caller's existing crash-handling path
+        (WorkerDispatcher._process_one) log it loudly via logger.exception.
+        """
         url = f"{self.base_url}/api/v1/internal/worker-results"
         payload = json.dumps(
             {
@@ -42,19 +52,16 @@ class CallbackClient:
         try:
             _, _, raw = fetch(req, timeout=10, label="worker-results callback")
             parsed = cast(object, json.loads(raw.decode()))
-            parsed_dict = _as_object_dict(parsed)
-            if parsed_dict is not None:
-                return parsed_dict
         except Exception:
             logger.warning(
                 "callback failed for request_id=%s after retries", result.request_id, exc_info=True
             )
+            raise
 
-        return {
-            "callback_base_url": self.base_url,
-            "request_id": result.request_id,
-            "status": "callback_failed",
-        }
+        parsed_dict = _as_object_dict(parsed)
+        if parsed_dict is not None:
+            return parsed_dict
+        return {"request_id": result.request_id, "status": result.status}
 
 
 def _as_object_dict(value: object) -> ObjectDict | None:

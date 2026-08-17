@@ -302,6 +302,30 @@ func TestRateLimiterIsolatesByClientIP(t *testing.T) {
 	}
 }
 
+func TestRateLimiterTrustsLastXFFHopNotClientSuppliedPrefix(t *testing.T) {
+	// nginx's $proxy_add_x_forwarded_for appends the real connecting address
+	// as the LAST entry; the client can set any value(s) before it. Keying on
+	// the first entry would let a client bypass the limiter by sending a
+	// fresh spoofed prefix on every request while its real (last-hop) address
+	// stays constant.
+	rl := NewRateLimiter(1, time.Minute)
+	h := rl.Limit(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+
+	do := func(xff string) int {
+		req := httptest.NewRequest(http.MethodPost, "/x", nil)
+		req.Header.Set("X-Forwarded-For", xff)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	if c := do("203.0.113.9, 198.51.100.50"); c != http.StatusOK {
+		t.Fatalf("first request = %d, want 200", c)
+	}
+	if c := do("203.0.113.99, 198.51.100.50"); c != http.StatusTooManyRequests {
+		t.Fatalf("spoofed-prefix retry = %d, want 429 (real last-hop IP unchanged)", c)
+	}
+}
+
 func TestRateLimiterZeroDisables(t *testing.T) {
 	rl := NewRateLimiter(0, time.Minute)
 	h := rl.Limit(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })

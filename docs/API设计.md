@@ -304,6 +304,8 @@
 
 `GET /api/v1/documents`
 
+权限范围：非 `admin` 角色只能看到自己拥有或所属（`project_members`）项目下的文档，与 `project_id` 查询参数取值无关——即使省略 `project_id` 或传入一个自己不属于的项目 ID，也只会返回有权限的项目内数据，不会像早期实现那样返回全库结果。`admin` 不受此限制。
+
 查询参数：
 
 - `team_space_id`
@@ -346,6 +348,8 @@
 ### 4.3 文档详情
 
 `GET /api/v1/documents/{document_id}`
+
+权限范围：非 `admin` 角色必须是文档所属项目的成员（或该文档当前责任人）才能访问，否则返回 403；`admin` 不受此限制。
 
 响应体：
 
@@ -1396,6 +1400,8 @@
 
 Query: `project_id`, `folder_id`, `keyword`, `page`, `page_size`
 
+权限范围：非 `admin` 角色只能看到自己拥有或所属项目下的数据资产，省略 `project_id` 或传入无权限的项目 ID 都不会绕过该限制。`GET /{id}` 详情与 `GET /{id}/download` 下载同样要求调用者是资产所属项目的成员（或该资产创建人），否则返回 403。
+
 ```json
 {
   "data": [
@@ -1508,6 +1514,8 @@ Body: `{ "items": [{ "data_asset_id": "uuid", "selected": true, "note": "..." }]
 `GET /api/v1/code-repositories`
 
 Query: `project_id`, `keyword`, `page`, `page_size`
+
+权限范围：非 `admin` 角色只能看到自己拥有或所属项目下的代码仓库；`GET /{id}` 详情同样要求调用者是该仓库所属项目的成员，否则返回 403。`push_token` 只在创建响应（`POST`）中一次性返回，`GET`（含列表和详情）不会回显；Git smart HTTP push 入口走仓库 `push_token` 校验，属于独立信任边界，不受这里的项目成员校验约束。
 
 #### 创建代码仓库
 

@@ -50,9 +50,12 @@ func (s CodeRepositoryService) List(ctx context.Context, filter query.CodeReposi
 	return s.reader.ListCodeRepositories(ctx, filter)
 }
 
-func (s CodeRepositoryService) Get(ctx context.Context, id string) (*query.CodeRepositoryDetail, error) {
+func (s CodeRepositoryService) Get(ctx context.Context, id string, actorID string, actorRole string) (*query.CodeRepositoryDetail, error) {
 	if id == "" {
 		return nil, fmt.Errorf("%w: id is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureViewCodeRepository(ctx, actorID, actorRole, id); err != nil {
+		return nil, err
 	}
 	return s.reader.GetCodeRepository(ctx, id)
 }

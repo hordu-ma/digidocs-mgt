@@ -30,6 +30,8 @@ func (r CodeRepositoryRepository) ListCodeRepositories(ctx context.Context, filt
 		pageSize = 30
 	}
 
+	isAdmin := filter.ActorRole == "admin"
+
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT
 			cr.id::text,
@@ -51,12 +53,14 @@ func (r CodeRepositoryRepository) ListCodeRepositories(ctx context.Context, filt
 		FROM code_repositories cr
 		LEFT JOIN projects p ON p.id = cr.project_id
 		LEFT JOIN users u ON u.id = cr.created_by
+		LEFT JOIN project_members pm ON pm.project_id = cr.project_id AND pm.user_id::text = $5
 		WHERE cr.is_deleted = false
 		  AND ($1 = '' OR cr.project_id::text = $1)
 		  AND ($2 = '' OR cr.name ILIKE '%' || $2 || '%' OR cr.slug ILIKE '%' || $2 || '%')
+		  AND ($6 = true OR p.owner_id::text = $5 OR pm.id IS NOT NULL)
 		ORDER BY cr.updated_at DESC
 		LIMIT $3 OFFSET $4
-	`, filter.ProjectID, filter.Keyword, pageSize, (page-1)*pageSize)
+	`, filter.ProjectID, filter.Keyword, pageSize, (page-1)*pageSize, filter.ActorID, isAdmin)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -82,11 +86,14 @@ func (r CodeRepositoryRepository) ListCodeRepositories(ctx context.Context, filt
 	var total int
 	if err := r.db.QueryRowContext(ctx, `
 		SELECT COUNT(*)
-		FROM code_repositories
-		WHERE is_deleted = false
-		  AND ($1 = '' OR project_id::text = $1)
-		  AND ($2 = '' OR name ILIKE '%' || $2 || '%' OR slug ILIKE '%' || $2 || '%')
-	`, filter.ProjectID, filter.Keyword).Scan(&total); err != nil {
+		FROM code_repositories cr
+		LEFT JOIN projects p ON p.id = cr.project_id
+		LEFT JOIN project_members pm ON pm.project_id = cr.project_id AND pm.user_id::text = $3
+		WHERE cr.is_deleted = false
+		  AND ($1 = '' OR cr.project_id::text = $1)
+		  AND ($2 = '' OR cr.name ILIKE '%' || $2 || '%' OR cr.slug ILIKE '%' || $2 || '%')
+		  AND ($4 = true OR p.owner_id::text = $3 OR pm.id IS NOT NULL)
+	`, filter.ProjectID, filter.Keyword, filter.ActorID, isAdmin).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	return items, total, nil

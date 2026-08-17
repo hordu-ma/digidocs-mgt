@@ -12,6 +12,12 @@ import xml.etree.ElementTree as ET
 import zipfile
 from typing import cast
 
+# Applies to every subprocess.run() call in this module (pdftotext, pdftoppm,
+# tesseract, antiword). Worker task processing is single-threaded and strictly
+# serial (see dispatcher.run_forever), so one hung subprocess on a malformed
+# or adversarial file would otherwise stall every other queued task forever.
+SUBPROCESS_TIMEOUT_SECONDS = int(os.getenv("DOCUMENT_EXTRACTION_TIMEOUT_SECONDS", "120"))
+
 
 class DocumentTextExtractionError(RuntimeError):
     """Raised when a document cannot be converted into plain text."""
@@ -232,7 +238,10 @@ def _extract_pdf(content: bytes) -> str:
                 check=True,
                 capture_output=True,
                 text=True,
+                timeout=SUBPROCESS_TIMEOUT_SECONDS,
             )
+        except subprocess.TimeoutExpired as exc:
+            raise DocumentTextExtractionError("pdftotext 执行超时") from exc
         except subprocess.CalledProcessError as exc:
             raise DocumentTextExtractionError(
                 f"pdftotext 执行失败: {exc.stderr.strip() or exc}"
@@ -263,7 +272,10 @@ def _extract_scanned_pdf(pdf_path: str, tmp_dir: str) -> str:
             check=True,
             capture_output=True,
             text=True,
+            timeout=SUBPROCESS_TIMEOUT_SECONDS,
         )
+    except subprocess.TimeoutExpired as exc:
+        raise DocumentTextExtractionError("pdftoppm 执行超时") from exc
     except subprocess.CalledProcessError as exc:
         raise DocumentTextExtractionError(
             f"pdftoppm 执行失败: {exc.stderr.strip() or exc}"
@@ -313,7 +325,10 @@ def _run_tesseract(file_path: str) -> str:
             check=True,
             capture_output=True,
             text=True,
+            timeout=SUBPROCESS_TIMEOUT_SECONDS,
         )
+    except subprocess.TimeoutExpired as exc:
+        raise DocumentTextExtractionError("tesseract 执行超时") from exc
     except subprocess.CalledProcessError as exc:
         raise DocumentTextExtractionError(
             f"tesseract 执行失败: {exc.stderr.strip() or exc}"

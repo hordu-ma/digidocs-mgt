@@ -166,6 +166,12 @@ type DocumentListFilter struct {
 	IncludeArchived bool
 	Page            int
 	PageSize        int
+	// ActorID/ActorRole scope the result to projects the actor can see.
+	// Non-admin actors only see documents in projects they own or are a
+	// member of; admin actors see everything. Set by the handler from the
+	// authenticated request context, never from client input.
+	ActorID   string
+	ActorRole string
 }
 
 type PaginationMeta struct {
@@ -328,6 +334,12 @@ type DataAssetListFilter struct {
 	Keyword   string
 	Page      int
 	PageSize  int
+	// ActorID/ActorRole scope the result to projects the actor can see.
+	// Non-admin actors only see data assets in projects they own or are a
+	// member of; admin actors see everything. Set by the handler from the
+	// authenticated request context, never from client input.
+	ActorID   string
+	ActorRole string
 }
 
 type HandoverDataLine struct {

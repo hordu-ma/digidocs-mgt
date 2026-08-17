@@ -90,6 +90,8 @@ func (h DataAssetHandler) List(w http.ResponseWriter, r *http.Request) {
 		Keyword:   r.URL.Query().Get("keyword"),
 		Page:      page,
 		PageSize:  pageSize,
+		ActorID:   middleware.UserIDFromContext(r.Context()),
+		ActorRole: middleware.UserRoleFromContext(r.Context()),
 	})
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list data assets")
@@ -105,7 +107,9 @@ func (h DataAssetHandler) List(w http.ResponseWriter, r *http.Request) {
 // Get  GET /api/v1/data-assets/{id}
 func (h DataAssetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	asset, err := h.service.GetDataAsset(r.Context(), id)
+	actorID := middleware.UserIDFromContext(r.Context())
+	actorRole := middleware.UserRoleFromContext(r.Context())
+	asset, err := h.service.GetDataAsset(r.Context(), id, actorID, actorRole)
 	if err != nil {
 		writeServiceError(w, err, "data asset not found", "failed to get data asset")
 		return
@@ -207,7 +211,9 @@ func (h DataAssetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // Download  GET /api/v1/data-assets/{id}/download
 func (h DataAssetHandler) Download(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	out, asset, err := h.service.DownloadDataAsset(r.Context(), id)
+	actorID := middleware.UserIDFromContext(r.Context())
+	actorRole := middleware.UserRoleFromContext(r.Context())
+	out, asset, err := h.service.DownloadDataAsset(r.Context(), id, actorID, actorRole)
 	if err != nil {
 		writeServiceError(w, err, "data asset not found", "failed to download data asset")
 		return

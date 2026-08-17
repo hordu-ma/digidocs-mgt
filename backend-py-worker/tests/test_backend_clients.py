@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from app.clients.backend_context_client import BackendContextClient
 from app.clients.callback_client import CallbackClient
 from app.clients.task_poller import TaskPollerClient
@@ -135,7 +137,5 @@ def test_callback_client_returns_backend_response_or_failure(monkeypatch) -> Non
 
     monkeypatch.setattr("urllib.request.urlopen", fake_failure)
 
-    response = client.submit_result(TaskResult(request_id="req-2", status="failed"))
-
-    assert response["status"] == "callback_failed"
-    assert response["request_id"] == "req-2"
+    with pytest.raises(OSError):
+        client.submit_result(TaskResult(request_id="req-2", status="failed"))

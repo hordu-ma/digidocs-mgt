@@ -9,6 +9,7 @@ import (
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/repository"
+	"digidocs-mgt/backend-go/internal/shared"
 	"digidocs-mgt/backend-go/internal/storage"
 )
 
@@ -79,9 +80,12 @@ func (s DataAssetService) ListDataAssets(ctx context.Context, filter query.DataA
 	return s.reader.ListDataAssets(ctx, filter)
 }
 
-func (s DataAssetService) GetDataAsset(ctx context.Context, id string) (*query.DataAssetDetail, error) {
+func (s DataAssetService) GetDataAsset(ctx context.Context, id string, actorID string, actorRole string) (*query.DataAssetDetail, error) {
 	if id == "" {
 		return nil, fmt.Errorf("%w: id is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureViewDataAsset(ctx, actorID, actorRole, id); err != nil {
+		return nil, err
 	}
 	return s.reader.GetDataAsset(ctx, id)
 }
@@ -109,7 +113,7 @@ func (s DataAssetService) UploadDataAsset(
 	// Use a placeholder ID for the object key; repo will generate the real ID.
 	// We upload first, then persist metadata.  If metadata fails, the orphaned
 	// object is a minor storage concern (acceptable for V1).
-	tempKey := fmt.Sprintf("data/%s/tmp-%d/%s", input.ProjectID, nowUnix(), fileName)
+	tempKey := fmt.Sprintf("data/%s/tmp-%d/%s", input.ProjectID, nowUnix(), shared.SanitizeStoredFileName(fileName))
 	uploadResult, err := s.storage.PutObject(ctx, storage.PutObjectInput{
 		ObjectKey:   tempKey,
 		Reader:      file,
@@ -154,7 +158,10 @@ func (s DataAssetService) DeleteDataAsset(ctx context.Context, input command.Dat
 }
 
 // DownloadDataAsset returns storage output for the file. Caller must close out.Reader.
-func (s DataAssetService) DownloadDataAsset(ctx context.Context, id string) (*storage.GetObjectOutput, *query.DataAssetDetail, error) {
+func (s DataAssetService) DownloadDataAsset(ctx context.Context, id string, actorID string, actorRole string) (*storage.GetObjectOutput, *query.DataAssetDetail, error) {
+	if err := s.permissions.EnsureViewDataAsset(ctx, actorID, actorRole, id); err != nil {
+		return nil, nil, err
+	}
 	asset, err := s.reader.GetDataAsset(ctx, id)
 	if err != nil {
 		return nil, nil, err
