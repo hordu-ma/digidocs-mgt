@@ -213,6 +213,7 @@ make clean-demo-data-apply  # 清理（执行前自动 pg_dump 备份）
 - `scripts/codex/report.sh`：输出当前分支、阶段、技能安装与 hooks 状态
 - `scripts/codex/smoke-local.sh`：接口烟测骨架（会写入一次性数据；默认打隔离栈，非烟测环境会被护栏拒绝）
 - `scripts/codex/smoke-stack.sh`：烟测隔离栈生命周期（`up` / `down` / `status`）
+- `scripts/codex/backup.sh` / `install-backup-timer.sh`：数据库与 Git 裸仓库定时备份（含完整性校验与保留策略）
 - `docker-compose.smoke.yml`：烟测隔离栈 override（独立 project / 容器名 / 端口 / 数据库 / 网络，`STORAGE_BACKEND=memory`）
 - `scripts/codex/clean-demo-data.sh`：清理演示库中的 smoke 残留（版本 / 会话 / 测试账号 / 邀请链接），执行前自动备份
 - `scripts/codex/smoke-e2e.sh`：在隔离栈上自动完成「起栈 → 灌种子 → 烟测 → 销毁」
@@ -251,7 +252,8 @@ docker compose up -d postgres
   - 前端专业度：修顶栏文字重叠、总览页三组重复 KPI 收敛为一行、版本历史与 AI 建议卡不再直出英文枚举。
   - 已清理演示库 smoke 残留（25 个 smoke 版本、28 个 smoke 会话、5 个测试账号、5 条邀请链接），新增 `scripts/codex/clean-demo-data.sh` 使其可重复执行。
   - **烟测与演示环境彻底隔离**：新增 `docker-compose.smoke.yml` + `scripts/codex/smoke-stack.sh`，烟测跑在独立 project/容器/端口/数据库/网络上且存储走 `memory`；`smoke-local.sh` 增加 `APP_ENV=smoke` 护栏，打到演示/生产环境直接拒绝。实测跑完整轮 e2e 后演示库计数零变化。
-  - 遗留项（演示环境默认口令、公网 TLS、smoke 未与演示库隔离等）见 [TASKS.md](TASKS.md) 「售卖前审阅遗留项」。
+  - 遗留项（演示环境默认口令、公网 TLS 等）见 [TASKS.md](TASKS.md) 「售卖前审阅遗留项」。
+- 已完成上线运维基线（2026-08-17）：定时数据库/代码仓库备份（含恢复演练）、迁移失败改为启动硬失败、Docker 日志封顶、四个服务健康检查。详见 [部署准备与运行说明 §3.2](docs/部署准备与运行说明.md)。
 - 已完成用户注册登录改造：开放手机号/邮箱自助注册（注册即激活、角色固定 `member`），登录支持用户名/手机号/邮箱三选一，现有用户名测试账号不受影响
 - 已完成课题入组闭环：未入组空状态 + 课题负责人成员管理与邀请链接（默认 `contributor`，7 天有效）
 

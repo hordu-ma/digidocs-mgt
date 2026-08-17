@@ -1,7 +1,10 @@
 import logging
+import os
 import re
 import signal
+import tempfile
 import time
+from pathlib import Path
 from types import FrameType
 from typing import cast
 
@@ -30,6 +33,25 @@ class WorkerDispatcher:
         self.poller: TaskPollerClient = TaskPollerClient()
         self.skill_adapter: WorkerSkillAdapter = WorkerSkillAdapter(self.openclaw_client)
         self._stop_requested = False
+        self._heartbeat_path = Path(
+            os.getenv("WORKER_HEARTBEAT_FILE", str(Path(tempfile.gettempdir()) / "digidocs-worker-heartbeat"))
+        )
+
+    def _touch_heartbeat(self) -> None:
+        """Record that the poll loop is still turning.
+
+        The worker exposes no port, so a container healthcheck has nothing to
+        probe: `restart: unless-stopped` only catches a crashed process, not one
+        that is alive but wedged (a hung HTTP call, a deadlock). Stamping a file
+        on every loop turn gives the healthcheck something to measure staleness
+        against — see the worker healthcheck in docker-compose.yml.
+        """
+        try:
+            self._heartbeat_path.write_text(str(int(time.time())), encoding="utf-8")
+        except OSError:
+            # A heartbeat failure must never take the worker down; losing the
+            # liveness signal is strictly better than losing the worker.
+            logger.warning("failed to write heartbeat file %s", self._heartbeat_path, exc_info=True)
 
     def describe_startup(self) -> None:
         print(
@@ -64,7 +86,9 @@ class WorkerDispatcher:
         # seconds of shutdown latency.
         signal.signal(signal.SIGTERM, self._handle_stop_signal)
         signal.signal(signal.SIGINT, self._handle_stop_signal)
+        self._touch_heartbeat()
         while not self._stop_requested:
+            self._touch_heartbeat()
             try:
                 tasks = self.poller.poll()
             except Exception:

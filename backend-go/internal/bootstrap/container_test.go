@@ -41,14 +41,20 @@ func TestBuildContainerPostgresBackendWiresRepositories(t *testing.T) {
 		WorkerCallbackToken: "worker",
 	}
 
+	// Migrations are now a hard startup dependency: an unreachable database
+	// fails the build instead of yielding a container that would serve traffic
+	// against an unmigrated schema. sql.Open itself is lazy, so this error
+	// surfaces from the migration step, which is exactly the point.
 	container, err := BuildContainer(cfg)
-	if err != nil {
-		t.Fatalf("build postgres container should defer connection errors: %v", err)
+	if err == nil {
+		if container.DB != nil {
+			_ = container.DB.Close()
+		}
+		t.Fatal("expected BuildContainer to fail when migrations cannot be applied")
 	}
-	if container.DB == nil {
-		t.Fatal("expected db handle")
+	if !strings.Contains(err.Error(), "run migrations") {
+		t.Fatalf("err = %v, want it to name the migration step", err)
 	}
-	_ = container.DB.Close()
 }
 
 func TestFindMigrationsDir(t *testing.T) {

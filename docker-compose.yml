@@ -3,6 +3,13 @@ services:
     image: postgres:17
     container_name: digidocs-postgres
     restart: unless-stopped
+    # json-file 默认不轮转。后端对每个请求打一行访问日志、worker 每 5 秒轮询一次，
+    # 不封顶就是慢性占满磁盘。三个服务统一 3×10MB 上限。
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-digidocs_mgt}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -50,6 +57,23 @@ services:
       - "${BACKEND_GO_PORT:-18081}:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # json-file 默认不轮转。后端对每个请求打一行访问日志、worker 每 5 秒轮询一次，
+    # 不封顶就是慢性占满磁盘。三个服务统一 3×10MB 上限。
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # restart: unless-stopped 只处理进程退出，处理不了「进程还在但卡死」
+    # （连接池耗尽、群晖调用挂住）。健康检查让这类情况也能被发现并自愈。
+    # start_period 给迁移留出时间——迁移失败现在会导致启动失败，属于预期行为。
+    # 同样用 127.0.0.1 而非 localhost，理由见前端健康检查的注释。
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "--max-time", "3", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,10 +96,31 @@ services:
       CALLBACK_BASE_URL: ${CALLBACK_BASE_URL:-http://backend-go:8080}
       CALLBACK_TOKEN: ${CALLBACK_TOKEN:-replace-me}
       POLL_INTERVAL: ${POLL_INTERVAL:-5}
+      WORKER_HEARTBEAT_FILE: /tmp/digidocs-worker-heartbeat
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # json-file 默认不轮转。后端对每个请求打一行访问日志、worker 每 5 秒轮询一次，
+    # 不封顶就是慢性占满磁盘。三个服务统一 3×10MB 上限。
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # worker 不监听端口，没有可探测的 HTTP 面。它每轮轮询会刷新心跳文件，
+    # 这里检查心跳新鲜度：超过 6 倍轮询间隔没更新，说明轮询循环卡住了。
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -f /tmp/digidocs-worker-heartbeat &&
+          [ $$(( $$(date +%s) - $$(cat /tmp/digidocs-worker-heartbeat) )) -lt $$(( ${POLL_INTERVAL:-5} * 6 )) ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
-      - backend-go
+      backend-go:
+        condition: service_healthy
     profiles:
       - app
 
@@ -86,8 +131,26 @@ services:
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-18080}:80"
+    # json-file 默认不轮转。后端对每个请求打一行访问日志、worker 每 5 秒轮询一次，
+    # 不封顶就是慢性占满磁盘。三个服务统一 3×10MB 上限。
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # nginx:alpine 自带 busybox wget（超时参数是 -T，没有 --timeout）。
+    # 必须写 127.0.0.1 而不是 localhost：容器内 localhost 先解析到 ::1，而
+    # nginx 的 `listen 80` 只绑 IPv4，用 localhost 会得到 Connection refused，
+    # 把一个完全正常的前端判成 unhealthy。
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     depends_on:
-      - backend-go
+      backend-go:
+        condition: service_healthy
     profiles:
       - app
 

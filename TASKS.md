@@ -587,6 +587,16 @@
 
 ## 待办
 
+### 上线运维基线（2026-08-17）✅ 已完成
+
+上线前复核发现四个「演示能跑但上线会出事」的运维缺口，均已修复并实测：
+
+- [x] **定时数据库备份** — 此前**完全没有任何备份机制**（无 timer、无 cron），PostgreSQL 数据与 Git 裸仓库都在单块 NVMe 的 docker 卷里，且 `docs/现场部署逐条清单.md` 的「确认数据库备份策略」一直是个没打勾的空占位。新增 `scripts/codex/backup.sh`（pg_dump + code_repos 卷打包 + 14 天保留 + 大小/gzip/建表语句三重校验）与 `install-backup-timer.sh`（systemd 用户级 timer，每天 03:30，`Persistent=true` 补跑）。**已实测恢复**：把备份灌进一次性 postgres 容器，五张关键表行数与源库完全一致。
+- [x] **迁移失败改为启动硬失败** — `bootstrap/container.go` 此前是 `log.Printf("migration warning")` 后继续启动，等于让应用跑在旧的/半截的 schema 上，表现为零星 500 或静默写错数据，而没人会翻启动日志。现改为返回错误、进程起不来；迁移目录找不到同样拒绝启动。
+- [x] **Docker 日志封顶** — 四个服务统一 `max-size: 10m` / `max-file: 3`。json-file 默认不轮转，而后端每请求一行访问日志、worker 每 5 秒轮询一次，此前是慢性占满磁盘。
+- [x] **四个服务健康检查 + `depends_on: service_healthy`** — `restart: unless-stopped` 只处理进程退出，处理不了进程卡死。backend-go 镜像为此装了 `curl`；worker 无端口可探，改为每轮轮询刷新心跳文件、健康检查测新鲜度（已反证：心跳落后 300 秒被正确判为不健康，恢复后判定健康）。
+  - 踩坑记录：健康检查最初写 `http://localhost`，前端一直 unhealthy 而站点却正常——容器内 `localhost` 先解析到 `::1`，nginx `listen 80` 只绑 IPv4。**必须写 `127.0.0.1`**。
+
 ### 售卖前审阅遗留项（2026-08-17，按优先级）
 
 - [ ] **P0-2 演示环境仍在用种子默认口令** — `admin` / `admin123` 目前可直接登录公网演示环境，角色是平台管理员，明文与 bcrypt 哈希都公开写在 `backend-go/sql/seed.sql` 注释里；`maliguo` / `qiaoanqiang` / `wangzhao` / `liuzongyou` 同为 `admin123`。`docs/现场部署逐条清单.md` 早已要求「初始化后立即修改默认演示账号密码」，但线上没有执行。改口令属于线上账号操作，需由负责人执行。后续建议把 `seed.sql` 拆成「结构演示数据」与「账号」两部分，账号口令改为部署时随机生成并只打印一次。

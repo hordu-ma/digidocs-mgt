@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"path/filepath"
 	"runtime"
@@ -53,12 +54,23 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			return Container{}, err
 		}
 
+		// Migrations are a hard startup dependency, not a best-effort step.
+		//
+		// This used to log a warning and carry on, which meant a failed or
+		// skipped migration left the process serving traffic against a stale or
+		// half-applied schema — surfacing later as scattered 500s or, worse, as
+		// writes that silently land in the wrong shape. Nobody reads a warning
+		// in the boot log. Refusing to start is the safer failure: the container
+		// restart policy will retry, and a genuinely broken migration becomes
+		// immediately visible instead of quietly corrupting data.
 		migrationsDir := findMigrationsDir()
-		if migrationsDir != "" {
-			if err := db.RunMigrations(postgresDB, migrationsDir); err != nil {
-				log.Printf("[bootstrap] migration warning: %v", err)
-			}
+		if migrationsDir == "" {
+			return Container{}, fmt.Errorf("migrations directory not found; refusing to start against an unmigrated database")
 		}
+		if err := db.RunMigrations(postgresDB, migrationsDir); err != nil {
+			return Container{}, fmt.Errorf("run migrations: %w", err)
+		}
+		log.Printf("[bootstrap] migrations applied from %s", migrationsDir)
 
 		actionRepo := pgrepo.NewActionRepository(postgresDB)
 		authService := service.NewAuthService(pgrepo.NewUserAuthRepository(postgresDB), tokenService)
