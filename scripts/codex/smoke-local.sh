@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+#
+# 本地容器联调烟测。
+#
+# 注意：本脚本会往 BACKEND_BASE_URL 指向的数据库**写入一次性数据**——smoke 文档
+# 版本、"请用一句话确认 smoke 已打通" 会话、`@digidocs.test` 注册账号、邀请链接。
+# 默认地址 127.0.0.1:18081 就是演示环境，因此每跑一次都会污染演示库；客户演示前
+# 请执行 `make clean-demo-data-apply` 清理。根治办法是把 smoke 指向独立数据库
+# （见 TASKS.md「售卖前审阅遗留项」）。
+#
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

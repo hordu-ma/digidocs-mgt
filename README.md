@@ -191,7 +191,11 @@ make integration-postgres
 ./scripts/codex/install-hooks.sh
 ./scripts/codex/install-persistent-routing.sh
 ./scripts/codex/install-project-skills.sh
+make clean-demo-data        # 预览演示库中的 smoke 残留
+make clean-demo-data-apply  # 清理（执行前自动 pg_dump 备份）
 ```
+
+> `make smoke` / `make smoke-e2e` 默认打的就是演示后端 `127.0.0.1:18081`，每跑一次都会往演示库写入一次性数据。给客户演示前记得跑一次 `make clean-demo-data-apply`。
 
 项目级 Codex 协作资产：
 
@@ -204,7 +208,8 @@ make integration-postgres
 - `scripts/codex/doctor.sh`：环境与协作资产体检
 - `scripts/codex/check-doc-sync.sh`：检查 `README.md` / `TASKS.md` / `AGENTS.md` 的阶段与协作约束一致性
 - `scripts/codex/report.sh`：输出当前分支、阶段、技能安装与 hooks 状态
-- `scripts/codex/smoke-local.sh`：本地容器联调烟测骨架
+- `scripts/codex/smoke-local.sh`：本地容器联调烟测骨架（会向目标库写入一次性数据）
+- `scripts/codex/clean-demo-data.sh`：清理演示库中的 smoke 残留（版本 / 会话 / 测试账号 / 邀请链接），执行前自动备份
 - `scripts/codex/smoke-e2e.sh`：自动拉起 compose、加载种子数据并执行核心端到端 smoke
 - `scripts/codex/postgres-integration.sh`：启动临时 PostgreSQL 容器并运行真实迁移 / 仓储集成测试
 - `Makefile`：统一 `make doctor`、`make verify`、`make check-doc-sync`
@@ -239,7 +244,8 @@ docker compose up -d postgres
   - **git smart-HTTP 改流式转发**，不再把整个 clone 缓进内存；`git archive` 同步同样改流式并校验退出码。
   - **补自助改密** `POST /auth/change-password`；前端补兜底 404 路由与品牌化 404 页、登录跳转补 `redirect` 参数、nginx 路由改为「带扩展名查文件、其余回 shell」并加基础安全响应头。
   - 前端专业度：修顶栏文字重叠、总览页三组重复 KPI 收敛为一行、版本历史与 AI 建议卡不再直出英文枚举。
-  - 遗留项（演示环境默认口令、公网 TLS、演示库 smoke 残留数据等）见 [TASKS.md](TASKS.md) 「售卖前审阅遗留项」。
+  - 已清理演示库 smoke 残留（25 个 smoke 版本、28 个 smoke 会话、5 个测试账号、5 条邀请链接），新增 `scripts/codex/clean-demo-data.sh` 使其可重复执行。
+  - 遗留项（演示环境默认口令、公网 TLS、smoke 未与演示库隔离等）见 [TASKS.md](TASKS.md) 「售卖前审阅遗留项」。
 - 已完成用户注册登录改造：开放手机号/邮箱自助注册（注册即激活、角色固定 `member`），登录支持用户名/手机号/邮箱三选一，现有用户名测试账号不受影响
 - 已完成课题入组闭环：未入组空状态 + 课题负责人成员管理与邀请链接（默认 `contributor`，7 天有效）
 

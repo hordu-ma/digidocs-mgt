@@ -1,4 +1,4 @@
-.PHONY: doctor verify verify-go coverage-go verify-worker coverage-worker verify-frontend coverage-frontend integration-postgres check-doc-sync install-project-skills install-hooks install-persistent-routing smoke smoke-e2e status
+.PHONY: doctor verify verify-go coverage-go verify-worker coverage-worker verify-frontend coverage-frontend integration-postgres check-doc-sync install-project-skills install-hooks install-persistent-routing smoke smoke-e2e status clean-demo-data
 
 doctor:
 	./scripts/codex/doctor.sh
@@ -11,6 +11,14 @@ status:
 
 smoke:
 	./scripts/codex/smoke-local.sh
+
+# smoke 会往目标库写入一次性数据（版本 / 会话 / 注册账号 / 邀请链接）。
+# 对着演示库跑过之后，用这个把残留清掉再给客户演示。
+clean-demo-data:
+	./scripts/codex/clean-demo-data.sh --dry-run
+
+clean-demo-data-apply:
+	./scripts/codex/clean-demo-data.sh --apply
 
 smoke-e2e:
 	./scripts/codex/smoke-e2e.sh
