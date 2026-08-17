@@ -20,3 +20,14 @@ components.d.ts
 .DS_Store
 .vscode
 .codex
+
+# 构建/抓取中间产物，不入库
+tmp/
+.playwright-cli/
+
+# Claude Code 本地检查点
+.claude/
+
+# 含明文口令的临时请求脚本一律不入库。
+# 曾经有一个 synology.http 把群晖账号口令提交进了当时还是 public 的仓库。
+*.http

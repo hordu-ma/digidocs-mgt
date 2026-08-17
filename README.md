@@ -33,7 +33,6 @@
 ├── backend-go/
 ├── backend-py-worker/
 ├── docker-compose.yml
-├── docker-compose.p14s.yml # P14s + 群晖同局域网测试部署 override
 ├── docker-compose.smoke.yml # 烟测隔离栈 override
 ├── frontend/
 ├── ops/
@@ -75,7 +74,7 @@
 ### 外部系统
 
 - Synology DS925+ DSM / File Station Web API（文件存储）
-- DGX Spark / p14s 上部署的 OpenClaw Gateway（AI 能力层，当前按 OpenAI 兼容 HTTP 接口接入）
+- DGX Spark 上部署的 OpenClaw Gateway（AI 能力层，当前按 OpenAI 兼容 HTTP 接口接入）
 
 ## 协作规范
 
@@ -108,7 +107,7 @@
 - 当前已支持正文抽取：`txt`、`md`、`csv`、`json`、`docx`、`pdf`。
 - 当前已支持图片 / 扫描 PDF OCR，但要求 Worker 主机存在 `tesseract`；若缺失会返回明确错误而非伪成功。
 - `openclaw status` 返回 Gateway 正常，不等于 OpenAI 兼容 HTTP 端点已启用；部署前仍需单独验证 `GET /v1/models`。
-- 假设/待确认：若 p14s 上 OpenClaw Gateway 未启用 OpenAI 兼容 HTTP 端点，需要先在网关配置中显式开启。
+- 假设/待确认：若应用节点上 OpenClaw Gateway 未启用 OpenAI 兼容 HTTP 端点，需要先在网关配置中显式开启。
 - 当前已补 Assistant 问答历史列表与筛选接口，前端助手页可直接回看历史请求并查看模型、OpenClaw 响应 ID 与耗时。
 - 当前限制：图片 / 扫描 PDF 的 OCR 依赖 Worker 主机安装 `tesseract`；若未安装，AI 摘要仍会退化为结构化业务上下文摘要。
 
@@ -156,19 +155,12 @@ docker compose up -d postgres
 docker compose --profile app up -d backend-go backend-py-worker frontend
 ```
 
-P14s + 群晖同局域网测试部署路径：
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.p14s.yml --profile app up -d --build --remove-orphans
-```
-
 说明：
 
 - 上述 `docker compose` 主要用于本地单机联调；
-- `docker-compose.p14s.yml` 用于 OpenClaw Gateway 运行在 P14s 宿主机、Worker 运行在 Docker 的测试环境：Worker 使用 host network，通过 `127.0.0.1:18789` 访问 OpenClaw，通过 `127.0.0.1:18081` 访问 Go 后端；
-- P14s 与群晖在同一局域网时，群晖 File Station / PostgreSQL 主链路优先使用群晖局域网 IP，Tailscale 仅用于远程运维或应急排障；
+- 应用节点与群晖在同一局域网时，群晖 File Station / PostgreSQL 主链路优先使用群晖局域网 IP，Tailscale 仅用于远程运维或应急排障；
 - 仓库当前把 compose 应用网络固定为 `172.29.0.0/24`，避免重启或重建后漂移到新的 Docker bridge 子网并与 `tailscaled` 的 `table 52` 发生竞争；
-- 当前目标部署分层为：`DGX Spark / P14s` 承载应用层与 OpenClaw，`群晖 DS925+` 承载数据库层（`Container Manager` 中的 PostgreSQL 容器）和文件层（DSM / File Station 原生服务）。
+- 当前目标部署分层为：`DGX Spark` 承载应用层与 OpenClaw，`群晖 DS925+` 承载数据库层（`Container Manager` 中的 PostgreSQL 容器）和文件层（DSM / File Station 原生服务）。
 
 部署前配置模板：
 
@@ -204,7 +196,6 @@ make clean-demo-data-apply  # 清理（执行前自动 pg_dump 备份）
 
 - `ops/codex/skills/`：可执行 skill 包
 - `ops/codex/skills/index.yaml`：技能索引
-- `docker-compose.p14s.yml`：P14s + 群晖同局域网测试部署 override，固化 Worker host network 与本机 OpenClaw / Go 后端访问路径
 - `scripts/codex/install-project-skills.sh`：把项目技能安装到 `~/.codex/skills/`
 - `scripts/codex/install-hooks.sh`：启用仓库内 `pre-commit` / `pre-push` hooks
 - `scripts/codex/install-persistent-routing.sh`：为 Linux 宿主机安装 `tailscaled` 持久化路由修正和定时兜底，当前默认覆盖 `8.152.204.76`、`172.17.0.0/16`、`172.18.0.0/16`、`172.29.0.0/24`、`192.168.1.0/24`
@@ -254,6 +245,8 @@ docker compose up -d postgres
   - **烟测与演示环境彻底隔离**：新增 `docker-compose.smoke.yml` + `scripts/codex/smoke-stack.sh`，烟测跑在独立 project/容器/端口/数据库/网络上且存储走 `memory`；`smoke-local.sh` 增加 `APP_ENV=smoke` 护栏，打到演示/生产环境直接拒绝。实测跑完整轮 e2e 后演示库计数零变化。
   - 遗留项（演示环境默认口令、公网 TLS 等）见 [TASKS.md](TASKS.md) 「售卖前审阅遗留项」。
 - 已完成上线运维基线（2026-08-17）：定时数据库/代码仓库备份（含恢复演练）、迁移失败改为启动硬失败、Docker 日志封顶、四个服务健康检查。详见 [部署准备与运行说明 §3.2](docs/部署准备与运行说明.md)。
+- 已完成「上线后会咬人」四项复核（2026-08-17）：登录限流改为按被尝试账号分桶（公网经 frp 裸 TCP 隧道，真实客户端 IP 在应用层之前已丢失，原按 IP 分桶退化为全局单桶、会连坐所有用户）、版本/流转列表加 200 条上限。详见 [部署准备与运行说明 §3.1.1](docs/部署准备与运行说明.md)。
+- 已完成仓库瘦身（2026-08-17）：移除 `docker-compose.p14s.yml`（P14s 已非部署形态）与入库的临时产物；仓库已转为 private。**遗留 P0：`synology.http` 曾把群晖账号明文口令提交进当时公开的仓库，该口令必须轮换**，详见 [TASKS.md](TASKS.md)。
 - 已完成用户注册登录改造：开放手机号/邮箱自助注册（注册即激活、角色固定 `member`），登录支持用户名/手机号/邮箱三选一，现有用户名测试账号不受影响
 - 已完成课题入组闭环：未入组空状态 + 课题负责人成员管理与邀请链接（默认 `contributor`，7 天有效）
 
@@ -280,7 +273,7 @@ docker compose up -d postgres
 - 已完成前端四个页面接入真实后端 API（仪表盘、文档列表、文档详情、交接单）
 - 已修复宿主机 Docker 端口转发问题（Tailscale 路由表与 Docker 网桥冲突）
 - 已固定 compose 应用网络为 `172.29.0.0/24`，并把持久化路由修正口径同步到该固定子网；当前方案同时包含 `tailscaled` 重启后修复和 `digidocs-route-fix.timer` 运行期兜底，降低再次被 `table 52` 抢路由的概率
-- 已新增 P14s + 群晖同局域网测试部署 override：`backend-py-worker` 可使用 host network 直连宿主机 OpenClaw 与 Go 后端，群晖主链路推荐走局域网 IP，Tailscale 仅作为远程运维通道；已通过 compose config、`make verify` 与严格 smoke（含 Assistant completed）
+- 已完成同局域网部署适配：群晖主链路推荐走局域网 IP，Tailscale 仅作为远程运维通道；已通过 compose config、`make verify` 与严格 smoke（含 Assistant completed）
 - 已完成前端商业化产品体验升级（二期）
   - 统一全局设计 token、Element Plus 皮肤与导航壳层
   - 新增全局搜索/跳转命令面板与快捷工作入口
@@ -325,7 +318,7 @@ docker compose up -d postgres
 - 已新增 `docs/backend-go核心源码学习导读.md`，面向 Go 初学者解释 backend-go 核心文件中的典型函数与关键代码块
 - 已完成前端 P0/P1 产品化体验改版首轮：统一视觉 token、应用外壳、状态/文件徽标，并重构负责人总览、文档资产库和文档档案页
 - 已完成前端 P2/P3 产品化体验改版首轮：毕业交接改为任务卡与流程工作台，OpenClaw 助手改为成熟对话工作区，并通过路由懒加载消除前端构建 chunk 过大提示
-- 已完成 p14s/Linux compose 首轮部署适配（标准路径支持 `host-gateway`；当前 P14s 同 LAN 测试路径已补 `docker-compose.p14s.yml` 作为 host network override）
+- 已完成 Linux compose 部署适配（容器访问宿主机走 `host-gateway`，配合 UFW 放行容器网段）
 - 已修复 `backend-go` 运行镜像未携带 `migrations/` 导致容器内自动迁移失效的问题
 - 已完成 Assistant 问答历史列表 / 筛选与 Markdown 结果展示首轮接线
 - 已完成 PDF 正文抽取与 AI 可观测性首轮补强（模型、上游响应 ID、耗时、Worker 日志）
