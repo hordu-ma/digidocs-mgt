@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -337,5 +338,102 @@ func TestRateLimiterZeroDisables(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("disabled limiter blocked at %d", i)
 		}
+	}
+}
+
+// The login limiter must bucket by the targeted account, not only by client IP:
+// behind an frp raw-TCP tunnel every visitor shares one address, so an IP-only
+// limiter degrades to a single global bucket that any one user can exhaust.
+func TestLoginIdentifierKeyBucketsByAccount(t *testing.T) {
+	newReq := func(body string) *http.Request {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(body))
+		req.RemoteAddr = "10.0.0.1:1234"
+		return req
+	}
+
+	if got := LoginIdentifierKey(newReq(`{"identifier":"alice","password":"x"}`)); got != "login:alice" {
+		t.Fatalf("key = %q, want login:alice", got)
+	}
+	// Case and surrounding whitespace must not create separate buckets.
+	if got := LoginIdentifierKey(newReq(`{"identifier":"  ALICE  ","password":"x"}`)); got != "login:alice" {
+		t.Fatalf("key = %q, want the normalized login:alice", got)
+	}
+	// No identifier: fall back to the IP-derived key rather than lumping every
+	// malformed request into one bucket.
+	if got := LoginIdentifierKey(newReq(`{"password":"x"}`)); got != "" {
+		t.Fatalf("key = %q, want empty so the caller falls back to client IP", got)
+	}
+	if got := LoginIdentifierKey(newReq("not json")); got != "" {
+		t.Fatalf("key = %q, want empty for an unparseable body", got)
+	}
+}
+
+func TestLoginIdentifierKeyLeavesBodyReadable(t *testing.T) {
+	body := `{"identifier":"bob","password":"secret"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(body))
+
+	if got := LoginIdentifierKey(req); got != "login:bob" {
+		t.Fatalf("key = %q, want login:bob", got)
+	}
+	// The handler still has to be able to read the credentials.
+	rest, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatalf("read body after peek: %v", err)
+	}
+	if string(rest) != body {
+		t.Fatalf("body after peek = %q, want it restored intact", rest)
+	}
+}
+
+func TestLimitKeyedSeparatesBuckets(t *testing.T) {
+	limiter := NewRateLimiter(1, time.Minute)
+	handler := limiter.LimitKeyed(
+		func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) },
+		LoginIdentifierKey,
+	)
+
+	call := func(identifier string) int {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login",
+			strings.NewReader(`{"identifier":"`+identifier+`","password":"x"}`))
+		req.RemoteAddr = "10.0.0.1:1234"
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	if code := call("alice"); code != http.StatusOK {
+		t.Fatalf("first alice attempt = %d, want 200", code)
+	}
+	if code := call("alice"); code != http.StatusTooManyRequests {
+		t.Fatalf("second alice attempt = %d, want 429", code)
+	}
+	// Same source address, different account: must not be collateral damage.
+	if code := call("bob"); code != http.StatusOK {
+		t.Fatalf("bob attempt = %d, want 200 — one account must not lock out another", code)
+	}
+}
+
+func TestClientIPHonoursTrustedProxyDepth(t *testing.T) {
+	original := TrustedProxyDepth
+	t.Cleanup(func() { TrustedProxyDepth = original })
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "10.0.0.9:1111"
+	req.Header.Set("X-Forwarded-For", "203.0.113.7, 198.51.100.1, 172.29.0.1")
+
+	// Depth 1 = only our own nginx appended an entry.
+	TrustedProxyDepth = 1
+	if got := clientIP(req); got != "172.29.0.1" {
+		t.Fatalf("depth 1 = %q, want the address our nginx observed", got)
+	}
+	// Depth 2 = nginx plus one upstream proxy that rewrites the header.
+	TrustedProxyDepth = 2
+	if got := clientIP(req); got != "198.51.100.1" {
+		t.Fatalf("depth 2 = %q, want the entry before the trusted tail", got)
+	}
+	// Depth deeper than the chain must clamp instead of panicking.
+	TrustedProxyDepth = 99
+	if got := clientIP(req); got != "203.0.113.7" {
+		t.Fatalf("oversized depth = %q, want it clamped to the first entry", got)
 	}
 }

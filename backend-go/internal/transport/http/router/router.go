@@ -13,6 +13,13 @@ import (
 func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux := http.NewServeMux()
 
+	// How many trailing X-Forwarded-For entries come from proxies we control.
+	// Raising this trusts one more entry of client-supplied data, so it must
+	// match the real chain — see middleware.clientIP.
+	if cfg.TrustedProxyDepth > 0 {
+		middleware.TrustedProxyDepth = cfg.TrustedProxyDepth
+	}
+
 	systemHandler := handlers.NewSystemHandler(cfg)
 	authHandler := handlers.NewAuthHandler(container.AuthService, container.TokenService)
 	assistantHandler := handlers.NewAssistantHandler(container.AssistantService)
@@ -54,7 +61,20 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/system/info", systemHandler.Info)
 	loginLimiter := middleware.NewRateLimiter(cfg.LoginRateLimitPerMin, time.Minute)
 	registerLimiter := middleware.NewRateLimiter(cfg.RegisterRateLimitPerMin, time.Minute)
-	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/login", loginLimiter.Limit(authHandler.Login))
+	// Login is bucketed by the account being targeted, not only by client IP.
+	//
+	// Per-IP alone does not work here: public traffic arrives through an frp
+	// raw-TCP tunnel, so every internet visitor shares one address and therefore
+	// one bucket — measured: twelve different X-Forwarded-For values counted
+	// together, 429 on the eleventh. That punishes everyone for one user's typos
+	// while doing nothing extra to an attacker.
+	//
+	// Keying on the identifier makes the limit do what it was added for: slow
+	// down guessing against a specific account, and contain the blast radius to
+	// that account. It also survives the tunnel fix, at which point the IP-keyed
+	// fallback below starts being meaningful again for anonymous floods.
+	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/login",
+		loginLimiter.LimitKeyed(authHandler.Login, middleware.LoginIdentifierKey))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/register", registerLimiter.Limit(authHandler.Register))
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/invites/{token}", membershipHandler.PreviewInvite)
 	// Worker callback uses its own shared-secret token, not user JWT.

@@ -33,6 +33,11 @@ type Config struct {
 	LoginRateLimitPerMin int
 	// RegisterRateLimitPerMin caps registration attempts per client IP per minute (0 disables).
 	RegisterRateLimitPerMin int
+	// TrustedProxyDepth is how many trailing X-Forwarded-For entries were added
+	// by reverse proxies under our control, counted from the end. 1 means only
+	// the frontend nginx. Raising it trusts one more entry of client-supplied
+	// data, so it must match the real proxy chain — see middleware.clientIP.
+	TrustedProxyDepth int
 }
 
 func Load() Config {
@@ -59,6 +64,7 @@ func Load() Config {
 		SynologySharePath:          getEnv("SYNOLOGY_SHARE_PATH", "/DigiDocs"),
 		CodeRepoRoot:               getEnv("CODE_REPO_ROOT", "/tmp/digidocs-code-repos"),
 		LoginRateLimitPerMin:       getEnvInt("LOGIN_RATE_LIMIT_PER_MIN", 10),
+		TrustedProxyDepth:          getEnvInt("TRUSTED_PROXY_DEPTH", 1),
 		RegisterRateLimitPerMin:    getEnvInt("REGISTER_RATE_LIMIT_PER_MIN", 5),
 	}
 

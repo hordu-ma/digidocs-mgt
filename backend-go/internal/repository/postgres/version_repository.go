@@ -18,6 +18,12 @@ func NewVersionRepository(db DBTX) VersionRepository {
 	return VersionRepository{db: db}
 }
 
+// maxDocumentVersions caps the version history returned for one document.
+// The list was previously unbounded: a long-lived document accumulates versions
+// forever and every detail-page load fetched all of them. The cap is high enough
+// that normal documents are unaffected and low enough to bound the response.
+const maxDocumentVersions = 200
+
 func (r VersionRepository) ListVersions(ctx context.Context, documentID string) ([]query.VersionItem, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
@@ -31,8 +37,10 @@ func (r VersionRepository) ListVersions(ctx context.Context, documentID string) 
 		FROM document_versions
 		WHERE document_id::text = $1
 		ORDER BY version_no DESC
+		LIMIT $2
 		`,
 		documentID,
+		maxDocumentVersions,
 	)
 	if err != nil {
 		return nil, err

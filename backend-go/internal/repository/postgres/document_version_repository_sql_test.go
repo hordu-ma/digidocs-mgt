@@ -107,7 +107,7 @@ func TestVersionRepositoryMethods(t *testing.T) {
 	db, mock := newMockDB(t)
 	repo := NewVersionRepository(db)
 	mock.ExpectQuery("FROM document_versions\\s+WHERE document_id").
-		WithArgs("doc-1").
+		WithArgs("doc-1", maxDocumentVersions).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "version_no", "file_name", "summary_status", "created_at"}).
 			AddRow("v-2", 2, "report.pdf", "pending", "2026-05-01T00:00:00Z"))
 	versions, err := repo.ListVersions(ctx, "doc-1")

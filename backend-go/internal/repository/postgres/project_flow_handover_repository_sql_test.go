@@ -54,7 +54,7 @@ func TestFlowAndHandoverRepositories(t *testing.T) {
 	flows := NewFlowRepository(db)
 	handovers := NewHandoverRepository(db)
 
-	mock.ExpectQuery("FROM flow_records").WithArgs("doc-1").
+	mock.ExpectQuery("FROM flow_records").WithArgs("doc-1", maxDocumentFlows).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "action", "from_status", "to_status", "created_at"}).
 			AddRow("flow-1", "transfer", "in_progress", "pending_handover", "2026-05-01T00:00:00Z"))
 	flowItems, err := flows.ListFlows(ctx, "doc-1")

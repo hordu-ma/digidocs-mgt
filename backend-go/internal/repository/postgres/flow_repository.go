@@ -14,6 +14,11 @@ func NewFlowRepository(db DBTX) FlowRepository {
 	return FlowRepository{db: db}
 }
 
+// maxDocumentFlows caps the flow history returned for one document. Same reason
+// as maxDocumentVersions: the list grows without bound over a document's life
+// and the detail page fetched all of it on every load.
+const maxDocumentFlows = 200
+
 func (r FlowRepository) ListFlows(ctx context.Context, documentID string) ([]query.FlowItem, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
@@ -27,8 +32,10 @@ func (r FlowRepository) ListFlows(ctx context.Context, documentID string) ([]que
 		FROM flow_records
 		WHERE document_id::text = $1
 		ORDER BY created_at DESC
+		LIMIT $2
 		`,
 		documentID,
+		maxDocumentFlows,
 	)
 	if err != nil {
 		return nil, err
