@@ -183,6 +183,30 @@ func (s PermissionService) EnsurePushCodeRepository(ctx context.Context, actorID
 	return permissionResult(ok, err, "push code repository")
 }
 
+func (s PermissionService) EnsureViewAssistantRequest(ctx context.Context, actorID string, actorRole string, requestID string) error {
+	if s.reader == nil {
+		return nil
+	}
+	ok, err := s.reader.CanViewAssistantRequest(ctx, actorID, actorRole, requestID)
+	return permissionResult(ok, err, "view assistant request")
+}
+
+func (s PermissionService) EnsureViewAssistantSuggestion(ctx context.Context, actorID string, actorRole string, suggestionID string) error {
+	if s.reader == nil {
+		return nil
+	}
+	ok, err := s.reader.CanViewAssistantSuggestion(ctx, actorID, actorRole, suggestionID)
+	return permissionResult(ok, err, "view assistant suggestion")
+}
+
+func (s PermissionService) EnsureViewConversation(ctx context.Context, actorID string, actorRole string, conversationID string) error {
+	if s.reader == nil {
+		return nil
+	}
+	ok, err := s.reader.CanViewConversation(ctx, actorID, actorRole, conversationID)
+	return permissionResult(ok, err, "view assistant conversation")
+}
+
 func permissionResult(ok bool, err error, action string) error {
 	if err != nil {
 		return err

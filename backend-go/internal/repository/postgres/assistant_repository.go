@@ -562,6 +562,7 @@ func (r AssistantRepository) ListSuggestions(
 	ctx context.Context,
 	filter query.AssistantSuggestionFilter,
 ) ([]query.AssistantSuggestionItem, error) {
+	isAdmin, actorID := scopeArgs(filter.Scope)
 	rows, err := r.db.QueryContext(
 		ctx,
 		`
@@ -582,12 +583,15 @@ func (r AssistantRepository) ListSuggestions(
 		  AND ($2 = '' OR related_id::text = $2)
 		  AND ($3 = '' OR status::text = $3)
 		  AND ($4 = '' OR suggestion_type::text = $4)
+		  AND `+projectScopeSQL(assistantRelatedProjectSQL("related_type", "related_id"), "$5", "$6")+`
 		ORDER BY generated_at DESC
 		`,
 		filter.RelatedType,
 		filter.RelatedID,
 		filter.Status,
 		filter.SuggestionType,
+		isAdmin,
+		actorID,
 	)
 	if err != nil {
 		return nil, err
@@ -634,6 +638,15 @@ func (r AssistantRepository) ListAssistantRequests(
 		pageSize = 20
 	}
 	offset := (page - 1) * pageSize
+	isAdmin, actorID := scopeArgs(filter.Scope)
+
+	// A request is visible to its own creator, or to anyone who can view the
+	// project behind its related resource (document/handover/project) — the
+	// same rule CanViewAssistantRequest applies for the single-item read path.
+	scopeSQL := `(
+		created_by::text = $8
+		OR ` + projectScopeSQL(assistantRelatedProjectSQL("related_type", "related_id"), "$7", "$8") + `
+	)`
 
 	var total int
 	err := r.db.QueryRowContext(
@@ -647,6 +660,7 @@ func (r AssistantRepository) ListAssistantRequests(
 		  AND ($4 = '' OR COALESCE(conversation_id::text, '') = $4)
 		  AND ($5 = '' OR status = $5)
 		  AND ($6 = '' OR COALESCE(payload->>'question', '') ILIKE '%' || $6 || '%')
+		  AND `+scopeSQL+`
 		`,
 		filter.RequestType,
 		filter.RelatedType,
@@ -654,6 +668,8 @@ func (r AssistantRepository) ListAssistantRequests(
 		filter.ConversationID,
 		filter.Status,
 		filter.Keyword,
+		isAdmin,
+		actorID,
 	).Scan(&total)
 	if err != nil {
 		return nil, 0, err
@@ -681,8 +697,9 @@ func (r AssistantRepository) ListAssistantRequests(
 		  AND ($4 = '' OR COALESCE(conversation_id::text, '') = $4)
 		  AND ($5 = '' OR status = $5)
 		  AND ($6 = '' OR COALESCE(payload->>'question', '') ILIKE '%' || $6 || '%')
+		  AND `+scopeSQL+`
 		ORDER BY created_at DESC
-		LIMIT $7 OFFSET $8
+		LIMIT $9 OFFSET $10
 		`,
 		filter.RequestType,
 		filter.RelatedType,
@@ -690,6 +707,8 @@ func (r AssistantRepository) ListAssistantRequests(
 		filter.ConversationID,
 		filter.Status,
 		filter.Keyword,
+		isAdmin,
+		actorID,
 		pageSize,
 		offset,
 	)

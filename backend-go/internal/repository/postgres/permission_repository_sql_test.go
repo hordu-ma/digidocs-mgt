@@ -30,6 +30,9 @@ func TestPermissionRepositoryAdminShortCircuits(t *testing.T) {
 		func() (bool, error) { return repo.CanViewProject(context.Background(), "u", "admin", "p") },
 		func() (bool, error) { return repo.CanViewProjectMembers(context.Background(), "u", "admin", "p") },
 		func() (bool, error) { return repo.CanManageProjectMembers(context.Background(), "u", "admin", "p") },
+		func() (bool, error) { return repo.CanViewAssistantRequest(context.Background(), "u", "admin", "r") },
+		func() (bool, error) { return repo.CanViewAssistantSuggestion(context.Background(), "u", "admin", "s") },
+		func() (bool, error) { return repo.CanViewConversation(context.Background(), "u", "admin", "c") },
 	}
 	for _, check := range checks {
 		ok, err := check()
@@ -172,6 +175,61 @@ func TestPermissionRepositoryViewChecks(t *testing.T) {
 	// An empty project id must never widen to "all projects".
 	if ok, err := repo.CanViewProject(ctx, "u-1", "member", ""); err != nil || ok {
 		t.Fatalf("CanViewProject(\"\") ok=%v err=%v, want false nil", ok, err)
+	}
+
+	assertExpectations(t, mock)
+}
+
+// TestPermissionRepositoryAssistantChecks covers the assistant read rules
+// added to close the same class of cross-project leak in the AI subsystem:
+// requests are visible to their creator or the related resource's project,
+// suggestions and conversations resolve purely through the related
+// resource/creator since they carry no independent membership of their own.
+func TestPermissionRepositoryAssistantChecks(t *testing.T) {
+	ctx := context.Background()
+	db, mock := newMockDB(t)
+	repo := NewPermissionRepository(db)
+
+	mock.ExpectQuery("FROM assistant_requests ar").
+		WithArgs("req-1", "u-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	if ok, err := repo.CanViewAssistantRequest(ctx, "u-1", "member", "req-1"); err != nil || !ok {
+		t.Fatalf("CanViewAssistantRequest ok=%v err=%v, want true nil", ok, err)
+	}
+
+	mock.ExpectQuery("FROM assistant_requests ar").
+		WithArgs("req-2", "u-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+	if ok, err := repo.CanViewAssistantRequest(ctx, "u-1", "member", "req-2"); err != nil || ok {
+		t.Fatalf("CanViewAssistantRequest ok=%v err=%v, want false nil for an outsider", ok, err)
+	}
+
+	mock.ExpectQuery("FROM assistant_suggestions s").
+		WithArgs("sug-1", "u-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	if ok, err := repo.CanViewAssistantSuggestion(ctx, "u-1", "member", "sug-1"); err != nil || !ok {
+		t.Fatalf("CanViewAssistantSuggestion ok=%v err=%v, want true nil", ok, err)
+	}
+
+	mock.ExpectQuery("FROM assistant_suggestions s").
+		WithArgs("sug-2", "u-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+	if ok, err := repo.CanViewAssistantSuggestion(ctx, "u-1", "member", "sug-2"); err != nil || ok {
+		t.Fatalf("CanViewAssistantSuggestion ok=%v err=%v, want false nil for an outsider", ok, err)
+	}
+
+	mock.ExpectQuery("FROM assistant_conversations c").
+		WithArgs("conv-1", "u-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	if ok, err := repo.CanViewConversation(ctx, "u-1", "member", "conv-1"); err != nil || !ok {
+		t.Fatalf("CanViewConversation ok=%v err=%v, want true nil", ok, err)
+	}
+
+	mock.ExpectQuery("FROM assistant_conversations c").
+		WithArgs("conv-2", "u-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+	if ok, err := repo.CanViewConversation(ctx, "u-1", "member", "conv-2"); err != nil || ok {
+		t.Fatalf("CanViewConversation ok=%v err=%v, want false nil for a non-owner", ok, err)
 	}
 
 	assertExpectations(t, mock)

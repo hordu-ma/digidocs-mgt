@@ -85,7 +85,7 @@ async function loadProfile() {
   try {
     const res = await api.get("/auth/me");
     fillForm(res.data?.data);
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "加载个人信息失败"));
   } finally {
     loading.value = false;
@@ -108,7 +108,7 @@ async function saveProfile() {
     });
     fillForm(res.data?.data);
     ElMessage.success("个人信息已更新");
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "保存个人信息失败"));
   } finally {
     saving.value = false;

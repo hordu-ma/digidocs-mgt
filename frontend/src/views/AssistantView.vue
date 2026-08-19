@@ -296,7 +296,7 @@ async function fetchConversations() {
     }
     const res = await api.get("/assistant/conversations", { params });
     conversations.value = (res.data?.data ?? []) as AssistantConversationItem[];
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "加载会话列表失败"));
   } finally {
     conversationsLoading.value = false;
@@ -308,7 +308,7 @@ async function fetchMessages(conversationID: string) {
   try {
     const res = await api.get(`/assistant/conversations/${conversationID}/messages`);
     messages.value = (res.data?.data ?? []) as AssistantConversationMessageItem[];
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "加载会话消息失败"));
   } finally {
     messagesLoading.value = false;
@@ -376,7 +376,7 @@ async function pollRequest(requestID: string) {
     pollTimer = window.setTimeout(() => {
       void pollRequest(requestID);
     }, POLL_INTERVAL_MS);
-  } catch (err: any) {
+  } catch (err) {
     stopPolling();
     thinking.value = false;
     ElMessage.error(extractError(err, "查询 AI 请求状态失败"));
@@ -421,7 +421,7 @@ async function submitQuestion() {
     if (activeRequestID.value) {
       await pollRequest(activeRequestID.value);
     }
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "提交失败"));
   } finally {
     loading.value = false;
@@ -447,7 +447,7 @@ async function archiveConversation(conversationID: string, archive: boolean) {
       startNewConversation();
     }
     await fetchConversations();
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "操作失败"));
   }
 }

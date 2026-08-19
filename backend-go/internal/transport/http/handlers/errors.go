@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"digidocs-mgt/backend-go/internal/service"
@@ -27,6 +28,11 @@ func writeServiceError(w http.ResponseWriter, err error, notFoundMsg, internalMs
 	case errors.Is(err, service.ErrConflict):
 		response.WriteError(w, http.StatusConflict, "conflict", err.Error())
 	default:
+		// The client only ever sees internalMsg. Without this, an unrecognized
+		// service error left no trace anywhere — the access log only recorded the
+		// 500 status, not why — so diagnosing a production 500 meant reproducing
+		// it locally with extra logging added first.
+		log.Printf("[http] unhandled service error: %v", err)
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", internalMsg)
 	}
 }

@@ -91,3 +91,15 @@ func (r PermissionRepository) CanViewProjectMembers(context.Context, string, str
 func (r PermissionRepository) CanManageProjectMembers(context.Context, string, string, string) (bool, error) {
 	return true, nil
 }
+
+func (r PermissionRepository) CanViewAssistantRequest(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+
+func (r PermissionRepository) CanViewAssistantSuggestion(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+
+func (r PermissionRepository) CanViewConversation(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}

@@ -84,6 +84,9 @@ type PermissionReader interface {
 	CanPushCodeRepository(ctx context.Context, actorID string, actorRole string, repositoryID string) (bool, error)
 	CanViewProjectMembers(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
 	CanManageProjectMembers(ctx context.Context, actorID string, actorRole string, projectID string) (bool, error)
+	CanViewAssistantRequest(ctx context.Context, actorID string, actorRole string, requestID string) (bool, error)
+	CanViewAssistantSuggestion(ctx context.Context, actorID string, actorRole string, suggestionID string) (bool, error)
+	CanViewConversation(ctx context.Context, actorID string, actorRole string, conversationID string) (bool, error)
 }
 
 type DocumentReader interface {

@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"digidocs-mgt/backend-go/internal/config"
 	"digidocs-mgt/backend-go/internal/domain/auth"
 	"digidocs-mgt/backend-go/internal/domain/query"
+	noopqueue "digidocs-mgt/backend-go/internal/queue/noop"
 	"digidocs-mgt/backend-go/internal/repository/memory"
 	"digidocs-mgt/backend-go/internal/service"
 	"digidocs-mgt/backend-go/internal/transport/http/router"
@@ -91,6 +93,15 @@ func (denyAllPermissionReader) CanViewProjectMembers(context.Context, string, st
 func (denyAllPermissionReader) CanManageProjectMembers(context.Context, string, string, string) (bool, error) {
 	return false, nil
 }
+func (denyAllPermissionReader) CanViewAssistantRequest(context.Context, string, string, string) (bool, error) {
+	return false, nil
+}
+func (denyAllPermissionReader) CanViewAssistantSuggestion(context.Context, string, string, string) (bool, error) {
+	return false, nil
+}
+func (denyAllPermissionReader) CanViewConversation(context.Context, string, string, string) (bool, error) {
+	return false, nil
+}
 
 // scopeSpy records the ActorScope the aggregate endpoints push into the
 // repository layer. Those endpoints cannot 403 (they legitimately return an
@@ -164,6 +175,7 @@ func lockedDownServer(t *testing.T) (http.Handler, *scopeSpy, string) {
 	codeRepo := memory.NewCodeRepositoryRepository()
 
 	container.DocumentService = service.NewDocumentService(docRepo, docRepo, nil, versionWorkflow, permissions)
+	container.AssistantService = service.NewAssistantService(noopqueue.NewPublisher(), memory.NewAssistantRepository(), docRepo, permissions)
 	container.VersionService = service.NewVersionService(nil, versionWorkflow, storageProvider, permissions)
 	container.FlowService = service.NewFlowService(memory.NewFlowRepository(), actionRepo, permissions)
 	container.HandoverService = service.NewHandoverService(spy, actionRepo, permissions)
@@ -255,6 +267,57 @@ func TestAggregateEndpointsCarryActorScope(t *testing.T) {
 			}
 			if scope.IsAdmin {
 				t.Error("scope.IsAdmin = true for a member token, want false")
+			}
+		})
+	}
+}
+
+// TestAssistantEndpointsDenyNonMember is the regression test for the Assistant
+// subsystem's own version of the cross-project leak: the P0-1 fix locked down
+// document/version/handover/flow/project/dashboard/audit-events, but every one
+// of these AI endpoints skipped the permission layer entirely, so an outsider
+// could read AI-generated answers/suggestions, read or post into someone
+// else's conversation, and even trigger a summary job against a document they
+// cannot view. Every entry here returned 200 (or a queued job) before the fix.
+func TestAssistantEndpointsDenyNonMember(t *testing.T) {
+	handler, _, token := lockedDownServer(t)
+
+	const (
+		docID          = "00000000-0000-0000-0000-000000000100"
+		handoverID     = "00000000-0000-0000-0000-000000000300"
+		requestID      = "00000000-0000-0000-0000-000000000500"
+		suggestionID   = "00000000-0000-0000-0000-000000000600"
+		conversationID = "00000000-0000-0000-0000-000000000700"
+	)
+
+	cases := []struct {
+		name   string
+		method string
+		path   string
+		body   any
+	}{
+		{"ask", http.MethodPost, "/api/v1/assistant/ask", map[string]any{"question": "q", "document_id": docID}},
+		{"create conversation", http.MethodPost, "/api/v1/assistant/conversations", map[string]any{"document_id": docID}},
+		{"get conversation", http.MethodGet, "/api/v1/assistant/conversations/" + conversationID, nil},
+		{"list conversation messages", http.MethodGet, "/api/v1/assistant/conversations/" + conversationID + "/messages", nil},
+		{"archive conversation", http.MethodPatch, "/api/v1/assistant/conversations/" + conversationID + "/archive", map[string]any{"archive": true}},
+		{"summarize document", http.MethodPost, "/api/v1/assistant/documents/" + docID + "/summarize", map[string]any{}},
+		{"summarize handover", http.MethodPost, "/api/v1/assistant/handovers/" + handoverID + "/summarize", map[string]any{}},
+		{"get request", http.MethodGet, "/api/v1/assistant/requests/" + requestID, nil},
+		{"confirm suggestion", http.MethodPost, "/api/v1/assistant/suggestions/" + suggestionID + "/confirm", map[string]any{}},
+		{"dismiss suggestion", http.MethodPost, "/api/v1/assistant/suggestions/" + suggestionID + "/dismiss", map[string]any{}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var body io.Reader
+			if tc.body != nil {
+				body = jsonBody(tc.body)
+			}
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, authedRequest(tc.method, tc.path, body, token))
+			if rec.Code != http.StatusForbidden {
+				t.Fatalf("%s %s = %d, want 403 (body: %s)", tc.method, tc.path, rec.Code, rec.Body.String())
 			}
 		})
 	}

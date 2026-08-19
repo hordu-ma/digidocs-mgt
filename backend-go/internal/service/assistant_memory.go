@@ -56,6 +56,23 @@ func (s AssistantService) normalizeScope(
 	}, nil
 }
 
+// ensureViewScope checks the actor can view the resource a normalized
+// assistant scope points to, before any AI work is queued against it.
+// Without this, Ask() would happily fetch and summarize another project's
+// document/project context for any authenticated user who supplies its id —
+// the same cross-project leak already fixed for documents/versions/handovers,
+// just reachable through the assistant instead of a direct resource endpoint.
+func (s AssistantService) ensureViewScope(ctx context.Context, actorID string, actorRole string, scope assistantScope) error {
+	switch scope.ScopeType {
+	case "document":
+		return s.permissions.EnsureViewDocument(ctx, actorID, actorRole, scope.ScopeID)
+	case "project":
+		return s.permissions.EnsureViewProject(ctx, actorID, actorRole, scope.ScopeID)
+	default:
+		return nil
+	}
+}
+
 func (s AssistantService) buildMemorySnapshot(
 	ctx context.Context,
 	conversationID string,
@@ -117,10 +134,15 @@ func (s AssistantService) collectConfirmedSuggestions(
 	items := make([]map[string]any, 0)
 	seen := map[string]struct{}{}
 	for _, target := range relatedTargetsForScope(scope) {
+		// Scope: bypass. This assembles the AI's own memory for a request whose
+		// caller already passed EnsureViewDocument/EnsureViewProject in Ask(), and
+		// the query is narrowly pinned to that same already-authorized
+		// document/project — it is not a general listing exposed to the actor.
 		suggestions, err := s.repo.ListSuggestions(ctx, query.AssistantSuggestionFilter{
 			RelatedType: target.RelatedType,
 			RelatedID:   target.RelatedID,
 			Status:      "confirmed",
+			Scope:       query.ActorScope{IsAdmin: true},
 		})
 		if err != nil {
 			return nil, err
@@ -152,6 +174,7 @@ func (s AssistantService) collectHistoricalAnswers(
 	items := make([]map[string]any, 0)
 	seen := map[string]struct{}{}
 	for _, target := range relatedTargetsForScope(scope) {
+		// Scope: bypass, for the same reason as collectConfirmedSuggestions above.
 		requests, _, err := s.repo.ListAssistantRequests(ctx, query.AssistantRequestFilter{
 			RequestType: "assistant.ask",
 			RelatedType: target.RelatedType,
@@ -159,6 +182,7 @@ func (s AssistantService) collectHistoricalAnswers(
 			Status:      "completed",
 			Page:        1,
 			PageSize:    5,
+			Scope:       query.ActorScope{IsAdmin: true},
 		})
 		if err != nil {
 			return nil, err

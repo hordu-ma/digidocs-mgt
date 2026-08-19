@@ -34,3 +34,19 @@ func projectScopeSQL(projectColumn string, adminParam string, actorParam string)
 func scopeArgs(scope query.ActorScope) (bool, string) {
 	return scope.IsAdmin, scope.ActorID
 }
+
+// assistantRelatedProjectSQL resolves the project id behind an
+// assistant_requests/assistant_suggestions row via its polymorphic
+// related_type/related_id pair (document/handover/project), so the result can
+// be fed into projectScopeSQL as a project id expression. Both columns must be
+// qualified references the caller already has in scope (e.g. "ar.related_type",
+// "ar.related_id").
+func assistantRelatedProjectSQL(relatedTypeColumn string, relatedIDColumn string) string {
+	return `(
+		CASE ` + relatedTypeColumn + `
+			WHEN 'document' THEN (SELECT d.project_id FROM documents d WHERE d.id::text = COALESCE(` + relatedIDColumn + `::text, ''))
+			WHEN 'handover' THEN (SELECT h.project_id FROM graduation_handovers h WHERE h.id::text = COALESCE(` + relatedIDColumn + `::text, ''))
+			WHEN 'project'  THEN (SELECT p.id FROM projects p WHERE p.id::text = COALESCE(` + relatedIDColumn + `::text, ''))
+		END
+	)`
+}

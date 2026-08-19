@@ -6,6 +6,21 @@
 
 ## 已完成
 
+- 完成**全局优化审阅第一批：Assistant 权限漏洞（P0）+ 低成本高收益修复（P1）**（2026-08-19）
+  - 起因：一次跳出单点修复、覆盖 Go 后端/Python Worker/前端+运维文档的全局审阅（三路并行只读探索 + 人工复核关键发现），产出分优先级清单；本轮先做清单里的第 1、2 两项。
+  - **Assistant（AI 助手）子系统跨课题越权（已修复并部署验证，与 2026-08-17 P0-1 同构）**
+    - 现象：P0-1 那轮把 document/version/handover/flow/project/dashboard/audit-events 都收口了，但 Assistant 子系统完全在覆盖范围之外——`GET /assistant/requests[/{id}]`、`GET /assistant/suggestions`、`POST /assistant/suggestions/{id}/confirm|dismiss`、`GET /assistant/conversations/{id}[/messages]`、`PATCH /assistant/conversations/{id}/archive`、`POST /assistant/{documents,handovers}/{id}/summarize`、`POST /assistant/ask`、`POST /assistant/conversations` 共 10 个接口均未取调用者身份。完整利用链：任意自助注册账号 → 对任意 `document_id` 发起摘要 → 无过滤读全平台 AI 问答/建议正文；还能确认/忽略别人课题的 AI 建议、读到别人会话的完整消息流（含被喂给 AI 的文档正文片段）。
+    - 修复：`PermissionReader` 新增 `CanViewAssistantRequest`/`CanViewAssistantSuggestion`/`CanViewConversation` 三条读规则（postgres 实现按 `related_type`/`related_id` 反查所属项目 + 创建者兜底，memory 维持"恒放行"的既有约定不变）；`AssistantService` 全部单资源接口（`GetRequest`/`ConfirmSuggestion`/`DismissSuggestion`/`GetConversation`/`ListConversationMessages`/`ArchiveConversation`/`CreateConversation`/`Ask`/`SummarizeDocument`/`SummarizeHandover`）在读写前补权限检查；`ListRequests`/`ListSuggestions` 改为 `ActorScope` 下推到 SQL 层收敛（复用 `scope.go` 的 `projectScopeSQL`，新增 `assistantRelatedProjectSQL` 解析多态关联资源的所属项目）。`ArchiveConversation`/`CreateConversation`/`Ask` 三个接口原本不在最初的问题清单里，是实现过程中顺带发现的同类缺口，一并修复。
+    - 回归测试：`permission_test.go` 新增 `TestAssistantEndpointsDenyNonMember`，用「全拒绝」权限 reader 对 10 个接口断言 403（并用移除单个检查的方式实测确认测试真的会失败，不是形同虚设）；`permission_repository_sql_test.go` 新增 `TestPermissionRepositoryAssistantChecks` 覆盖三条新 SQL 规则的正反例。
+    - 部署验证：重新构建部署 `backend-go` 后，用一个自助注册的一次性账号对真实生产库发起 10 组跨课题探针（单资源接口全部 403，`ListRequests`/`ListSuggestions` 返回按调用者收敛后的空集，未鉴权请求 401），验证通过后已从库中删除该账号，无残留。
+  - **P1 低成本高收益修复（已完成并部署验证）**
+    - `frontend/nginx/default.conf` 补 `gzip on`（此前 nginx:alpine 默认关闭，896KB 的 `element-plus` chunk 一直以未压缩体积传输），实测 `curl -H "Accept-Encoding: gzip"` 命中 `Content-Encoding: gzip`。
+    - `writeServiceError` 兜底 500 分支补 `log.Printf` 记录原始 `err`（此前全 handler 54 处调用点几乎都不落日志，排查 500 只能复现+现改代码）。
+    - 新增迁移 `012_assistant_requests_status_index.sql`：`assistant_requests` 建表起没有任何索引，但 Worker 轮询每约 5 秒跑一次按 `status` 过滤的两条语句，量大后会退化为全表扫描；补 `(status, created_at)` 复合索引。
+    - `DataView.downloadAsset` 改用统一 `api` 封装（`responseType: "blob"`），补齐此前"AdminView 改用统一封装"那轮修复漏改的唯一一处裸 `fetch()`，会话过期时不再绕过 401 拦截器。
+    - 前端 6 个 view（`DocumentDetailView`/`DocumentsView`/`HandoversView`/`CodeView`/`ProfileView`/`AssistantView`）共 29 处 `catch (err: any)` 批量替换为 `catch (err)`，统一走已有的 `extractError(err, ...)`（逐一确认过 `err` 只被传给 `extractError`，替换零行为风险）。
+  - 验证：`go build`/`vet`/`test ./...` 全绿（含新增测试）；`npm run build`（`vue-tsc` + `vite build`）与 `npm run test:run` 通过；已重建部署 `backend-go`/`frontend` 两容器，四容器 healthy，公网 `8.152.204.76` 复测 200，容器日志无 panic/error。
+  - 已同步 `docs/API设计.md`「3.5 首期权限矩阵」补 Assistant 读操作权限表、`docs/数据库设计.md` 补 `assistant_requests` 索引说明。
 - 修复**浏览器控制台 favicon.ico 404**（2026-08-19）
   - 起因：`index.html` 从未声明 `<link rel="icon">`，也没有 `frontend/public/favicon.ico`；nginx 早就为 `/favicon.ico` 单独开了 `location`（只是压了 `log_not_found`），浏览器仍会在控制台报 404
   - 新增 `frontend/public/favicon.ico`（品牌色渐变圆角方块 + "DG"，与侧边栏 `.brand-mark` 一致，16/32/48/64 四档尺寸），`index.html` 补 `<link rel="icon" href="/favicon.ico">`

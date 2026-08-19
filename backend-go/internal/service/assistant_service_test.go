@@ -13,7 +13,7 @@ func TestAssistantServiceAskCreatesConversationQueuesTaskAndMemory(t *testing.T)
 	ctx := context.Background()
 	repo := newFakeAssistantRepo()
 	publisher := &fakePublisher{}
-	svc := NewAssistantService(publisher, repo, nil)
+	svc := NewAssistantService(publisher, repo, nil, PermissionService{})
 
 	// Seed historical memory in another conversation with the same project scope.
 	oldConv, _ := repo.CreateConversation(ctx, "project", "project-1", map[string]any{"project_id": "project-1"}, "old", "actor-1")
@@ -35,7 +35,7 @@ func TestAssistantServiceAskCreatesConversationQueuesTaskAndMemory(t *testing.T)
 	result, err := svc.Ask(ctx, map[string]any{
 		"question":   "  What next?  ",
 		"project_id": "project-1",
-	}, "actor-2")
+	}, "actor-2", "member")
 	if err != nil {
 		t.Fatalf("ask: %v", err)
 	}
@@ -65,27 +65,27 @@ func TestAssistantServiceAskExistingConversationAndErrors(t *testing.T) {
 	ctx := context.Background()
 	repo := newFakeAssistantRepo()
 	publisher := &fakePublisher{}
-	svc := NewAssistantService(publisher, repo, nil)
+	svc := NewAssistantService(publisher, repo, nil, PermissionService{})
 
-	if _, err := svc.Ask(ctx, map[string]any{"question": " "}, "actor"); !errors.Is(err, ErrValidation) {
+	if _, err := svc.Ask(ctx, map[string]any{"question": " "}, "actor", "member"); !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected question validation error, got %v", err)
 	}
-	if _, err := svc.Ask(ctx, map[string]any{"question": "Q"}, "actor"); !errors.Is(err, ErrValidation) {
+	if _, err := svc.Ask(ctx, map[string]any{"question": "Q"}, "actor", "member"); !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected scope validation error, got %v", err)
 	}
 
-	conv, err := svc.CreateConversation(ctx, map[string]any{"project_id": "project-1"}, "title", "actor")
+	conv, err := svc.CreateConversation(ctx, map[string]any{"project_id": "project-1"}, "title", "actor", "member")
 	if err != nil {
 		t.Fatalf("create conversation: %v", err)
 	}
-	result, err := svc.Ask(ctx, map[string]any{"question": "Q", "conversation_id": conv.ID, "project_id": "project-1"}, "actor")
+	result, err := svc.Ask(ctx, map[string]any{"question": "Q", "conversation_id": conv.ID, "project_id": "project-1"}, "actor", "member")
 	if err != nil {
 		t.Fatalf("ask existing conversation: %v", err)
 	}
 	if result.ConversationID != conv.ID {
 		t.Fatalf("expected existing conversation id, got %+v", result)
 	}
-	if _, err := svc.Ask(ctx, map[string]any{"question": "Q", "conversation_id": conv.ID, "project_id": "project-2"}, "actor"); !errors.Is(err, ErrValidation) {
+	if _, err := svc.Ask(ctx, map[string]any{"question": "Q", "conversation_id": conv.ID, "project_id": "project-2"}, "actor", "member"); !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected scope mismatch validation error, got %v", err)
 	}
 
@@ -104,22 +104,22 @@ func TestAssistantServiceDelegatesRepositoryMethods(t *testing.T) {
 	ctx := context.Background()
 	repo := newFakeAssistantRepo()
 	publisher := &fakePublisher{}
-	svc := NewAssistantService(publisher, repo, nil)
+	svc := NewAssistantService(publisher, repo, nil, PermissionService{})
 
-	conv, err := svc.CreateConversation(ctx, map[string]any{"project_id": "project-1"}, "title", "actor")
+	conv, err := svc.CreateConversation(ctx, map[string]any{"project_id": "project-1"}, "title", "actor", "member")
 	if err != nil {
 		t.Fatalf("create conversation: %v", err)
 	}
-	if _, err := svc.GetConversation(ctx, conv.ID); err != nil {
+	if _, err := svc.GetConversation(ctx, conv.ID, "actor", "member"); err != nil {
 		t.Fatalf("get conversation: %v", err)
 	}
 	if items, err := svc.ListConversations(ctx, query.AssistantConversationFilter{}); err != nil || len(items) != 1 {
 		t.Fatalf("list conversations = (%+v, %v)", items, err)
 	}
-	if err := svc.ArchiveConversation(ctx, conv.ID, true); err != nil {
+	if err := svc.ArchiveConversation(ctx, conv.ID, true, "actor", "member"); err != nil {
 		t.Fatalf("archive conversation: %v", err)
 	}
-	if _, err := svc.ListConversationMessages(ctx, "missing"); !errors.Is(err, ErrNotFound) {
+	if _, err := svc.ListConversationMessages(ctx, "missing", "actor", "member"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected missing conversation before listing messages, got %v", err)
 	}
 
@@ -130,7 +130,7 @@ func TestAssistantServiceDelegatesRepositoryMethods(t *testing.T) {
 	if err := svc.ReceiveResult(ctx, task.Result{RequestID: message.RequestID, Status: "completed", Output: map[string]any{"extracted_text": "text"}}); err != nil {
 		t.Fatalf("receive result: %v", err)
 	}
-	if _, err := svc.GetRequest(ctx, message.RequestID); err != nil {
+	if _, err := svc.GetRequest(ctx, message.RequestID, "actor", "member"); err != nil {
 		t.Fatalf("get request: %v", err)
 	}
 	if items, total, err := svc.ListRequests(ctx, query.AssistantRequestFilter{}); err != nil || total == 0 || len(items) == 0 {
@@ -150,10 +150,10 @@ func TestAssistantServiceDelegatesRepositoryMethods(t *testing.T) {
 	if suggestions, err := svc.ListSuggestions(ctx, query.AssistantSuggestionFilter{Status: "pending"}); err != nil || len(suggestions) != 1 {
 		t.Fatalf("list suggestions = (%+v, %v)", suggestions, err)
 	}
-	if result, err := svc.ConfirmSuggestion(ctx, "suggestion-1", "actor", "ok"); err != nil || result["status"] != "confirmed" {
+	if result, err := svc.ConfirmSuggestion(ctx, "suggestion-1", "actor", "member", "ok"); err != nil || result["status"] != "confirmed" {
 		t.Fatalf("confirm suggestion = (%+v, %v)", result, err)
 	}
-	if result, err := svc.DismissSuggestion(ctx, "suggestion-1", "actor", "no"); err != nil || result["status"] != "dismissed" {
+	if result, err := svc.DismissSuggestion(ctx, "suggestion-1", "actor", "member", "no"); err != nil || result["status"] != "dismissed" {
 		t.Fatalf("dismiss suggestion = (%+v, %v)", result, err)
 	}
 }

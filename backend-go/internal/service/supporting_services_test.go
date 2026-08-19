@@ -154,6 +154,15 @@ func (m mockPermissionReader) CanViewProjectMembers(context.Context, string, str
 func (m mockPermissionReader) CanManageProjectMembers(context.Context, string, string, string) (bool, error) {
 	return m.ok, m.err
 }
+func (m mockPermissionReader) CanViewAssistantRequest(context.Context, string, string, string) (bool, error) {
+	return m.ok, m.err
+}
+func (m mockPermissionReader) CanViewAssistantSuggestion(context.Context, string, string, string) (bool, error) {
+	return m.ok, m.err
+}
+func (m mockPermissionReader) CanViewConversation(context.Context, string, string, string) (bool, error) {
+	return m.ok, m.err
+}
 
 func TestPermissionServiceAllowsNilReaderAndGrantedActions(t *testing.T) {
 	if err := (PermissionService{}).EnsureCreateDocument(context.Background(), "u", "member", "p"); err != nil {

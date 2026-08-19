@@ -411,6 +411,28 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 
 已知例外：`GET /users` 仍对全部登录用户返回精简用户名录（`id` / `username` / `display_name` / `role` / `status`，不含联系方式）。课题负责人的「添加成员」需要按姓名检索尚未加入本课题的账号，收敛该接口会直接破坏该功能，因此保持现状。
 
+读操作权限（2026-08-19 补齐，AI 助手子系统）：
+
+2026-08-17 那轮读权限收口覆盖了 document/version/handover/code-repository 等常规资源，但完全遗漏了 AI 助手（Assistant）子系统——`GET /assistant/requests[/{id}]`、`GET /assistant/suggestions`、`POST /assistant/suggestions/{id}/confirm|dismiss`、`GET /assistant/conversations/{id}[/messages]`、`PATCH /assistant/conversations/{id}/archive`、`POST /assistant/{documents,handovers}/{id}/summarize`、`POST /assistant/ask`、`POST /assistant/conversations` 均未取调用者身份，任意登录用户可跨课题读取 AI 生成的问答/摘要正文，甚至确认或忽略别人课题的 AI 建议、对无权查看的文档触发摘要任务。现口径如下，非 `admin` 违反时统一返回 403：
+
+| 接口/动作 | 授权规则 |
+| --- | --- |
+| 发起问答 `POST /assistant/ask` | scope 为 `document` 时按「查看文档详情」规则；为 `project` 时要求调用者是该项目成员 |
+| 创建会话 `POST /assistant/conversations` | 同「发起问答」的 scope 规则 |
+| 查看会话详情 / 消息 `GET /assistant/conversations/{id}[/messages]` | `admin`、会话创建者本人（与 `GET /assistant/conversations` 列表口径一致） |
+| 归档 / 恢复会话 `PATCH /assistant/conversations/{id}/archive` | 同上 |
+| 生成文档摘要 `POST /assistant/documents/{id}/summarize` | 同「查看文档详情」 |
+| 生成交接摘要 `POST /assistant/handovers/{id}/summarize` | 同「查看交接单详情」 |
+| 查询问答任务详情 `GET /assistant/requests/{id}` | `admin`、请求创建者本人、关联资源（文档/交接单/项目）所属项目成员 |
+| 确认 / 忽略建议 `POST /assistant/suggestions/{id}/confirm\|dismiss` | `admin`、建议关联资源所属项目成员 |
+
+聚合类读接口同样按项目集合在 SQL 层收敛（`admin` 不收敛）：
+
+| 接口 | 收敛口径 |
+| --- | --- |
+| `GET /assistant/requests` | 请求创建者本人的记录，外加调用者可见项目下的记录（按 `related_type`/`related_id` 反查所属项目） |
+| `GET /assistant/suggestions` | 仅返回调用者可见项目下的建议 |
+
 权限不足时统一返回：
 
 ```json

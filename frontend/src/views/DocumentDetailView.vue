@@ -260,7 +260,7 @@ async function submitTransfer() {
     ElMessage.success("转交成功");
     showTransferDialog.value = false;
     await loadData();
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "转交失败"));
   } finally {
     transferLoading.value = false;
@@ -278,7 +278,7 @@ async function applyFlowAction(endpoint: string, label: string) {
     await api.post(`/documents/${documentID}/flow/${endpoint}`, {});
     ElMessage.success(`${label}成功`);
     await loadData();
-  } catch (err: any) {
+  } catch (err) {
     const msg = extractError(err, `${label}失败`);
     ElMessage.error(msg);
   } finally {
@@ -305,7 +305,7 @@ async function submitEdit() {
     ElMessage.success("文档信息已更新");
     showEditDialog.value = false;
     await loadData();
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "更新失败"));
   } finally {
     editLoading.value = false;
@@ -319,7 +319,7 @@ async function deleteDocument() {
     await api.post(`/documents/${documentID}/delete`, { reason: "" });
     ElMessage.success("文档已删除");
     router.push("/documents");
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "删除失败"));
   } finally {
     actionLoading.value = false;
@@ -332,7 +332,7 @@ async function restoreDocument() {
     await api.post(`/documents/${documentID}/restore`);
     ElMessage.success("文档已恢复");
     await loadData();
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "恢复失败"));
   } finally {
     actionLoading.value = false;
@@ -371,7 +371,7 @@ async function submitUpload() {
     ElMessage.success("新版本上传成功");
     showUploadDialog.value = false;
     await loadData();
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "上传失败"));
   } finally {
     uploadLoading.value = false;
@@ -427,7 +427,7 @@ async function requestSummary() {
       summaryPolling.value = true;
       void pollSummaryRequest(requestID);
     }
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "摘要提交失败"));
   } finally {
     summaryLoading.value = false;
@@ -444,7 +444,7 @@ async function updateSuggestionStatus(id: string, action: "confirm" | "dismiss")
     );
     ElMessage.success(action === "confirm" ? "建议已确认" : "建议已忽略");
     await loadData();
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "操作失败"));
   }
 }
@@ -456,7 +456,7 @@ function goToHandovers() {
 onMounted(async () => {
   try {
     await Promise.all([loadData(), loadUsers()]);
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "加载文档详情失败"));
   }
 });

@@ -162,7 +162,7 @@ async function selectRepository(id: string) {
     ]);
     selectedRepo.value = detailRes.data?.data ?? null;
     pushEvents.value = eventRes.data?.data ?? [];
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "加载代码仓库失败"));
   } finally {
     detailLoading.value = false;
@@ -196,7 +196,7 @@ async function submitCreate() {
     selectedRepoID.value = repo.id;
     selectedRepo.value = repo;
     pushEvents.value = [];
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "创建失败"));
   } finally {
     createLoading.value = false;

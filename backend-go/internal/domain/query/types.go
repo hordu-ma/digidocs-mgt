@@ -252,6 +252,10 @@ type AssistantSuggestionFilter struct {
 	RelatedID      string
 	Status         string
 	SuggestionType string
+	// Scope narrows the result set to the acting user's own projects, the same
+	// way ActorScope does for audit events/handovers. Set by handlers; the
+	// memory backend ignores it (see repository/memory precedent).
+	Scope ActorScope
 }
 
 type AssistantRequestFilter struct {
@@ -263,6 +267,9 @@ type AssistantRequestFilter struct {
 	Keyword        string
 	Page           int
 	PageSize       int
+	// Scope narrows the result set to requests the actor created, or that
+	// belong to a project they are a member of. See AssistantSuggestionFilter.Scope.
+	Scope ActorScope
 }
 
 type AssistantRequestItem struct {

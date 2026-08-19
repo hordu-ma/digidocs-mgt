@@ -208,7 +208,7 @@ async function toggleArchiveState(row: any) {
       ElMessage.success("文档已移出当前工作台");
     }
     await fetchDocuments();
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "操作失败"));
   }
 }
@@ -270,7 +270,7 @@ async function fetchReferenceData() {
     ]);
     teamSpaces.value = teamRes.data?.data ?? [];
     users.value = userRes.data?.data ?? [];
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "加载基础选项失败"));
   } finally {
     referenceLoading.value = false;
@@ -351,7 +351,7 @@ async function submitCreate() {
     ElMessage.success("文档创建成功");
     showCreateDialog.value = false;
     await fetchDocuments();
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "创建失败"));
   } finally {
     createLoading.value = false;
@@ -361,7 +361,7 @@ async function submitCreate() {
 async function handleTeamSpaceChange(teamSpaceID: string) {
   try {
     await loadProjects(teamSpaceID);
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "加载课题列表失败"));
   }
 }
@@ -369,7 +369,7 @@ async function handleTeamSpaceChange(teamSpaceID: string) {
 async function handleProjectChange(projectID: string) {
   try {
     await loadFolders(projectID);
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "加载目录树失败"));
   }
 }

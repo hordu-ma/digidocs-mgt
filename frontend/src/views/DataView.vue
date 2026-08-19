@@ -337,24 +337,18 @@ async function submitUpload() {
 
 // ─────────────────────────── download ────────────────────────────
 
-function downloadAsset(row: DataAsset) {
-  const token = localStorage.getItem("access_token");
-  const a = document.createElement("a");
-  a.href = `/api/v1/data-assets/${row.id}/download`;
-  // Attach token via query only if needed — prefer Authorization header via fetch
-  fetch(a.href, { headers: { Authorization: `Bearer ${token}` } })
-    .then((res) => {
-      if (!res.ok) throw new Error("下载失败");
-      return res.blob();
-    })
-    .then((blob) => {
-      const url = URL.createObjectURL(blob);
-      a.href = url;
-      a.download = row.file_name;
-      a.click();
-      URL.revokeObjectURL(url);
-    })
-    .catch((e) => ElMessage.error(e.message ?? "下载失败"));
+async function downloadAsset(row: DataAsset) {
+  try {
+    const res = await api.get(`/data-assets/${row.id}/download`, { responseType: "blob" });
+    const url = URL.createObjectURL(new Blob([res.data]));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = row.file_name;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    ElMessage.error(extractError(err, "下载失败"));
+  }
 }
 
 // ─────────────────────────── delete ──────────────────────────────

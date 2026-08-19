@@ -244,7 +244,7 @@ async function fetchReferenceData() {
       ),
     );
     projects.value = projectResponses.flatMap((item) => item.data?.data ?? []);
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "加载基础选项失败"));
   } finally {
     referenceLoading.value = false;
@@ -360,7 +360,7 @@ async function submitCreate() {
     ElMessage.success("交接单已创建");
     showDialog.value = false;
     await fetchHandovers();
-  } catch (err: any) {
+  } catch (err) {
     const msg = extractError(err, "创建失败");
     ElMessage.error(msg);
   } finally {
@@ -387,7 +387,7 @@ async function openDetail(handoverID: string) {
     buildEditableItems(detail, projectDocuments.value);
     buildEditableDataItems(dataItems, projectDataAssets.value);
     showDetailDialog.value = true;
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "加载交接单详情失败"));
   } finally {
     detailLoading.value = false;
@@ -410,7 +410,7 @@ async function saveItems() {
     ElMessage.success("交接清单已更新");
     await openDetail(activeHandover.value.id);
     await fetchHandovers();
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "更新交接清单失败"));
   } finally {
     actionLoading.value = false;
@@ -431,7 +431,7 @@ async function saveDataItems() {
       })),
     });
     ElMessage.success("数据资产清单已更新");
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "更新数据资产清单失败"));
   } finally {
     actionLoading.value = false;
@@ -469,7 +469,7 @@ async function applyAction(action: "confirm" | "complete" | "cancel") {
     );
     await openDetail(activeHandover.value.id);
     await fetchHandovers();
-  } catch (err: any) {
+  } catch (err) {
     ElMessage.error(extractError(err, "交接动作执行失败"));
   } finally {
     actionLoading.value = false;

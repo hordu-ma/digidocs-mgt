@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"digidocs-mgt/backend-go/internal/domain/query"
-	"digidocs-mgt/backend-go/internal/domain/task"
 	"digidocs-mgt/backend-go/internal/service"
 	"digidocs-mgt/backend-go/internal/transport/http/middleware"
 	"digidocs-mgt/backend-go/internal/transport/http/response"
@@ -33,6 +32,7 @@ func (h AssistantHandler) Ask(w http.ResponseWriter, r *http.Request) {
 		r.Context(),
 		payload,
 		middleware.UserIDFromContext(r.Context()),
+		middleware.UserRoleFromContext(r.Context()),
 	)
 	if err != nil {
 		if errors.Is(err, service.ErrValidation) {
@@ -41,6 +41,10 @@ func (h AssistantHandler) Ask(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, service.ErrNotFound) {
 			response.WriteError(w, http.StatusNotFound, "not_found", "assistant conversation not found")
+			return
+		}
+		if errors.Is(err, service.ErrForbidden) {
+			response.WriteError(w, http.StatusForbidden, "forbidden", "permission denied")
 			return
 		}
 		log.Printf("[assistant] ask failed actor=%s err=%v", middleware.UserIDFromContext(r.Context()), err)
@@ -72,6 +76,7 @@ func (h AssistantHandler) CreateConversation(w http.ResponseWriter, r *http.Requ
 		extractAssistantScopePayload(payload),
 		stringValue(payload["title"]),
 		middleware.UserIDFromContext(r.Context()),
+		middleware.UserRoleFromContext(r.Context()),
 	)
 	if err != nil {
 		writeServiceError(w, err, "assistant conversation not found", "failed to create assistant conversation")
@@ -112,7 +117,12 @@ func (h AssistantHandler) ListConversations(w http.ResponseWriter, r *http.Reque
 }
 
 func (h AssistantHandler) GetConversation(w http.ResponseWriter, r *http.Request) {
-	item, err := h.service.GetConversation(r.Context(), r.PathValue("conversationID"))
+	item, err := h.service.GetConversation(
+		r.Context(),
+		r.PathValue("conversationID"),
+		middleware.UserIDFromContext(r.Context()),
+		middleware.UserRoleFromContext(r.Context()),
+	)
 	if err != nil {
 		writeServiceError(w, err, "assistant conversation not found", "failed to get assistant conversation")
 		return
@@ -121,7 +131,12 @@ func (h AssistantHandler) GetConversation(w http.ResponseWriter, r *http.Request
 }
 
 func (h AssistantHandler) ListConversationMessages(w http.ResponseWriter, r *http.Request) {
-	items, err := h.service.ListConversationMessages(r.Context(), r.PathValue("conversationID"))
+	items, err := h.service.ListConversationMessages(
+		r.Context(),
+		r.PathValue("conversationID"),
+		middleware.UserIDFromContext(r.Context()),
+		middleware.UserRoleFromContext(r.Context()),
+	)
 	if err != nil {
 		writeServiceError(w, err, "assistant conversation not found", "failed to list assistant messages")
 		return
@@ -136,16 +151,15 @@ func (h AssistantHandler) SummarizeDocument(w http.ResponseWriter, r *http.Reque
 	}
 
 	documentID := r.PathValue("documentID")
-	message, err := h.service.QueueTask(
+	message, err := h.service.SummarizeDocument(
 		r.Context(),
-		task.TaskTypeDocumentSummarize,
-		"document",
 		documentID,
 		payload,
 		middleware.UserIDFromContext(r.Context()),
+		middleware.UserRoleFromContext(r.Context()),
 	)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to queue document summary")
+		writeServiceError(w, err, "document not found", "failed to queue document summary")
 		return
 	}
 
@@ -164,16 +178,15 @@ func (h AssistantHandler) SummarizeHandover(w http.ResponseWriter, r *http.Reque
 	}
 
 	handoverID := r.PathValue("handoverID")
-	message, err := h.service.QueueTask(
+	message, err := h.service.SummarizeHandover(
 		r.Context(),
-		task.TaskTypeHandoverSummarize,
-		"handover",
 		handoverID,
 		payload,
 		middleware.UserIDFromContext(r.Context()),
+		middleware.UserRoleFromContext(r.Context()),
 	)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to queue handover summary")
+		writeServiceError(w, err, "handover not found", "failed to queue handover summary")
 		return
 	}
 
@@ -186,7 +199,12 @@ func (h AssistantHandler) SummarizeHandover(w http.ResponseWriter, r *http.Reque
 }
 
 func (h AssistantHandler) GetRequest(w http.ResponseWriter, r *http.Request) {
-	item, err := h.service.GetRequest(r.Context(), r.PathValue("requestID"))
+	item, err := h.service.GetRequest(
+		r.Context(),
+		r.PathValue("requestID"),
+		middleware.UserIDFromContext(r.Context()),
+		middleware.UserRoleFromContext(r.Context()),
+	)
 	if err != nil {
 		writeServiceError(w, err, "assistant request not found", "failed to get assistant request")
 		return
@@ -207,6 +225,10 @@ func (h AssistantHandler) ListRequests(w http.ResponseWriter, r *http.Request) {
 		Keyword:        r.URL.Query().Get("keyword"),
 		Page:           page,
 		PageSize:       pageSize,
+		Scope: query.ActorScope{
+			ActorID: middleware.UserIDFromContext(r.Context()),
+			IsAdmin: middleware.UserRoleFromContext(r.Context()) == "admin",
+		},
 	})
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list assistant requests")
@@ -259,7 +281,13 @@ func (h AssistantHandler) ArchiveConversation(w http.ResponseWriter, r *http.Req
 	if v, ok := payload["archive"].(bool); ok {
 		archive = v
 	}
-	err := h.service.ArchiveConversation(r.Context(), conversationID, archive)
+	err := h.service.ArchiveConversation(
+		r.Context(),
+		conversationID,
+		archive,
+		middleware.UserIDFromContext(r.Context()),
+		middleware.UserRoleFromContext(r.Context()),
+	)
 	if err != nil {
 		writeServiceError(w, err, "conversation not found", "failed to archive conversation")
 		return
@@ -281,6 +309,10 @@ func (h AssistantHandler) ListSuggestions(w http.ResponseWriter, r *http.Request
 		RelatedID:      r.URL.Query().Get("related_id"),
 		Status:         r.URL.Query().Get("status"),
 		SuggestionType: r.URL.Query().Get("suggestion_type"),
+		Scope: query.ActorScope{
+			ActorID: middleware.UserIDFromContext(r.Context()),
+			IsAdmin: middleware.UserRoleFromContext(r.Context()) == "admin",
+		},
 	})
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list suggestions")
@@ -299,6 +331,7 @@ func (h AssistantHandler) ConfirmSuggestion(w http.ResponseWriter, r *http.Reque
 		r.Context(),
 		r.PathValue("suggestionID"),
 		middleware.UserIDFromContext(r.Context()),
+		middleware.UserRoleFromContext(r.Context()),
 		stringValue(payload["note"]),
 	)
 	if err != nil {
@@ -318,6 +351,7 @@ func (h AssistantHandler) DismissSuggestion(w http.ResponseWriter, r *http.Reque
 		r.Context(),
 		r.PathValue("suggestionID"),
 		middleware.UserIDFromContext(r.Context()),
+		middleware.UserRoleFromContext(r.Context()),
 		stringValue(payload["reason"]),
 	)
 	if err != nil {
