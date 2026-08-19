@@ -6,6 +6,10 @@
 
 ## 已完成
 
+- 修复**浏览器控制台 favicon.ico 404**（2026-08-19）
+  - 起因：`index.html` 从未声明 `<link rel="icon">`，也没有 `frontend/public/favicon.ico`；nginx 早就为 `/favicon.ico` 单独开了 `location`（只是压了 `log_not_found`），浏览器仍会在控制台报 404
+  - 新增 `frontend/public/favicon.ico`（品牌色渐变圆角方块 + "DG"，与侧边栏 `.brand-mark` 一致，16/32/48/64 四档尺寸），`index.html` 补 `<link rel="icon" href="/favicon.ico">`
+  - 验证：`npm run build` 产物含 `dist/favicon.ico`；重建部署后本地与公网 `curl .../favicon.ico` 均 200
 - 完成**登录/注册页与主界面底部管理员联系方式**（2026-08-19）
   - `LoginView`、`RegisterView` 卡片下方与 `AppLayout`（登录后全部业务页公共布局）内容区底部新增页脚，展示管理员联系邮箱 `maliguo@outlook.com`（`mailto:` 链接）
   - 已同步 `docs/用户使用说明.md` 新增「联系管理员」小节
