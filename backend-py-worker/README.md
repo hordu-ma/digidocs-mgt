@@ -36,6 +36,7 @@ docker compose --profile app up -d backend-py-worker
 - OpenClaw 调用统一走 `POST /v1/chat/completions`
 - 业务侧 skill 只允许消费显式 `scope / context / memory`，并按任务类型走白名单绑定
 - 已补调度器与 OpenClaw 客户端测试样例
+- 调度器按 `WORKER_CONCURRENCY`（默认 3）用线程池并发处理一批任务，不再逐个串行；单任务崩溃仍相互隔离，互不影响
 
 ## Current Notes
 
@@ -44,3 +45,4 @@ docker compose --profile app up -d backend-py-worker
 - 当前文档摘要和交接摘要优先消费“结构化业务上下文”；如果缺少正文内容，结果会明确标注为元数据级摘要。
 - `document.extract_text` 已支持 `txt / md / csv / json / docx / pdf` 文本抽取。
 - 若 Worker 主机存在 `tesseract`，还可进一步支持图片 OCR 与扫描 PDF OCR；若不存在，会返回明确的运行时错误提示。
+- 扫描 PDF 自动 OCR 有页数上限 `MAX_OCR_PAGES`（默认 30 页）：超出会在渲染阶段（`pdftoppm -l MAX_OCR_PAGES+1`）就提前拒绝，不会先跑完整份 OCR 再报错，避免任意用户上传超大扫描件把单个 Worker 线程堵上几小时。

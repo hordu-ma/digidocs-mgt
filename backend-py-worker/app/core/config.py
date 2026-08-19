@@ -20,6 +20,7 @@ class Settings:
     poll_interval: int = 5
     http_retry_attempts: int = 3
     http_retry_base_delay: float = 0.5
+    worker_concurrency: int = 3
 
 
 def load_settings() -> Settings:
@@ -52,6 +53,7 @@ def load_settings() -> Settings:
         poll_interval=int(os.getenv("POLL_INTERVAL", "5")),
         http_retry_attempts=int(os.getenv("HTTP_RETRY_ATTEMPTS", "3")),
         http_retry_base_delay=float(os.getenv("HTTP_RETRY_BASE_DELAY", "0.5")),
+        worker_concurrency=int(os.getenv("WORKER_CONCURRENCY", "3")),
     )
 
 

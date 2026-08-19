@@ -70,11 +70,17 @@ const statusClass: Record<string, string> = {
   archived: "status-archived",
 };
 
+// 后端分页上限是 200（backend-go/internal/transport/http/handlers/documents.go
+// 的 maxPageSize），请求更大的 page_size 也只会被静默截到 200——之前这里传
+// 500，会让人误以为拿到的就是全部数据，实际上超过 200 篇的部分被悄悄丢弃且
+// 界面没有任何提示。改成如实请求 200，并用 isTruncated 在超限时给出提示。
+const MAX_PAGE_SIZE = 200;
+
 async function fetchDocuments() {
   const res = await api.get("/documents", {
     params: {
       page: 1,
-      page_size: 500,
+      page_size: MAX_PAGE_SIZE,
       keyword: keyword.value,
       include_archived: showArchived.value || undefined,
     },
@@ -82,6 +88,8 @@ async function fetchDocuments() {
   rows.value = res.data?.data ?? [];
   total.value = res.data?.meta?.total ?? 0;
 }
+
+const isTruncated = computed(() => total.value > rows.value.length);
 
 function parseDateValue(value?: string) {
   return value ? new Date(value).getTime() : 0;
@@ -428,6 +436,15 @@ onMounted(async () => {
         </aside>
 
         <section class="page-card asset-panel">
+          <ElAlert
+            v-if="isTruncated"
+            type="warning"
+            show-icon
+            :closable="false"
+            class="truncation-alert"
+            title="仅显示前 200 篇文档"
+            :description="`该范围内共有 ${total} 篇文档，超过单次加载上限，已省略其余 ${total - rows.length} 篇。请用关键词搜索或在左侧按课题筛选缩小范围以查看全部。`"
+          />
           <div class="control-bar asset-control-bar">
             <div class="segmented-filters">
               <button
@@ -731,6 +748,10 @@ onMounted(async () => {
 
 .asset-control-bar {
   justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.truncation-alert {
   margin-bottom: 14px;
 }
 

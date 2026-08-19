@@ -4,6 +4,7 @@ import re
 import signal
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import FrameType
 from typing import cast
@@ -71,12 +72,16 @@ class WorkerDispatcher:
         except Exception:
             logger.exception("poll failed")
             tasks = []
-        for task in tasks:
-            self._process_one(task)
+        with ThreadPoolExecutor(max_workers=max(1, settings.worker_concurrency)) as executor:
+            self._process_batch(tasks, executor)
 
     def run_forever(self) -> None:
         self.describe_startup()
-        logger.info("entering poll loop (interval=%ds)", settings.poll_interval)
+        logger.info(
+            "entering poll loop (interval=%ds, concurrency=%d)",
+            settings.poll_interval,
+            settings.worker_concurrency,
+        )
         # Docker's default `docker stop` sends SIGTERM and only escalates to
         # SIGKILL after a grace period; without a handler, a redeploy/restart
         # can kill the process mid-task, leaving it stuck in `running` until
@@ -87,20 +92,35 @@ class WorkerDispatcher:
         signal.signal(signal.SIGTERM, self._handle_stop_signal)
         signal.signal(signal.SIGINT, self._handle_stop_signal)
         self._touch_heartbeat()
-        while not self._stop_requested:
-            self._touch_heartbeat()
-            try:
-                tasks = self.poller.poll()
-            except Exception:
-                logger.exception("poll failed")
-                tasks = []
-            # Isolate each task: one task crashing must not skip its siblings.
-            for task in tasks:
-                self._process_one(task)
-            if self._stop_requested:
-                break
-            time.sleep(settings.poll_interval)
+        # One pool for the process lifetime rather than one per batch: task
+        # handling is I/O-bound (OpenClaw, backend callbacks) or a bounded
+        # subprocess (OCR), so there is nothing to gain from tearing threads
+        # down between polls, and it avoids paying thread-creation cost every
+        # poll_interval.
+        with ThreadPoolExecutor(max_workers=max(1, settings.worker_concurrency)) as executor:
+            while not self._stop_requested:
+                self._touch_heartbeat()
+                try:
+                    tasks = self.poller.poll()
+                except Exception:
+                    logger.exception("poll failed")
+                    tasks = []
+                self._process_batch(tasks, executor)
+                if self._stop_requested:
+                    break
+                time.sleep(settings.poll_interval)
         logger.info("poll loop stopped")
+
+    def _process_batch(self, tasks: list[WorkerTask], executor: ThreadPoolExecutor) -> None:
+        """Run a batch through the pool and wait for it to fully drain before
+        returning, so the caller's next poll only ever sees tasks that were
+        not already claimed by this batch. _process_one already catches and
+        reports every exception itself, so .result() here only blocks for
+        completion — it is not expected to raise.
+        """
+        futures = [executor.submit(self._process_one, task) for task in tasks]
+        for future in futures:
+            future.result()
 
     def _process_one(self, task: WorkerTask) -> None:
         started_at = time.perf_counter()

@@ -6,6 +6,14 @@
 
 ## 已完成
 
+- 完成**全局优化审阅第三批：DocumentsView 分页修正 + Worker 并发/OCR 上限改造**（2026-08-19）
+  - 起因：全局审阅清单剩余两项——`DocumentsView` 请求 `page_size:500` 但后端分页上限已收紧到 200（此前"交付前安全与可靠性加固"的副作用），超过 200 篇的课题会静默丢数据且无提示；Worker 严格单线程串行处理任务，且扫描 PDF OCR 无页数上限，理论上单任务可堵住数小时，任何有上传权限的成员都能触发。
+  - **DocumentsView 分页修正**：`fetchDocuments` 的 `page_size` 从 500 改为如实的 200（与后端 `maxPageSize` 一致）；新增 `isTruncated` computed（`total > rows.length`）驱动一条 `ElAlert` 提示条，说明已省略多少篇、引导用户用搜索/课题筛选缩小范围。之前 `total`（后端真实总数）已经在渲染侧边栏"全部文档"计数，但各课题分组计数只统计到手的 `rows`——课题文档超过 200 篇时两个数字会对不上，这个不一致现在随截断提示一起暴露给用户而不是悄悄存在。
+    - 验证：`vue-tsc` + `vite build` 通过；用 Playwright（headless Chromium，无沙箱依赖，本机装了 `~/.cache/ms-playwright` 里现成的 chromium）挂真实 admin token 实测：①真实数据（13 篇文档）下不显示截断提示、控制台无报错、页面截图确认渲染正常；②用 `page.route` 拦截响应把 `meta.total` 改成 350（不触碰真实数据库）复现截断场景，确认提示条正确渲染、文案数字准确、控制台仍无报错。
+  - **Worker 并发改造**：新增 `WORKER_CONCURRENCY`（默认 3），`dispatcher.run_forever`/`poll_once` 用 `ThreadPoolExecutor` 并发处理同一批任务（等批内全部完成再拉下一批，不是改成流式轮询）；各任务处理路径本身无共享可变状态，单任务崩溃仍互相隔离。
+  - **OCR 页数上限**：新增 `MAX_OCR_PAGES`（默认 30），`_extract_scanned_pdf` 用 `pdftoppm -l MAX_OCR_PAGES+1` 只多渲染一页去探测是否超限，超限直接报错拒绝，不会先跑完整份渲染+逐页 OCR 再报错。
+    - 验证：`pytest` 新增 7 个用例（`_process_batch` 真并发的 barrier 证明、崩溃隔离、`_handle_stop_signal`、`run_forever` 的正常轮询/异常不中断两个场景；扫描 PDF OCR 成功路径首次补齐覆盖、超页数上限时确认 `tesseract` 零调用），51 个用例全绿；`ruff check` 通过。已重建部署 `frontend`/`backend-py-worker` 两容器，worker 启动日志确认 `concurrency=3` 生效，四容器 healthy。
+  - 已同步 `docs/部署准备与运行说明.md`（新增「Worker 并发与 OCR 上限」小节）、`docs/用户使用说明.md`、`backend-py-worker/README.md`、`.env.example`、`.env.production.example`。
 - 完成**全局优化审阅第二批：数据库备份异地化 + docker-compose 资源限制**（2026-08-19）
   - 起因：全局审阅清单第 3 项——本地备份与 `postgres_data` 卷同机同盘，磁盘/整机故障会同时带走源数据和全部备份历史；四个容器此前都没有 CPU/内存上限，同机部署的 OpenClaw/vLLM 容器没有边界保护。
   - **备份异地化**：新增 `backend-go/cmd/backup-sync`（复用 `internal/storage/synology` 客户端，而不是在 shell 里重新实现一遍 DSM 会话认证），支持 `upload`/`prune` 两个子命令；`Dockerfile` 一并构建该工具到 `backend-go` 镜像。`scripts/codex/backup.sh` 本地备份校验通过后，把文件 `docker cp` 进 `backend-go` 容器再 `docker exec` 调用该工具推到群晖 NAS 的 `ops-backups/` 目录（复用应用自身已配置的 `SYNOLOGY_*` 凭据，不引入新凭据）；群晖侧同样按 `BACKUP_KEEP_DAYS` 清理旧文件。未配置 Synology 存储的部署自动跳过，不算失败；本地上传失败会让脚本以非零状态退出（清理失败只警告）。

@@ -9,6 +9,7 @@ from app.services.document_text_extractor import (
     DocumentTextExtractionError,
     extract_text,
 )
+import app.services.document_text_extractor as document_text_extractor
 
 
 def test_extract_text_pdf_uses_pdftotext(monkeypatch) -> None:
@@ -65,6 +66,78 @@ def test_extract_text_scanned_pdf_requires_ocr_dependencies(monkeypatch) -> None
         extract_text("scan.pdf", b"%PDF-1.4 scanned")
 
     assert "tesseract" in str(exc_info.value)
+
+
+def _fake_ocr_which(name: str) -> str | None:
+    return {
+        "pdftotext": "/usr/bin/pdftotext",
+        "pdftoppm": "/usr/bin/pdftoppm",
+        "tesseract": "/usr/bin/tesseract",
+    }.get(name)
+
+
+def test_extract_text_scanned_pdf_ocr_success(monkeypatch) -> None:
+    """Full happy path through the scanned-PDF branch: pdftotext finds nothing,
+    pdftoppm rasterizes pages, tesseract OCRs each one, and the per-page text
+    is joined. This path had zero coverage before — the previous test only
+    exercised the "dependencies missing" branch."""
+
+    def fake_run(args, check, capture_output, text, timeout=None):
+        tool = args[0]
+        if tool == "/usr/bin/pdftotext":
+            Path(args[-1]).write_text("", encoding="utf-8")  # scanned: no text layer
+            return subprocess.CompletedProcess(args, 0, "", "")
+        if tool == "/usr/bin/pdftoppm":
+            prefix = args[-1]
+            for i in (1, 2):
+                Path(f"{prefix}-{i}.png").write_bytes(b"fake-png")
+            return subprocess.CompletedProcess(args, 0, "", "")
+        if tool == "/usr/bin/tesseract":
+            page_path = args[1]
+            page_num = page_path.rsplit("-", 1)[-1].split(".")[0]
+            return subprocess.CompletedProcess(args, 0, f"第{page_num}页正文", "")
+        raise AssertionError(f"unexpected tool: {tool}")
+
+    monkeypatch.setattr("app.services.document_text_extractor.shutil.which", _fake_ocr_which)
+    monkeypatch.setattr("app.services.document_text_extractor.subprocess.run", fake_run)
+
+    extracted = extract_text("scan.pdf", b"%PDF-1.4 scanned")
+
+    assert "第1页正文" in extracted
+    assert "第2页正文" in extracted
+
+
+def test_extract_text_scanned_pdf_rejects_too_many_pages(monkeypatch) -> None:
+    """MAX_OCR_PAGES must reject an oversized scan before ever invoking
+    tesseract — the whole point is bounding worst-case OCR cost, not just
+    reporting a nicer error after paying for it."""
+    monkeypatch.setattr(document_text_extractor, "MAX_OCR_PAGES", 2)
+    tesseract_calls: list[str] = []
+
+    def fake_run(args, check, capture_output, text, timeout=None):
+        tool = args[0]
+        if tool == "/usr/bin/pdftotext":
+            Path(args[-1]).write_text("", encoding="utf-8")
+            return subprocess.CompletedProcess(args, 0, "", "")
+        if tool == "/usr/bin/pdftoppm":
+            # Requested at most MAX_OCR_PAGES + 1 = 3 pages.
+            assert args[1:5] == ["-f", "1", "-l", "3"]
+            prefix = args[-1]
+            for i in (1, 2, 3):
+                Path(f"{prefix}-{i}.png").write_bytes(b"fake-png")
+            return subprocess.CompletedProcess(args, 0, "", "")
+        if tool == "/usr/bin/tesseract":
+            tesseract_calls.append(args[1])
+            return subprocess.CompletedProcess(args, 0, "不应该被调用", "")
+        raise AssertionError(f"unexpected tool: {tool}")
+
+    monkeypatch.setattr("app.services.document_text_extractor.shutil.which", _fake_ocr_which)
+    monkeypatch.setattr("app.services.document_text_extractor.subprocess.run", fake_run)
+
+    with pytest.raises(DocumentTextExtractionError, match="超过自动 OCR 上限"):
+        extract_text("huge-scan.pdf", b"%PDF-1.4 scanned")
+
+    assert tesseract_calls == []
 
 
 # ── xlsx tests ──────────────────────────────────────────────

@@ -1,3 +1,5 @@
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import cast
 
 from _pytest.monkeypatch import MonkeyPatch
@@ -272,3 +274,124 @@ def test_assistant_ask_inline_extraction_updates_context(monkeypatch: MonkeyPatc
     assert result.status == "completed"
     assert context["document_text"] == "内联正文"
     assert doc_context["extracted_text"] == "内联正文"
+
+
+# ── run_forever / poll_once / _process_batch ───────────────────
+#
+# These cover the process lifecycle (concurrency, crash isolation, signal
+# handling, poll-failure resilience) that previously had zero test coverage —
+# exactly the code that WORKER_CONCURRENCY now touches.
+
+
+def test_process_batch_runs_tasks_concurrently(monkeypatch: MonkeyPatch) -> None:
+    """Proves the batch actually runs in parallel rather than being a thread
+    pool in name only: N tasks all reach a barrier that only releases once N
+    threads are simultaneously waiting on it. A serial implementation would
+    process one task at a time and never satisfy the barrier, timing out."""
+    dispatcher = WorkerDispatcher()
+    n = 3
+    barrier = threading.Barrier(n, timeout=2)
+    seen_threads: set[int] = set()
+    lock = threading.Lock()
+
+    def fake_handle_and_callback(task: WorkerTask) -> ObjectDict:
+        with lock:
+            seen_threads.add(threading.get_ident())
+        barrier.wait()
+        return {}
+
+    monkeypatch.setattr(dispatcher, "handle_and_callback", fake_handle_and_callback)
+
+    tasks = [
+        WorkerTask(request_id=f"req-{i}", task_type="assistant.ask", payload={})
+        for i in range(n)
+    ]
+    with ThreadPoolExecutor(max_workers=n) as executor:
+        dispatcher._process_batch(tasks, executor)
+
+    assert len(seen_threads) == n
+
+
+def test_process_batch_isolates_crashes(monkeypatch: MonkeyPatch) -> None:
+    """One task crashing must not prevent its siblings in the same batch from
+    completing, and must not raise out of _process_batch itself."""
+    dispatcher = WorkerDispatcher()
+    processed: list[str] = []
+    reported_failures: list[str] = []
+
+    def fake_handle_and_callback(task: WorkerTask) -> ObjectDict:
+        if task.request_id == "bad":
+            raise RuntimeError("boom")
+        processed.append(task.request_id)
+        return {}
+
+    def fake_submit_result(result) -> ObjectDict:
+        reported_failures.append(result.request_id)
+        return {}
+
+    monkeypatch.setattr(dispatcher, "handle_and_callback", fake_handle_and_callback)
+    monkeypatch.setattr(dispatcher.callback_client, "submit_result", fake_submit_result)
+
+    tasks = [
+        WorkerTask(request_id="good-1", task_type="assistant.ask", payload={}),
+        WorkerTask(request_id="bad", task_type="assistant.ask", payload={}),
+        WorkerTask(request_id="good-2", task_type="assistant.ask", payload={}),
+    ]
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        dispatcher._process_batch(tasks, executor)  # must not raise
+
+    assert set(processed) == {"good-1", "good-2"}
+    assert reported_failures == ["bad"]
+
+
+def test_handle_stop_signal_sets_flag() -> None:
+    dispatcher = WorkerDispatcher()
+    assert dispatcher._stop_requested is False
+    dispatcher._handle_stop_signal(15, None)
+    assert dispatcher._stop_requested is True
+
+
+def test_run_forever_stops_without_starting_a_new_poll(monkeypatch: MonkeyPatch) -> None:
+    """A stop request observed while handling the current batch must end the
+    loop before the next poll — not after it."""
+    dispatcher = WorkerDispatcher()
+    poll_calls = 0
+
+    def fake_poll() -> list[WorkerTask]:
+        nonlocal poll_calls
+        poll_calls += 1
+        dispatcher._stop_requested = True
+        return []
+
+    monkeypatch.setattr(dispatcher.poller, "poll", fake_poll)
+    monkeypatch.setattr(dispatcher, "_touch_heartbeat", lambda: None)
+    monkeypatch.setattr("app.services.dispatcher.time.sleep", lambda _seconds: None)
+    monkeypatch.setattr("app.services.dispatcher.signal.signal", lambda *_args: None)
+
+    dispatcher.run_forever()
+
+    assert poll_calls == 1
+
+
+def test_run_forever_continues_after_poll_exception(monkeypatch: MonkeyPatch) -> None:
+    """A poll() failure must be logged and swallowed, not crash the loop —
+    the next iteration should still run normally."""
+    dispatcher = WorkerDispatcher()
+    poll_calls = 0
+
+    def fake_poll() -> list[WorkerTask]:
+        nonlocal poll_calls
+        poll_calls += 1
+        if poll_calls == 1:
+            raise RuntimeError("poll boom")
+        dispatcher._stop_requested = True
+        return []
+
+    monkeypatch.setattr(dispatcher.poller, "poll", fake_poll)
+    monkeypatch.setattr(dispatcher, "_touch_heartbeat", lambda: None)
+    monkeypatch.setattr("app.services.dispatcher.time.sleep", lambda _seconds: None)
+    monkeypatch.setattr("app.services.dispatcher.signal.signal", lambda *_args: None)
+
+    dispatcher.run_forever()  # must not raise
+
+    assert poll_calls == 2

@@ -13,10 +13,18 @@ import zipfile
 from typing import cast
 
 # Applies to every subprocess.run() call in this module (pdftotext, pdftoppm,
-# tesseract, antiword). Worker task processing is single-threaded and strictly
-# serial (see dispatcher.run_forever), so one hung subprocess on a malformed
-# or adversarial file would otherwise stall every other queued task forever.
+# tesseract, antiword). dispatcher.run_forever processes a batch concurrently
+# (see WORKER_CONCURRENCY), but each in-flight task still runs this extractor
+# on its own thread with its own subprocess — a hung subprocess on a malformed
+# or adversarial file must not be allowed to block that thread forever.
 SUBPROCESS_TIMEOUT_SECONDS = int(os.getenv("DOCUMENT_EXTRACTION_TIMEOUT_SECONDS", "120"))
+
+# A scanned PDF is OCR'd one page at a time with no prior limit on page count.
+# SUBPROCESS_TIMEOUT_SECONDS bounds each individual tesseract call, but not the
+# total: a 100-page scan could tie up one worker thread for hours, and any
+# project member with upload rights can trigger it just by uploading a large
+# scanned document. MAX_OCR_PAGES rejects the request up front instead.
+MAX_OCR_PAGES = int(os.getenv("MAX_OCR_PAGES", "30"))
 
 
 class DocumentTextExtractionError(RuntimeError):
@@ -266,9 +274,14 @@ def _extract_scanned_pdf(pdf_path: str, tmp_dir: str) -> str:
         raise DocumentTextExtractionError("当前环境未安装 pdftoppm，无法抽取扫描 PDF")
 
     image_prefix = os.path.join(tmp_dir, "page")
+    # Render at most MAX_OCR_PAGES + 1 pages. Rendering one page past the
+    # limit is enough to detect "this document has more pages than we OCR"
+    # without paying to rasterize (and then OCR) the rest of a 100-page scan
+    # just to reject it — pdftoppm silently clamps -l to the real page count,
+    # so this is a no-op for any document within the limit.
     try:
         subprocess.run(
-            [pdftoppm, "-png", pdf_path, image_prefix],
+            [pdftoppm, "-f", "1", "-l", str(MAX_OCR_PAGES + 1), "-png", pdf_path, image_prefix],
             check=True,
             capture_output=True,
             text=True,
@@ -288,6 +301,10 @@ def _extract_scanned_pdf(pdf_path: str, tmp_dir: str) -> str:
     )
     if not pages:
         raise DocumentTextExtractionError("扫描 PDF 未生成可 OCR 的页面图像")
+    if len(pages) > MAX_OCR_PAGES:
+        raise DocumentTextExtractionError(
+            f"扫描 PDF 页数超过自动 OCR 上限（{MAX_OCR_PAGES} 页），请拆分后重新上传"
+        )
 
     chunks = [_run_tesseract(page) for page in pages]
     text = "\n\n".join(chunk for chunk in chunks if chunk).strip()

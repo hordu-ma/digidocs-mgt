@@ -110,6 +110,8 @@ services:
       CALLBACK_BASE_URL: ${CALLBACK_BASE_URL:-http://backend-go:8080}
       CALLBACK_TOKEN: ${CALLBACK_TOKEN:-replace-me}
       POLL_INTERVAL: ${POLL_INTERVAL:-5}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-3}
+      MAX_OCR_PAGES: ${MAX_OCR_PAGES:-30}
       WORKER_HEARTBEAT_FILE: /tmp/digidocs-worker-heartbeat
     extra_hosts:
       - "host.docker.internal:host-gateway"
