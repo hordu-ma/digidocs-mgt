@@ -6,6 +6,13 @@
 
 ## 已完成
 
+- 完成**全局优化审阅第二批：数据库备份异地化 + docker-compose 资源限制**（2026-08-19）
+  - 起因：全局审阅清单第 3 项——本地备份与 `postgres_data` 卷同机同盘，磁盘/整机故障会同时带走源数据和全部备份历史；四个容器此前都没有 CPU/内存上限，同机部署的 OpenClaw/vLLM 容器没有边界保护。
+  - **备份异地化**：新增 `backend-go/cmd/backup-sync`（复用 `internal/storage/synology` 客户端，而不是在 shell 里重新实现一遍 DSM 会话认证），支持 `upload`/`prune` 两个子命令；`Dockerfile` 一并构建该工具到 `backend-go` 镜像。`scripts/codex/backup.sh` 本地备份校验通过后，把文件 `docker cp` 进 `backend-go` 容器再 `docker exec` 调用该工具推到群晖 NAS 的 `ops-backups/` 目录（复用应用自身已配置的 `SYNOLOGY_*` 凭据，不引入新凭据）；群晖侧同样按 `BACKUP_KEEP_DAYS` 清理旧文件。未配置 Synology 存储的部署自动跳过，不算失败；本地上传失败会让脚本以非零状态退出（清理失败只警告）。
+    - 验证：`go build/vet/test ./...` 全绿（新增 7 个单测覆盖 upload/prune 的成功、失败、参数校验分支）；实测跑通两轮真实 `backup.sh`（非 dry-run），在群晖上核对到 4 个真实备份文件（db + coderepos 各 2 份），大小与本地一致；过程中发现本机 `docker` 是 snap 包、`docker cp` 读不到 `/tmp` 下的源文件（AppArmor 沙箱限制），已确认 `backup.sh` 的 `$BACKUP_DIR` 默认在 `$HOME` 下不受影响，仅在人工验证脚本时踩到，记录以防以后有人在这台机器上写运维脚本时重复踩坑。
+  - **docker-compose 资源限制**：四个服务加 `deploy.resources.limits`（Compose V2 非 swarm 模式同样生效）：postgres 2 core/2g、backend-go 2 core/1g、backend-py-worker 4 core/4g（明显更宽松，因为 OCR 大文件的内存峰值暂无实测上限，限制太紧会把正常处理直接 OOM）、frontend 1 core/256m。数值按当前实测空闲用量（个位数 MB）给了充足但不放任的上限。
+    - 验证：`docker compose config` 确认限制正确解析；四容器重建后全部立即 `healthy`；`docker stats` 确认 MEM USAGE / LIMIT 显示的是各自配置的上限而非宿主机总内存 121.6GiB；用一次性自助注册账号验证注册/`auth/me`/文档列表/项目列表均 200，公网 `8.152.204.76` 复测 200，验证完删号无残留。
+  - 已同步 `README.md`、`docs/部署准备与运行说明.md`（新增「资源限制」小节）、`docs/现场部署逐条清单.md`（补两条交付收口检查项）。
 - 完成**全局优化审阅第一批：Assistant 权限漏洞（P0）+ 低成本高收益修复（P1）**（2026-08-19）
   - 起因：一次跳出单点修复、覆盖 Go 后端/Python Worker/前端+运维文档的全局审阅（三路并行只读探索 + 人工复核关键发现），产出分优先级清单；本轮先做清单里的第 1、2 两项。
   - **Assistant（AI 助手）子系统跨课题越权（已修复并部署验证，与 2026-08-17 P0-1 同构）**

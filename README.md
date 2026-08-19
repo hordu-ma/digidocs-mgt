@@ -204,7 +204,8 @@ make clean-demo-data-apply  # 清理（执行前自动 pg_dump 备份）
 - `scripts/codex/report.sh`：输出当前分支、阶段、技能安装与 hooks 状态
 - `scripts/codex/smoke-local.sh`：接口烟测骨架（会写入一次性数据；默认打隔离栈，非烟测环境会被护栏拒绝）
 - `scripts/codex/smoke-stack.sh`：烟测隔离栈生命周期（`up` / `down` / `status`）
-- `scripts/codex/backup.sh` / `install-backup-timer.sh`：数据库与 Git 裸仓库定时备份（含完整性校验与保留策略）
+- `scripts/codex/backup.sh` / `install-backup-timer.sh`：数据库与 Git 裸仓库定时备份（含完整性校验、保留策略，成功后同步一份到群晖 NAS 异地保存）
+- `backend-go/cmd/backup-sync`：`backup.sh` 用来把备份文件推到群晖 NAS 的小工具，复用应用自己的 Synology 存储客户端
 - `docker-compose.smoke.yml`：烟测隔离栈 override（独立 project / 容器名 / 端口 / 数据库 / 网络，`STORAGE_BACKEND=memory`）
 - `scripts/codex/clean-demo-data.sh`：清理演示库中的 smoke 残留（版本 / 会话 / 测试账号 / 邀请链接），执行前自动备份
 - `scripts/codex/smoke-e2e.sh`：在隔离栈上自动完成「起栈 → 灌种子 → 烟测 → 销毁」

@@ -24,6 +24,15 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    # 四个服务此前都没有 CPU/内存上限：这台机器同时跑着 OpenClaw/vLLM
+    # 推理容器，任何一个服务失控（比如 worker 处理超大扫描件 OCR 时内存
+    # 暴涨）都能挤占同机其它服务的资源，而且完全没有边界。数值按当前实测
+    # 用量（个位数 MB）给了充足但不放任的上限，不是精确压测出的下限。
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2g
 
   backend-go:
     build:
@@ -79,6 +88,11 @@ services:
         condition: service_healthy
     profiles:
       - app
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1g
 
   backend-py-worker:
     build:
@@ -123,6 +137,14 @@ services:
         condition: service_healthy
     profiles:
       - app
+    # 比其它三个服务给得更宽松：这里跑 pdftoppm/tesseract，大扫描件 OCR 的
+    # 内存峰值目前没有实测过上限（见 TASKS.md 待办里的 OCR 页数上限项），
+    # 限制太紧会把正常大文件处理直接 OOM 掉，比不限制更糟。
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 4g
 
   frontend:
     build:
@@ -153,6 +175,11 @@ services:
         condition: service_healthy
     profiles:
       - app
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256m
 
 volumes:
   postgres_data:

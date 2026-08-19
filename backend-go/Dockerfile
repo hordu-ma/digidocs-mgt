@@ -4,6 +4,12 @@ WORKDIR /app
 
 COPY . .
 RUN go build -mod=vendor -o /out/digidocs-go-api ./cmd/api
+# backup-sync is not part of the running server; it is invoked ad hoc via
+# `docker exec` from scripts/codex/backup.sh to push a backup file to the
+# Synology NAS this container is already configured to trust, reusing the
+# same internal/storage/synology client instead of a bespoke curl-based
+# reimplementation of DSM auth in the backup script.
+RUN go build -mod=vendor -o /out/digidocs-backup-sync ./cmd/backup-sync
 
 FROM debian:bookworm-slim
 
@@ -16,6 +22,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /out/digidocs-go-api /usr/local/bin/digidocs-go-api
+COPY --from=build /out/digidocs-backup-sync /usr/local/bin/digidocs-backup-sync
 COPY --from=build /app/migrations ./migrations
 
 EXPOSE 8080
