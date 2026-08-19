@@ -356,6 +356,9 @@ onBeforeUnmount(() => {
       </header>
       <NoProjectMembership v-if="showNoProjectState" />
       <slot v-else />
+      <footer class="app-footer">
+        系统管理员：<a href="mailto:maliguo@outlook.com">maliguo@outlook.com</a>
+      </footer>
     </main>
   </div>
   <ElDrawer
@@ -612,6 +615,25 @@ onBeforeUnmount(() => {
 
 .content {
   min-width: 0;
+}
+
+.app-footer {
+  padding: 20px 28px calc(24px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--dd-line-soft);
+  color: var(--dd-subtle);
+  font-size: 12px;
+  text-align: center;
+}
+
+.app-footer a {
+  color: var(--dd-muted);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.app-footer a:hover {
+  color: var(--dd-primary);
 }
 
 .topbar {
@@ -931,6 +953,10 @@ onBeforeUnmount(() => {
 
   .mobile-nav-drawer :deep(.el-drawer__body) {
     padding: 0;
+  }
+
+  .app-footer {
+    padding: 16px 12px calc(20px + env(safe-area-inset-bottom));
   }
 }
 </style>

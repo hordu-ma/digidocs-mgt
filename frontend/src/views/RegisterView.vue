@@ -105,6 +105,9 @@ async function submit() {
         <RouterLink to="/login">去登录</RouterLink>
       </div>
     </ElCard>
+    <footer class="auth-footer">
+      系统管理员：<a href="mailto:maliguo@outlook.com">maliguo@outlook.com</a>
+    </footer>
   </div>
 </template>
 
@@ -141,5 +144,23 @@ async function submit() {
 .auth-switch a {
   color: var(--dd-primary, #124b87);
   font-weight: 600;
+}
+
+.auth-footer {
+  margin-top: 20px;
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
+}
+
+.auth-footer a {
+  color: #61748d;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth-footer a:hover {
+  color: var(--dd-primary, #124b87);
 }
 </style>
