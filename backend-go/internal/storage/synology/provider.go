@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -66,6 +67,35 @@ func NewProvider(cfg Config) *Provider {
 	}
 }
 
+// redactURLError keeps the transport cause (including timeout semantics) but
+// removes credentials and session IDs before errors reach callers or logs.
+func redactURLError(err error) error {
+	var urlErr *url.Error
+	if !errors.As(err, &urlErr) {
+		return err
+	}
+	safeURL := "[redacted URL]"
+	if parsed, parseErr := url.Parse(urlErr.URL); parseErr == nil {
+		parsed.User = nil
+		parsed.RawQuery = ""
+		parsed.ForceQuery = false
+		parsed.Fragment = ""
+		parsed.RawFragment = ""
+		safeURL = parsed.String()
+	}
+	return &url.Error{Op: urlErr.Op, URL: safeURL, Err: redactURLError(urlErr.Err)}
+}
+
+func newRequest(ctx context.Context, method, rawURL string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, method, rawURL, body)
+	return req, redactURLError(err)
+}
+
+func (p *Provider) do(req *http.Request) (*http.Response, error) {
+	resp, err := p.client.Do(req)
+	return resp, redactURLError(err)
+}
+
 // --- DSM API response envelope ---
 
 type dsmResponse struct {
@@ -119,13 +149,13 @@ func (p *Provider) discoverAuthPath(ctx context.Context) (string, error) {
 		"query":   {"SYNO.API.Auth"},
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+	req, err := newRequest(ctx, http.MethodGet,
 		p.baseURL+"/webapi/query.cgi?"+params.Encode(), nil)
 	if err != nil {
 		return "", fmt.Errorf("synology query info request: %w", err)
 	}
 
-	resp, err := p.client.Do(req)
+	resp, err := p.do(req)
 	if err != nil {
 		return "", fmt.Errorf("synology query info: %w", err)
 	}
@@ -186,13 +216,13 @@ func (p *Provider) login(ctx context.Context) error {
 		}
 		tried[loginPath] = struct{}{}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		req, err := newRequest(ctx, http.MethodGet,
 			p.baseURL+loginPath+"?"+params.Encode(), nil)
 		if err != nil {
 			return fmt.Errorf("synology login request: %w", err)
 		}
 
-		resp, err := p.client.Do(req)
+		resp, err := p.do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("synology login %s: %w", loginPath, err)
 			continue
@@ -274,12 +304,12 @@ func (p *Provider) callAPI(ctx context.Context, params url.Values) (_ *dsmRespon
 
 	params.Set("_sid", p.getSID())
 	reqURL := p.baseURL + "/webapi/entry.cgi?" + params.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	req, err := newRequest(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := p.client.Do(req)
+	resp, err := p.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -297,8 +327,8 @@ func (p *Provider) callAPI(ctx context.Context, params url.Values) (_ *dsmRespon
 		}
 		params.Set("_sid", p.getSID())
 		reqURL = p.baseURL + "/webapi/entry.cgi?" + params.Encode()
-		req2, _ := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
-		resp2, err := p.client.Do(req2)
+		req2, _ := newRequest(ctx, http.MethodGet, reqURL, nil)
+		resp2, err := p.do(req2)
 		if err != nil {
 			return nil, err
 		}
@@ -401,14 +431,14 @@ func (p *Provider) PutObject(ctx context.Context, input storage.PutObjectInput) 
 }
 
 func (p *Provider) uploadOnce(ctx context.Context, contentType string, bodyBytes []byte) (*dsmResponse, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+	req, err := newRequest(ctx, http.MethodPost,
 		p.baseURL+"/webapi/entry.cgi?_sid="+url.QueryEscape(p.getSID()), bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", contentType)
 
-	resp, err := p.client.Do(req)
+	resp, err := p.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("synology upload: %w", err)
 	}
@@ -459,7 +489,7 @@ func (p *Provider) downloadOnce(ctx context.Context, objectKey string) (out *sto
 		"_sid":    {p.getSID()},
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+	req, err := newRequest(ctx, http.MethodGet,
 		p.baseURL+"/webapi/entry.cgi?"+params.Encode(), nil)
 	if err != nil {
 		return nil, false, err
@@ -469,7 +499,7 @@ func (p *Provider) downloadOnce(ctx context.Context, objectKey string) (out *sto
 	// to retry with a small backoff.
 	var resp *http.Response
 	for attempt := 1; attempt <= 3; attempt++ {
-		resp, err = p.client.Do(req)
+		resp, err = p.do(req)
 		if err == nil {
 			break
 		}

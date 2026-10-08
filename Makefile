@@ -38,7 +38,11 @@ clean-demo-data-apply:
 integration-postgres:
 	./scripts/codex/postgres-integration.sh
 
-verify: doctor check-doc-sync verify-go verify-worker verify-frontend
+verify: doctor check-doc-sync verify-go verify-backup verify-worker verify-frontend
+
+.PHONY: verify-backup
+verify-backup:
+	python3 scripts/codex/test_backup.py
 
 verify-go:
 	cd backend-go && go test ./...

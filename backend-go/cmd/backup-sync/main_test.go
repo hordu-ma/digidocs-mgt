@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +16,9 @@ import (
 )
 
 type fakeStore struct {
+	objects   map[string][]byte
+	getErr    error
+	corrupt   bool
 	putErr    error
 	putCalls  []storage.PutObjectInput
 	listDir   map[string][]storage.FileInfo
@@ -26,7 +32,29 @@ func (f *fakeStore) PutObject(_ context.Context, input storage.PutObjectInput) (
 	if f.putErr != nil {
 		return storage.PutObjectResult{}, f.putErr
 	}
+	if f.objects == nil {
+		f.objects = map[string][]byte{}
+	}
+	data, err := io.ReadAll(input.Reader)
+	if err != nil {
+		return storage.PutObjectResult{}, err
+	}
+	if f.corrupt {
+		data = []byte("damaged")
+	}
+	f.objects[input.ObjectKey] = data
 	return storage.PutObjectResult{ObjectKey: input.ObjectKey, Provider: "fake"}, nil
+}
+
+func (f *fakeStore) GetObject(_ context.Context, key string) (*storage.GetObjectOutput, error) {
+	if f.getErr != nil {
+		return nil, f.getErr
+	}
+	data, ok := f.objects[key]
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	return &storage.GetObjectOutput{Reader: io.NopCloser(bytes.NewReader(data)), Size: int64(len(data))}, nil
 }
 
 func (f *fakeStore) ListDir(_ context.Context, folderPath string) ([]storage.FileInfo, error) {
@@ -104,8 +132,9 @@ func TestPruneDeletesOnlyStaleFiles(t *testing.T) {
 	store := &fakeStore{
 		listDir: map[string][]storage.FileInfo{
 			"ops-backups": {
-				{Name: "old.sql.gz", IsDir: false, ModifiedAt: now.Add(-20 * 24 * time.Hour)},
-				{Name: "fresh.sql.gz", IsDir: false, ModifiedAt: now.Add(-1 * time.Hour)},
+				{Name: "db_test_20260101-030000.sql.gz", IsDir: false, ModifiedAt: now.Add(-20 * 24 * time.Hour)},
+				{Name: "db_test_20261008-030000.sql.gz", IsDir: false, ModifiedAt: now.Add(-1 * time.Hour)},
+				{Name: "notes.txt", IsDir: false, ModifiedAt: now.Add(-30 * 24 * time.Hour)},
 				{Name: "subdir", IsDir: true, ModifiedAt: now.Add(-30 * 24 * time.Hour)},
 			},
 		},
@@ -116,8 +145,8 @@ func TestPruneDeletesOnlyStaleFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prune: %v", err)
 	}
-	if len(store.deleted) != 1 || store.deleted[0] != "ops-backups/old.sql.gz" {
-		t.Fatalf("expected only old.sql.gz to be pruned, got %+v", store.deleted)
+	if len(store.deleted) != 1 || store.deleted[0] != "ops-backups/db_test_20260101-030000.sql.gz" {
+		t.Fatalf("expected only db_test_20260101-030000.sql.gz to be pruned, got %+v", store.deleted)
 	}
 }
 
@@ -126,5 +155,43 @@ func TestPruneRejectsInvalidKeepDays(t *testing.T) {
 		func() config.Config { return config.Config{SynologyHost: "nas.local"} }, withStore(&fakeStore{}))
 	if err == nil || !strings.Contains(err.Error(), "keep-days") {
 		t.Fatalf("expected keep-days error, got %v", err)
+	}
+}
+
+func TestUploadRejectsCorruptOrUnreadableRemote(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		store *fakeStore
+	}{
+		{"corrupt", &fakeStore{corrupt: true}},
+		{"download failure", &fakeStore{getErr: errors.New("download unavailable")}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			local := filepath.Join(t.TempDir(), "backup.gz")
+			if err := os.WriteFile(local, []byte("original"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := runUpload([]string{local, "ops-backups/test.gz"}, tc.store); err == nil {
+				t.Fatal("unverified upload accepted")
+			}
+		})
+	}
+}
+
+func TestVerifyIsReadOnlyAndDetectsSameSizeCorruption(t *testing.T) {
+	local := filepath.Join(t.TempDir(), "backup.gz")
+	if err := os.WriteFile(local, []byte("original"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	store := &fakeStore{objects: map[string][]byte{"backup.gz": []byte("original")}}
+	if err := runVerify([]string{local, "backup.gz"}, store); err != nil {
+		t.Fatal(err)
+	}
+	store.objects["backup.gz"] = []byte("tampered")
+	if err := runVerify([]string{local, "backup.gz"}, store); err == nil {
+		t.Fatal("same-size corruption accepted")
+	}
+	if len(store.putCalls) != 0 || len(store.deleted) != 0 {
+		t.Fatal("verification mutated storage")
 	}
 }

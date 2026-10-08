@@ -1,28 +1,8 @@
 #!/usr/bin/env bash
-#
-# DigiDocs 数据备份。
-#
-# 备份两份东西——它们都是「丢了就没有了」的：
-#   1. PostgreSQL 全库（业务事实：文档元数据、流转、交接、审计、账号）
-#   2. code_repos 卷里的 Git 裸仓库（成员推送的代码资产的唯一副本）
-#
-# 群晖上的文件不在这里备份：它由 DSM 自己的快照/备份能力负责，见
-# docs/现场部署逐条清单.md。.env 含密钥，也不进本备份，需单独妥善保管。
-#
-# 本地备份只防「人祸」（误删、误覆盖、坏迁移）：postgres_data 卷和
-# $BACKUP_DIR 目前在同一台宿主机的同一块盘上，磁盘物理损坏或整机故障会
-# 同时带走源数据和全部备份历史。备份成功后额外同步一份到群晖 NAS（异盘、
-# 异机），复用 backend-go 容器已经配置好的 SYNOLOGY_* 凭据——应用本身就
-# 用它做文件存储，这里不引入任何新凭据或新挂载方式。未配置群晖存储的部署
-# （`STORAGE_BACKEND` 非 `synology`）会自动跳过这一步，只打印提示。
-#
-# 用法：
-#   scripts/codex/backup.sh                 # 执行一次备份
-#   BACKUP_KEEP_DAYS=30 scripts/codex/backup.sh
-#
-# 定时执行见 scripts/codex/install-backup-timer.sh。
-
+# PostgreSQL + code_repos backups, with verified offsite delivery and retry.
+# NAS document snapshots and secret configuration are managed separately.
 set -euo pipefail
+umask 077
 
 CONTAINER="${DIGIDOCS_PG_CONTAINER:-digidocs-postgres}"
 DB_USER="${POSTGRES_USER:-postgres}"
@@ -32,108 +12,125 @@ BACKUP_DIR="${DIGIDOCS_BACKUP_DIR:-$HOME/ops/digidocs-backups}"
 KEEP_DAYS="${BACKUP_KEEP_DAYS:-14}"
 BACKEND_CONTAINER="${DIGIDOCS_BACKEND_CONTAINER:-digidocs-backend-go}"
 OFFSITE_PREFIX="${DIGIDOCS_OFFSITE_PREFIX:-ops-backups}"
-
-stamp="$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$BACKUP_DIR"
-
+OFFSITE_REQUIRED="${DIGIDOCS_OFFSITE_REQUIRED:-1}"
+SYNC_ONLY=0
 log() { echo "[backup] $*"; }
 fail() { echo "[backup][ERR] $*" >&2; exit 1; }
+[[ "$#" -eq 0 ]] || { [[ "$#" -eq 1 && "$1" == --sync-only ]] && SYNC_ONLY=1; } \
+  || fail "usage: backup.sh [--sync-only]"
+[[ "$KEEP_DAYS" =~ ^[0-9]+$ ]] || fail "BACKUP_KEEP_DAYS must be non-negative"
+[[ "$OFFSITE_REQUIRED" == 0 || "$OFFSITE_REQUIRED" == 1 ]] || fail "DIGIDOCS_OFFSITE_REQUIRED must be 0 or 1"
 
-docker ps --format '{{.Names}}' | grep -qx "$CONTAINER" \
-  || fail "容器 $CONTAINER 未运行，无法备份数据库"
+mkdir -p "$BACKUP_DIR/.offsite"
+exec 9>"$BACKUP_DIR/.backup.lock"
+flock -n 9 || fail "another backup/sync is running"
+partial=""
+staged=""
+cleanup() {
+  if [[ -n "$partial" ]]; then rm -f -- "$partial"; fi
+  if [[ -n "$staged" ]]; then docker exec "$BACKEND_CONTAINER" rm -f "$staged" >/dev/null 2>&1 || true; fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+running() { docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null | grep -qx true; }
 
-# ---------- 1. PostgreSQL ----------
-db_file="$BACKUP_DIR/db_${DB_NAME}_${stamp}.sql.gz"
-log "导出数据库 $DB_NAME → $(basename "$db_file")"
-# pg_dump 的退出码要看 pipefail 前一段，否则 gzip 成功就会掩盖导出失败。
-docker exec "$CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" --clean --if-exists \
-  | gzip > "$db_file"
+if [[ "$SYNC_ONLY" == 0 ]]; then
+  running "$CONTAINER" || fail "database container is not running"
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  db_file="$BACKUP_DIR/db_${DB_NAME}_${stamp}.sql.gz"
+  [[ ! -e "$db_file" ]] || fail "backup timestamp already exists"
+  partial="$db_file.partial"
+  log "export database -> $(basename "$db_file")"
+  docker exec "$CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" --clean --if-exists | gzip > "$partial"
+  [[ $(stat -c %s "$partial") -gt 1024 ]] || fail "database dump is unexpectedly small"
+  gzip -t "$partial" || fail "database gzip validation failed"
+  table_count=$(zcat "$partial" | grep -c 'CREATE TABLE' || true)
+  [[ "${table_count:-0}" -gt 0 ]] || fail "database dump has no CREATE TABLE"
+  mv -- "$partial" "$db_file"
+  partial=""
+  log "database backup OK: tables=$table_count"
 
-# 空档或截断的备份比没有备份更危险——它会让人以为自己有备份。
-db_size=$(stat -c %s "$db_file")
-[ "$db_size" -gt 1024 ] || fail "数据库备份异常小（${db_size} 字节），判定失败"
-gzip -t "$db_file" || fail "数据库备份 gzip 校验失败"
-# 恢复时必须能看到建表语句，只校验 gzip 完整性不足以说明内容有效。
-# 用 grep -c 而不是 grep -q：-q 命中后立刻退出会让 zcat 收到 SIGPIPE，在
-# `set -o pipefail` 下被判成整条管道失败，把一份好备份误报为损坏。
-table_count=$(zcat "$db_file" | grep -c "CREATE TABLE" || true)
-[ "${table_count:-0}" -gt 0 ] || fail "数据库备份中找不到 CREATE TABLE，内容可疑"
-log "数据库备份含 ${table_count} 条建表语句"
-log "数据库备份 OK（$(du -h "$db_file" | cut -f1)）"
-
-# ---------- 2. Git 裸仓库 ----------
-if docker volume inspect "$CODE_VOLUME" >/dev/null 2>&1; then
-  code_file="$BACKUP_DIR/coderepos_${stamp}.tar.gz"
-  log "打包代码仓库卷 $CODE_VOLUME → $(basename "$code_file")"
-  docker run --rm -v "$CODE_VOLUME":/data:ro -w /data debian:bookworm-slim \
-    tar czf - . > "$code_file"
-  gzip -t "$code_file" || fail "代码仓库备份 gzip 校验失败"
-  log "代码仓库备份 OK（$(du -h "$code_file" | cut -f1)）"
-else
-  log "跳过代码仓库：卷 $CODE_VOLUME 不存在"
+  if docker volume inspect "$CODE_VOLUME" >/dev/null 2>&1; then
+    code_file="$BACKUP_DIR/coderepos_${stamp}.tar.gz"
+    partial="$code_file.partial"
+    docker run --rm -v "$CODE_VOLUME":/data:ro -w /data debian:bookworm-slim tar czf - . > "$partial"
+    tar tzf "$partial" >/dev/null || fail "code repository archive validation failed"
+    mv -- "$partial" "$code_file"
+    partial=""
+    log "code repository backup OK: $(basename "$code_file")"
+  else
+    fail "code repository volume is missing: $CODE_VOLUME (database backup retained)"
+  fi
 fi
 
-# ---------- 3. 异地同步（群晖）----------
-# 把刚生成、已校验过的备份文件复制进 backend-go 容器，再用同容器里的
-# digidocs-backup-sync（复用 internal/storage/synology 客户端）推到群晖。
-# 本地文件已经是校验通过的有效备份，这一步失败不影响本地备份继续保留。
-sync_offsite() {
-  local local_file="$1"
-  local remote_name staged sync_output
-  remote_name="$(basename "$local_file")"
-  staged="/tmp/digidocs-backup-sync-payload"
+# A receipt is bound to both the content and the destination. Credential changes
+# do not invalidate receipts; changing NAS/share/account/prefix does.
+if [[ "$OFFSITE_REQUIRED" == 1 ]]; then
+  running "$BACKEND_CONTAINER" || fail "backend container unavailable; local backups retained, cleanup skipped"
+  destination=$(docker exec "$BACKEND_CONTAINER" sh -c '
+    [ -n "$SYNOLOGY_HOST" ] || exit 1
+    printf "%s\n" "$SYNOLOGY_HOST" "$SYNOLOGY_PORT" "$SYNOLOGY_HTTPS" "$SYNOLOGY_SHARE_PATH" "$SYNOLOGY_ACCOUNT" | sha256sum
+  ') || fail "offsite configuration missing; local backups retained, cleanup skipped"
+  destination=$(printf '%s\n' "$destination" "$OFFSITE_PREFIX" | sha256sum | cut -d ' ' -f1)
+fi
 
-  if ! docker ps --format '{{.Names}}' | grep -qx "$BACKEND_CONTAINER"; then
-    log "跳过群晖同步：容器 $BACKEND_CONTAINER 未运行"
-    return 0
-  fi
-  if ! docker cp "$local_file" "$BACKEND_CONTAINER:$staged" 2>/dev/null; then
-    log "[ERR] 群晖同步失败：无法把 $remote_name 复制进 $BACKEND_CONTAINER"
+sync_offsite() {
+  local local_file="$1" remote_name receipt expected sync_output
+  remote_name="$(basename "$local_file")"
+  receipt="$BACKUP_DIR/.offsite/$remote_name.sha256"
+  expected="$destination $(sha256sum "$local_file" | cut -d ' ' -f1)"
+  if [[ -f "$receipt" && "$(cat "$receipt")" == "$expected" ]]; then return 0; fi
+  gzip -t "$local_file" || { log "[ERR] invalid local gzip: $remote_name"; return 1; }
+  staged=$(docker exec "$BACKEND_CONTAINER" mktemp /tmp/digidocs-backup-sync.XXXXXX) || return 1
+  docker cp "$local_file" "$BACKEND_CONTAINER:$staged" || return 1
+  # Existing copies are verified first, so migration does not overwrite good
+  # backups or refresh their NAS retention time unnecessarily.
+  if sync_output=$(docker exec "$BACKEND_CONTAINER" /usr/local/bin/digidocs-backup-sync verify "$staged" "$OFFSITE_PREFIX/$remote_name" 2>&1); then
+    log "existing offsite copy verified: $remote_name"
+  elif sync_output=$(docker exec "$BACKEND_CONTAINER" /usr/local/bin/digidocs-backup-sync upload "$staged" "$OFFSITE_PREFIX/$remote_name" 2>&1); then
+    log "offsite upload and verification OK: $remote_name"
+  else
+    log "[ERR] offsite delivery failed: $remote_name"
+    echo "$sync_output" >&2
     return 1
   fi
-
-  if sync_output=$(docker exec "$BACKEND_CONTAINER" /usr/local/bin/digidocs-backup-sync upload "$staged" "$OFFSITE_PREFIX/$remote_name" 2>&1); then
-    docker exec "$BACKEND_CONTAINER" rm -f "$staged" 2>/dev/null || true
-    log "群晖同步 OK：$remote_name"
-    return 0
-  fi
-
-  docker exec "$BACKEND_CONTAINER" rm -f "$staged" 2>/dev/null || true
-  if grep -q "SYNOLOGY_HOST is not set" <<<"$sync_output"; then
-    log "跳过群晖同步：本部署未配置 Synology 存储（STORAGE_BACKEND != synology）"
-    return 0
-  fi
-  log "[ERR] 群晖同步失败：$remote_name"
-  echo "$sync_output" >&2
-  return 1
+  echo "$sync_output"
+  docker exec "$BACKEND_CONTAINER" rm -f "$staged" || return 1
+  staged=""
+  printf '%s\n' "$expected" > "$receipt.tmp"
+  mv -- "$receipt.tmp" "$receipt"
 }
 
-offsite_ok=1
-sync_offsite "$db_file" || offsite_ok=0
-if [ -n "${code_file:-}" ] && [ -f "$code_file" ]; then
-  sync_offsite "$code_file" || offsite_ok=0
+if [[ "$OFFSITE_REQUIRED" == 1 ]]; then
+  # Most recent database backups first, then all pending historical archives.
+  while IFS= read -r -d '' local_file; do
+    sync_offsite "$local_file" || fail "offsite delivery incomplete; all local backups retained, cleanup skipped"
+  done < <(find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'db_*.sql.gz' -o -name 'coderepos_*.tar.gz' \) -print0 | sort -zr)
+else
+  log "offsite delivery explicitly disabled (DIGIDOCS_OFFSITE_REQUIRED=0)"
 fi
 
-# ---------- 4. 保留策略 ----------
-log "清理 ${KEEP_DAYS} 天前的备份"
-find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'db_*.sql.gz' -o -name 'coderepos_*.tar.gz' \) \
-  -mtime "+${KEEP_DAYS}" -print -delete || true
+if [[ "$SYNC_ONLY" == 1 ]]; then
+  log "sync-only complete; no backups deleted"
+  exit 0
+fi
 
-log "完成。当前保有 $(find "$BACKUP_DIR" -maxdepth 1 -name 'db_*.sql.gz' | wc -l) 份数据库备份，"
-log "目录占用 $(du -sh "$BACKUP_DIR" | cut -f1)：$BACKUP_DIR"
+# Only a fully successful run reaches retention. Pending files survive outages.
+while IFS= read -r -d '' old_file; do
+  if [[ "$OFFSITE_REQUIRED" == 0 || -f "$BACKUP_DIR/.offsite/$(basename "$old_file").sha256" ]]; then
+    rm -- "$old_file"
+    rm -f -- "$BACKUP_DIR/.offsite/$(basename "$old_file").sha256"
+    log "pruned local backup: $(basename "$old_file")"
+  fi
+done < <(find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'db_*.sql.gz' -o -name 'coderepos_*.tar.gz' \) -mtime "+${KEEP_DAYS}" -print0)
 
-# 群晖侧同步过去之后不会自动过期，每天一次不清理会一直堆积。这一步只是
-# 「省磁盘」，不是安全网，失败只警告、不影响本次备份的成败判定。
-if docker ps --format '{{.Names}}' | grep -qx "$BACKEND_CONTAINER"; then
+if [[ "$OFFSITE_REQUIRED" == 1 ]]; then
   if prune_output=$(docker exec "$BACKEND_CONTAINER" /usr/local/bin/digidocs-backup-sync prune "$OFFSITE_PREFIX" "$KEEP_DAYS" 2>&1); then
-    log "群晖侧清理完成"
-  elif ! grep -q "SYNOLOGY_HOST is not set" <<<"$prune_output"; then
-    log "[WARN] 群晖侧清理失败（不影响本次备份结果）："
+    log "offsite retention complete"
+  else
+    log "[WARN] offsite retention failed (verified backups retained)"
     echo "$prune_output" >&2
   fi
 fi
-
-# 本地备份已经落盘且校验通过，不会被下面这一步撤销——只是让"群晖同步失败"
-# 这件事在 systemctl --user list-timers / journalctl 里能被看见，而不是被
-# 本地备份的成功日志盖过去，逼着有人真去 NAS 侧查一下。
-[ "$offsite_ok" -eq 1 ] || fail "本地备份已完成，但群晖异地同步失败，请检查群晖连通性/凭据后重跑"
+log "complete: database_backups=$(find "$BACKUP_DIR" -maxdepth 1 -name 'db_*.sql.gz' | wc -l) size=$(du -sh "$BACKUP_DIR" | cut -f1)"

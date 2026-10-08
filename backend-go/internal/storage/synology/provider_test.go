@@ -1,8 +1,11 @@
 package synology
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -439,5 +442,68 @@ func TestProviderCreateFolderTreatsExistingDirectoryAsSuccess(t *testing.T) {
 	}
 	if createCalls != 1 {
 		t.Fatalf("create calls = %d, want 1", createCalls)
+	}
+}
+
+type failingTransport struct{}
+
+func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, context.DeadlineExceeded
+}
+
+func TestTransportErrorsDoNotLeakCredentialsOrSessions(t *testing.T) {
+	for _, operation := range []string{"login", "list", "upload", "download"} {
+		t.Run(operation, func(t *testing.T) {
+			p := NewProvider(Config{Host: "nas.invalid", Port: 5001, HTTPS: true, Account: "private-user", Password: "password-with-&-secrets", SharePath: "/DigiDocs"})
+			p.client = &http.Client{Transport: failingTransport{}}
+			if operation != "login" {
+				p.sid = "secret-session-id"
+			}
+			var logs bytes.Buffer
+			previous := log.Writer()
+			log.SetOutput(&logs)
+			defer log.SetOutput(previous)
+			var err error
+			switch operation {
+			case "login":
+				err = p.login(context.Background())
+			case "list":
+				_, err = p.ListDir(context.Background(), "ops-backups")
+			case "upload":
+				_, err = p.PutObject(context.Background(), storage.PutObjectInput{ObjectKey: "backup.gz", Reader: strings.NewReader("test")})
+			case "download":
+				_, err = p.GetObject(context.Background(), "backup.gz")
+			}
+			if !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("lost timeout cause: %v", err)
+			}
+			var urlErr *url.Error
+			if !errors.As(err, &urlErr) || !urlErr.Timeout() {
+				t.Fatalf("lost timeout type: %v", err)
+			}
+			output := err.Error() + logs.String()
+			for _, secret := range []string{p.account, p.password, url.QueryEscape(p.password), "secret-session-id", "passwd=", "_sid="} {
+				if strings.Contains(output, secret) {
+					t.Fatalf("sensitive value leaked for %s", operation)
+				}
+			}
+			if !strings.Contains(output, "nas.invalid:5001") {
+				t.Fatal("lost destination context")
+			}
+		})
+	}
+}
+
+func TestRedactURLErrorRemovesUserInfoAndNestedQuery(t *testing.T) {
+	err := &url.Error{Op: "Get", URL: "https://user:secret@nas/path?passwd=secret#token", Err: &url.Error{Op: "Get", URL: "https://nas/path?_sid=secret", Err: context.DeadlineExceeded}}
+	safe := redactURLError(err)
+	if strings.Contains(safe.Error(), "secret") || strings.Contains(safe.Error(), "user") || strings.Contains(safe.Error(), "token") {
+		t.Fatal("nested URL credentials leaked")
+	}
+	if !errors.Is(safe, context.DeadlineExceeded) {
+		t.Fatal("lost cause")
+	}
+	if !strings.Contains(err.URL, "passwd=secret") {
+		t.Fatal("mutated original error")
 	}
 }
