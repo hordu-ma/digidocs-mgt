@@ -304,7 +304,7 @@ func (r ActionRepository) ApplyHandover(ctx context.Context, input command.Hando
 		`
 		SELECT status::text
 		FROM graduation_handovers
-		WHERE id::text = $1
+		WHERE id::text = $1 FOR UPDATE
 		`,
 		input.HandoverID,
 	).Scan(&currentStatus); err != nil {

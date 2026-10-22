@@ -163,7 +163,8 @@ func (r DocumentRepository) GetDocument(ctx context.Context, documentID string) 
 			u.id::text,
 			u.display_name,
 			COALESCE(d.current_version_id::text, ''),
-			d.is_archived
+			d.is_archived,
+ d.project_id::text
 		FROM documents d
 		LEFT JOIN users u ON u.id = d.current_owner_id
 		WHERE d.id::text = $1
@@ -179,6 +180,7 @@ func (r DocumentRepository) GetDocument(ctx context.Context, documentID string) 
 		&owner.DisplayName,
 		&item.CurrentVersionID,
 		&item.IsArchived,
+		&item.ProjectID,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, service.ErrNotFound
@@ -287,13 +289,13 @@ func (r DocumentRepository) UpdateDocument(ctx context.Context, input command.Do
 	}
 
 	result := map[string]any{
-		"id":               input.DocumentID,
-		"title":            title,
-		"description":      description,
-		"current_status":   status,
-		"current_owner":    map[string]string{"id": owner.ID, "display_name": owner.DisplayName},
+		"id":                 input.DocumentID,
+		"title":              title,
+		"description":        description,
+		"current_status":     status,
+		"current_owner":      map[string]string{"id": owner.ID, "display_name": owner.DisplayName},
 		"current_version_id": currentVersionID,
-		"is_archived":      isArchived,
+		"is_archived":        isArchived,
 	}
 	return result, nil
 }

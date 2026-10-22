@@ -351,9 +351,9 @@ func (r *AssistantRepository) ListAssistantRequests(
 	return items[start:end], total, nil
 }
 
-func (r *AssistantRepository) GetLatestDocumentExtractedText(
+func (r *AssistantRepository) GetDocumentVersionExtractedText(
 	_ context.Context,
-	documentID string,
+	documentID, versionID string,
 ) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -361,7 +361,7 @@ func (r *AssistantRepository) GetLatestDocumentExtractedText(
 	latestCreatedAt := ""
 	extractedText := ""
 	for _, req := range r.requests {
-		if req.RelatedID != documentID {
+		if req.RelatedID != documentID || versionID == "" || stringValue(req.Output["version_id"]) != versionID {
 			continue
 		}
 		if req.RequestType != string(task.TaskTypeDocumentExtractText) &&

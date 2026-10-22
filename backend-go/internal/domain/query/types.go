@@ -150,6 +150,7 @@ type DocumentListItem struct {
 }
 
 type DocumentDetail struct {
+	ProjectID        string       `json:"project_id"`
 	ID               string       `json:"id"`
 	Title            string       `json:"title"`
 	Description      string       `json:"description,omitempty"`

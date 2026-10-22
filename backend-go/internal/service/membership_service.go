@@ -15,9 +15,9 @@ import (
 type MembershipRepo interface {
 	ListProjectMembers(ctx context.Context, projectID string) ([]query.ProjectMemberItem, error)
 	AddProjectMember(ctx context.Context, projectID, userID, projectRole string) (*query.ProjectMemberItem, error)
-	UpdateProjectMember(ctx context.Context, memberID, projectRole string) (*query.ProjectMemberItem, error)
-	RemoveProjectMember(ctx context.Context, memberID string) error
-	GetProjectMember(ctx context.Context, memberID string) (*query.ProjectMemberItem, error)
+	UpdateProjectMember(ctx context.Context, projectID, memberID, projectRole string) (*query.ProjectMemberItem, error)
+	RemoveProjectMember(ctx context.Context, projectID, memberID string) error
+	GetProjectMember(ctx context.Context, projectID, memberID string) (*query.ProjectMemberItem, error)
 	FindProjectMember(ctx context.Context, projectID, userID string) (*query.ProjectMemberItem, error)
 	CountOwners(ctx context.Context, projectID string) (int, error)
 	CreateInvite(ctx context.Context, projectID, token, projectRole, createdBy string, expiresAt time.Time) (*query.ProjectInviteItem, error)
@@ -83,7 +83,7 @@ func (s MembershipService) UpdateMember(ctx context.Context, actorID, actorRole,
 	if err := s.perm.EnsureManageProjectMembers(ctx, actorID, actorRole, projectID); err != nil {
 		return nil, err
 	}
-	current, err := s.repo.GetProjectMember(ctx, memberID)
+	current, err := s.repo.GetProjectMember(ctx, projectID, memberID)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (s MembershipService) UpdateMember(ctx context.Context, actorID, actorRole,
 	if actorRole != "admin" && (current.ProjectRole == "owner" || role == "owner") {
 		return nil, fmt.Errorf("%w: only admin can change owner", ErrForbidden)
 	}
-	if actorRole != "admin" && !managerAssignableRoles[role] {
+	if !allowedProjectRoles[role] {
 		return nil, fmt.Errorf("%w: invalid project_role", ErrValidation)
 	}
 	if current.ProjectRole == "owner" && role != "owner" {
@@ -103,7 +103,7 @@ func (s MembershipService) UpdateMember(ctx context.Context, actorID, actorRole,
 			return nil, fmt.Errorf("%w: cannot demote the last owner", ErrValidation)
 		}
 	}
-	return s.repo.UpdateProjectMember(ctx, memberID, role)
+	return s.repo.UpdateProjectMember(ctx, projectID, memberID, role)
 }
 
 func (s MembershipService) RemoveMember(ctx context.Context, actorID, actorRole, projectID, memberID string) error {
@@ -113,7 +113,7 @@ func (s MembershipService) RemoveMember(ctx context.Context, actorID, actorRole,
 	if err := s.perm.EnsureManageProjectMembers(ctx, actorID, actorRole, projectID); err != nil {
 		return err
 	}
-	current, err := s.repo.GetProjectMember(ctx, memberID)
+	current, err := s.repo.GetProjectMember(ctx, projectID, memberID)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (s MembershipService) RemoveMember(ctx context.Context, actorID, actorRole,
 			return fmt.Errorf("%w: only admin can remove an owner", ErrForbidden)
 		}
 	}
-	return s.repo.RemoveProjectMember(ctx, memberID)
+	return s.repo.RemoveProjectMember(ctx, projectID, memberID)
 }
 
 func (s MembershipService) CreateInvite(ctx context.Context, actorID, actorRole, projectID string) (*query.ProjectInviteItem, error) {

@@ -35,8 +35,8 @@ func TestDocumentRepository_ListAndGet(t *testing.T) {
 
 	mock.ExpectQuery("FROM documents d\\s+LEFT JOIN users").
 		WithArgs("doc-1").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "description", "status", "owner_id", "owner_name", "version_id", "archived"}).
-			AddRow("doc-1", "Report", "Desc", "in_progress", "u-1", "张三", "v-1", false))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "description", "status", "owner_id", "owner_name", "version_id", "archived", "project_id"}).
+			AddRow("doc-1", "Report", "Desc", "in_progress", "u-1", "张三", "v-1", false, "p-1"))
 	doc, err := repo.GetDocument(ctx, "doc-1")
 	if err != nil || doc.ID != "doc-1" || doc.CurrentOwner.DisplayName != "张三" {
 		t.Fatalf("GetDocument doc=%#v err=%v", doc, err)

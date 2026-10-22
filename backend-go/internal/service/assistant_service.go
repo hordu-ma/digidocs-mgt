@@ -24,6 +24,7 @@ type AssistantService struct {
 	publisher   queue.Publisher
 	repo        repository.AssistantRepository
 	documents   repository.DocumentReader
+	versions    repository.VersionReader
 	permissions PermissionService
 }
 
@@ -31,6 +32,7 @@ func NewAssistantService(
 	publisher queue.Publisher,
 	repo repository.AssistantRepository,
 	documents repository.DocumentReader,
+	versions repository.VersionReader,
 	permissions ...PermissionService,
 ) AssistantService {
 	permissionService := PermissionService{}
@@ -41,6 +43,7 @@ func NewAssistantService(
 		publisher:   publisher,
 		repo:        repo,
 		documents:   documents,
+		versions:    versions,
 		permissions: permissionService,
 	}
 }
@@ -63,12 +66,15 @@ func (s AssistantService) Ask(
 		return AssistantAskResult{}, fmt.Errorf("%w: question is required", ErrValidation)
 	}
 
-	payload = clonePayload(payload)
 	scopeInput := extractScope(payload)
+	payload = assistantPayload(payload, "question", "conversation_id", "skill_name")
 	conversationID := strings.TrimSpace(stringValue(payload["conversation_id"]))
 
 	var conversation *query.AssistantConversationItem
 	if conversationID != "" {
+		if err := s.permissions.EnsureViewConversation(ctx, actorID, actorRole, conversationID); err != nil {
+			return AssistantAskResult{}, err
+		}
 		item, err := s.repo.GetConversation(ctx, conversationID)
 		if err != nil {
 			return AssistantAskResult{}, err
@@ -182,6 +188,20 @@ func (s AssistantService) SummarizeDocument(
 	if err := s.permissions.EnsureViewDocument(ctx, actorID, actorRole, documentID); err != nil {
 		return task.Message{}, err
 	}
+	payload = assistantPayload(payload, "version_id", "skill_name")
+	if versionID := strings.TrimSpace(stringValue(payload["version_id"])); versionID != "" {
+		if s.versions == nil {
+			return task.Message{}, ErrValidation
+		}
+		version, err := s.versions.GetVersion(ctx, versionID)
+		if err != nil {
+			return task.Message{}, err
+		}
+		if version.DocumentID != documentID {
+			return task.Message{}, fmt.Errorf("%w: version does not belong to document", ErrValidation)
+		}
+		payload["version_id"] = versionID
+	}
 	return s.QueueTask(ctx, task.TaskTypeDocumentSummarize, "document", documentID, payload, actorID)
 }
 
@@ -196,7 +216,7 @@ func (s AssistantService) SummarizeHandover(
 	if err := s.permissions.EnsureViewHandover(ctx, actorID, actorRole, handoverID); err != nil {
 		return task.Message{}, err
 	}
-	return s.QueueTask(ctx, task.TaskTypeHandoverSummarize, "handover", handoverID, payload, actorID)
+	return s.QueueTask(ctx, task.TaskTypeHandoverSummarize, "handover", handoverID, assistantPayload(payload, "skill_name"), actorID)
 }
 
 func (s AssistantService) GetRequest(
@@ -283,11 +303,11 @@ func (s AssistantService) ListConversationMessages(
 	return s.repo.ListConversationMessages(ctx, conversationID)
 }
 
-func (s AssistantService) GetLatestDocumentExtractedText(
+func (s AssistantService) GetDocumentVersionExtractedText(
 	ctx context.Context,
-	documentID string,
+	documentID, versionID string,
 ) (string, error) {
-	return s.repo.GetLatestDocumentExtractedText(ctx, documentID)
+	return s.repo.GetDocumentVersionExtractedText(ctx, documentID, versionID)
 }
 
 // ListSuggestions relies on filter.Scope the same way ListRequests does.
@@ -322,4 +342,15 @@ func (s AssistantService) DismissSuggestion(
 		return nil, err
 	}
 	return s.repo.DismissSuggestion(ctx, suggestionID, actorID, reason)
+}
+
+// Only server-built scope and memory may influence resource reads.
+func assistantPayload(input map[string]any, keys ...string) map[string]any {
+	result := map[string]any{}
+	for _, key := range keys {
+		if value, ok := input[key]; ok {
+			result[key] = value
+		}
+	}
+	return result
 }

@@ -53,9 +53,10 @@ func (r DocumentRepository) GetDocument(ctx context.Context, documentID string) 
 	_ = ctx
 
 	return &query.DocumentDetail{
-		ID:          documentID,
-		Title:       "课题申报书",
-		Description: "Go 迁移阶段的内存仓储占位数据",
+		ProjectID:     "00000000-0000-0000-0000-000000000020",
+		ID:            documentID,
+		Title:         "课题申报书",
+		Description:   "Go 迁移阶段的内存仓储占位数据",
 		CurrentStatus: "draft",
 		CurrentOwner: &query.UserSummary{
 			ID:          "00000000-0000-0000-0000-000000000001",
@@ -79,13 +80,13 @@ func (r DocumentRepository) UpdateDocument(_ context.Context, input command.Docu
 		title = "课题申报书"
 	}
 	return map[string]any{
-		"id":               input.DocumentID,
-		"title":            title,
-		"description":      input.Description,
-		"current_status":   "draft",
-		"current_owner":    map[string]string{"id": "00000000-0000-0000-0000-000000000001", "display_name": "系统管理员"},
+		"id":                 input.DocumentID,
+		"title":              title,
+		"description":        input.Description,
+		"current_status":     "draft",
+		"current_owner":      map[string]string{"id": "00000000-0000-0000-0000-000000000001", "display_name": "系统管理员"},
 		"current_version_id": nil,
-		"is_archived":      false,
+		"is_archived":        false,
 	}, nil
 }
 

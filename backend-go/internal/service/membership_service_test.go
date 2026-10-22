@@ -21,11 +21,11 @@ func (s *stubMembershipRepo) AddProjectMember(_ context.Context, _, userID, role
 	s.members = append(s.members, item)
 	return &item, nil
 }
-func (s *stubMembershipRepo) UpdateProjectMember(_ context.Context, memberID, role string) (*query.ProjectMemberItem, error) {
+func (s *stubMembershipRepo) UpdateProjectMember(_ context.Context, projectID, memberID, role string) (*query.ProjectMemberItem, error) {
 	return &query.ProjectMemberItem{ID: memberID, ProjectRole: role}, nil
 }
-func (s *stubMembershipRepo) RemoveProjectMember(context.Context, string) error { return nil }
-func (s *stubMembershipRepo) GetProjectMember(_ context.Context, memberID string) (*query.ProjectMemberItem, error) {
+func (s *stubMembershipRepo) RemoveProjectMember(context.Context, string, string) error { return nil }
+func (s *stubMembershipRepo) GetProjectMember(_ context.Context, projectID, memberID string) (*query.ProjectMemberItem, error) {
 	for _, m := range s.members {
 		if m.ID == memberID {
 			return &m, nil

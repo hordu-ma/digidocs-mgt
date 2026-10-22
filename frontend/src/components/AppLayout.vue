@@ -2,7 +2,6 @@
 import {
   ArrowDown,
   ArrowRight,
-  Bell,
   ChatDotRound,
   Coin,
   Connection,
@@ -332,10 +331,7 @@ onBeforeUnmount(() => {
             <span>{{ isMobile ? "搜索" : "搜索 / 跳转" }}</span>
             <span v-if="!isMobile" class="app-kbd">Ctrl K</span>
           </button>
-          <span v-if="!isMobile" class="topbar-signal">
-            <ElIcon><Bell /></ElIcon>
-            <span>工作流在线</span>
-          </span>
+
           <ElDropdown trigger="click" @command="handleUserCommand">
             <button class="user-menu" type="button">
               <span class="user-avatar">{{ auth.displayName.slice(0, 1) || "用" }}</span>
@@ -753,18 +749,6 @@ onBeforeUnmount(() => {
   box-shadow: 0 10px 22px rgba(18, 75, 135, 0.18);
 }
 
-.topbar-signal {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: var(--dd-success-soft);
-  color: var(--dd-success);
-  font-size: 12px;
-  font-weight: 700;
-}
 
 .user-menu {
   display: inline-flex;
@@ -915,9 +899,6 @@ onBeforeUnmount(() => {
 
   .topbar-caption,
   .topbar-breadcrumbs,
-  .topbar-signal {
-    display: none;
-  }
 
   .topbar-tools {
     gap: 8px;

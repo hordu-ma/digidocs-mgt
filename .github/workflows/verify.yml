@@ -44,3 +44,6 @@ jobs:
 
       - name: Verify
         run: make verify
+
+      - name: PostgreSQL integration regressions
+        run: make integration-postgres

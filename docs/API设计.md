@@ -1576,7 +1576,7 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 
 ### 13.1 概述
 
-数据资产模块用于存储图片、视频、压缩包、模型文件等非 Office/PDF 数据文件。以课题为核心，支持 1-10GB 大文件，简单文件夹结构（最多 2 层），无工作流与版本管理。
+数据资产模块用于存储图片、视频、压缩包、模型文件等非 Office/PDF 数据文件。以课题为核心，支持单文件最大 511 MiB（请求体最大 512 MiB），简单文件夹结构（最多 2 层），无工作流与版本管理。
 
 **权限规则：**
 - 上传：项目成员即可（`CanUploadDataAsset`）
@@ -1781,3 +1781,14 @@ git push digidocs main
 ```
 
 认证失败返回 `401 unauthorized`。仓库不存在返回 `404`。
+
+
+## 15. 2026-10-22 权限与版本契约补充
+
+- 项目成员 PATCH/DELETE 的 memberID 必须属于 URL projectID；数据库更新带双重条件，最后 owner 的保护在事务中执行。
+- 数据目录 GET 必须具备项目读取权限；DELETE 必须具备项目数据上传权限。
+- 交接 data-items GET 复用交接读取权限；PUT 复用交接编辑权限，仅 generated 状态可编辑，事务内锁定交接单，资产必须未删除且属于交接项目（无项目交接按 target_user_id 对应资产创建人限定），写入审计。
+- assistant/ask 追问必须具备会话所有权；document scope 的 project_id 由文档归属推导，客户端冲突范围拒绝。
+- 摘要只接受 version_id、skill_name；交接摘要只接受 skill_name。版本必须属于 URL 文档；不接受客户端扩大上下文范围。
+- Worker 文档上下文支持 version_id 查询参数，校验版本归属；响应包含 version_id、extracted_text_version_id。正文缓存仅按文档及输出 version_id 匹配，旧的无版本结果不复用。
+- 数据上传请求体上限仍为 512 MiB，页面单文件限制为 511 MiB，预留 1 MiB 表单开销；选择文件时即校验，不再承诺 10 GB。

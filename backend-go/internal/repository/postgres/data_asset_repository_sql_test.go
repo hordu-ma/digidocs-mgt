@@ -168,6 +168,10 @@ func TestDataAssetRepositoryAssetNotFoundAndHandoverTransaction(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery("FROM graduation_handovers.*FOR UPDATE").WithArgs("handover-1").WillReturnRows(sqlmock.NewRows([]string{"status", "project_id", "target_user_id"}).AddRow("generated", "p-1", "actor-1"))
+	for _, id := range []string{"asset-1", "asset-2"} {
+		mock.ExpectQuery("FROM data_assets.*FOR SHARE").WithArgs(id).WillReturnRows(sqlmock.NewRows([]string{"project_id", "created_by"}).AddRow("p-1", "actor-1"))
+	}
 	mock.ExpectExec("DELETE FROM graduation_handover_data_items").
 		WithArgs("handover-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -177,6 +181,7 @@ func TestDataAssetRepositoryAssetNotFoundAndHandoverTransaction(t *testing.T) {
 	mock.ExpectExec("INSERT INTO graduation_handover_data_items").
 		WithArgs(sqlmock.AnyArg(), "handover-1", "asset-2", false, nil).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO audit_events").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	result, err := repo.UpdateHandoverDataItems(ctx, command.HandoverDataItemUpdateInput{
 		HandoverID: "handover-1",

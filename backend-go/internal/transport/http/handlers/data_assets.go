@@ -27,7 +27,7 @@ func NewDataAssetHandler(svc service.DataAssetService) DataAssetHandler {
 // ListFolders  GET /api/v1/projects/{id}/data-folders
 func (h DataAssetHandler) ListFolders(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
-	items, err := h.service.ListDataFolders(r.Context(), projectID)
+	items, err := h.service.ListDataFolders(r.Context(), projectID, middleware.UserIDFromContext(r.Context()), middleware.UserRoleFromContext(r.Context()))
 	if err != nil {
 		writeServiceError(w, err, "folder not found", "failed to list folders")
 		return
@@ -244,7 +244,7 @@ func (h DataAssetHandler) Download(w http.ResponseWriter, r *http.Request) {
 // ListHandoverDataItems  GET /api/v1/handovers/{id}/data-items
 func (h DataAssetHandler) ListHandoverDataItems(w http.ResponseWriter, r *http.Request) {
 	handoverID := r.PathValue("id")
-	items, err := h.service.ListHandoverDataItems(r.Context(), handoverID)
+	items, err := h.service.ListHandoverDataItems(r.Context(), handoverID, middleware.UserIDFromContext(r.Context()), middleware.UserRoleFromContext(r.Context()))
 	if err != nil {
 		writeServiceError(w, err, "handover not found", "failed to list handover data items")
 		return
@@ -265,6 +265,8 @@ func (h DataAssetHandler) UpdateHandoverDataItems(w http.ResponseWriter, r *http
 
 	result, err := h.service.UpdateHandoverDataItems(r.Context(), command.HandoverDataItemUpdateInput{
 		HandoverID: handoverID,
+		ActorID:    middleware.UserIDFromContext(r.Context()),
+		ActorRole:  middleware.UserRoleFromContext(r.Context()),
 		Items:      body.Items,
 	})
 	if err != nil {

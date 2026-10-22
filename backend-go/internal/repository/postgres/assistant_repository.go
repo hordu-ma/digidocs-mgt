@@ -762,9 +762,9 @@ func (r AssistantRepository) GetAssistantRequest(
 	return &item, nil
 }
 
-func (r AssistantRepository) GetLatestDocumentExtractedText(
+func (r AssistantRepository) GetDocumentVersionExtractedText(
 	ctx context.Context,
-	documentID string,
+	documentID, versionID string,
 ) (string, error) {
 	var outputText string
 	err := r.db.QueryRowContext(
@@ -776,6 +776,8 @@ func (r AssistantRepository) GetLatestDocumentExtractedText(
 		  AND related_type = 'document'
 		  AND related_id::text = $2
 		  AND status = 'completed'
+ AND output->>'version_id' = $3 AND $3 <> ''
+ AND COALESCE(output->>'extracted_text', '') <> ''
 		ORDER BY completed_at DESC NULLS LAST, created_at DESC
 		LIMIT 1
 		`,
@@ -784,6 +786,7 @@ func (r AssistantRepository) GetLatestDocumentExtractedText(
 			string(task.TaskTypeDocumentSummarize),
 		}),
 		documentID,
+		versionID,
 	).Scan(&outputText)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -1022,12 +1025,12 @@ func suggestionTypeForRequest(requestType string) string {
 }
 
 var validSuggestionTypes = map[string]bool{
-	"document_summary":          true,
-	"document_tag":              true,
-	"risk_alert":                true,
-	"handover_summary":          true,
-	"archive_recommendation":    true,
-	"structure_recommendation":  true,
+	"document_summary":         true,
+	"document_tag":             true,
+	"risk_alert":               true,
+	"handover_summary":         true,
+	"archive_recommendation":   true,
+	"structure_recommendation": true,
 }
 
 // normalizeSuggestionType returns raw if it's a valid enum value, otherwise fallback.

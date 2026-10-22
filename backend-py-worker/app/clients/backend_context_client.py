@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import urllib.request
+from urllib.parse import urlencode
 from typing import cast
 
 from ..core.config import settings
@@ -20,8 +21,11 @@ class BackendContextClient:
         self.base_url: str = settings.callback_base_url.rstrip("/")
         self.token: str = settings.callback_token
 
-    def get_document_context(self, document_id: str) -> ObjectDict:
-        return self._fetch(f"/api/v1/internal/assistant-context/documents/{document_id}")
+    def get_document_context(self, document_id: str, version_id: str = "") -> ObjectDict:
+        path = f"/api/v1/internal/assistant-context/documents/{document_id}"
+        if version_id:
+            path += "?" + urlencode({"version_id": version_id})
+        return self._fetch(path)
 
     def get_project_context(self, project_id: str) -> ObjectDict:
         return self._fetch(f"/api/v1/internal/assistant-context/projects/{project_id}")

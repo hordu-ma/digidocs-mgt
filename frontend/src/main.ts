@@ -1,4 +1,7 @@
-import "element-plus/dist/index.css";
+import "element-plus/es/components/base/style/css";
+import "element-plus/es/components/message/style/css";
+import "element-plus/es/components/message-box/style/css";
+import "element-plus/es/components/loading/style/css";
 import { createPinia } from "pinia";
 import { createApp } from "vue";
 

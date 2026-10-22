@@ -113,6 +113,7 @@ type UserAuthReader interface {
 // ========== Data Asset ==========
 
 type DataAssetReader interface {
+	GetDataFolder(ctx context.Context, id string) (*query.DataFolderItem, error)
 	ListDataAssets(ctx context.Context, filter query.DataAssetListFilter) ([]query.DataAssetListItem, int, error)
 	GetDataAsset(ctx context.Context, id string) (*query.DataAssetDetail, error)
 	ListDataFolders(ctx context.Context, projectID string) ([]query.DataFolderItem, error)
@@ -152,7 +153,7 @@ type AssistantRepository interface {
 	CompleteAssistantRequest(ctx context.Context, result task.Result) error
 	ListAssistantRequests(ctx context.Context, filter query.AssistantRequestFilter) ([]query.AssistantRequestItem, int, error)
 	GetAssistantRequest(ctx context.Context, requestID string) (*query.AssistantRequestItem, error)
-	GetLatestDocumentExtractedText(ctx context.Context, documentID string) (string, error)
+	GetDocumentVersionExtractedText(ctx context.Context, documentID, versionID string) (string, error)
 	ListSuggestions(ctx context.Context, filter query.AssistantSuggestionFilter) ([]query.AssistantSuggestionItem, error)
 	ConfirmSuggestion(ctx context.Context, suggestionID string, actorID string, note string) (map[string]any, error)
 	DismissSuggestion(ctx context.Context, suggestionID string, actorID string, reason string) (map[string]any, error)

@@ -146,18 +146,18 @@ func TestAssistantRepositorySuggestionStatusAndLatestTextBranches(t *testing.T) 
 	}
 
 	mock.ExpectQuery("FROM assistant_requests").
-		WithArgs(sqlmock.AnyArg(), "doc-1").
+		WithArgs(sqlmock.AnyArg(), "doc-1", "v-1").
 		WillReturnRows(sqlmock.NewRows([]string{"output"}).AddRow(`{"extracted_text":"正文"}`))
-	text, err := repo.GetLatestDocumentExtractedText(ctx, "doc-1")
+	text, err := repo.GetDocumentVersionExtractedText(ctx, "doc-1", "v-1")
 	if err != nil || text != "正文" {
-		t.Fatalf("GetLatestDocumentExtractedText text=%q err=%v", text, err)
+		t.Fatalf("GetDocumentVersionExtractedText text=%q err=%v", text, err)
 	}
 
 	mock.ExpectQuery("FROM assistant_requests").
-		WithArgs(sqlmock.AnyArg(), "missing").
+		WithArgs(sqlmock.AnyArg(), "missing", "v-1").
 		WillReturnError(sqlmock.ErrCancelled)
-	if _, err := repo.GetLatestDocumentExtractedText(ctx, "missing"); !errors.Is(err, sqlmock.ErrCancelled) {
-		t.Fatalf("GetLatestDocumentExtractedText err=%v, want propagated sql error", err)
+	if _, err := repo.GetDocumentVersionExtractedText(ctx, "missing", "v-1"); !errors.Is(err, sqlmock.ErrCancelled) {
+		t.Fatalf("GetDocumentVersionExtractedText err=%v, want propagated sql error", err)
 	}
 
 	db2, mock2 := newMockDB(t)

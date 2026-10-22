@@ -250,10 +250,10 @@ func (m *mockDataAssetRepo) UpdateHandoverDataItems(context.Context, command.Han
 func TestDataAssetServiceFoldersAndValidation(t *testing.T) {
 	repo := &mockDataAssetRepo{folders: []query.DataFolderItem{{ID: "folder-1"}}, result: map[string]any{"ok": true}}
 	svc := NewDataAssetService(repo, repo, &mockStorageProvider{})
-	if got, err := svc.ListDataFolders(context.Background(), "p-1"); err != nil || len(got) != 1 {
+	if got, err := svc.ListDataFolders(context.Background(), "p-1", "u-1", "admin"); err != nil || len(got) != 1 {
 		t.Fatalf("ListDataFolders = %#v err=%v", got, err)
 	}
-	if _, err := svc.ListDataFolders(context.Background(), ""); !errors.Is(err, ErrValidation) {
+	if _, err := svc.ListDataFolders(context.Background(), "", "u-1", "admin"); !errors.Is(err, ErrValidation) {
 		t.Fatalf("empty project err = %v, want ErrValidation", err)
 	}
 	folder, err := svc.CreateDataFolder(context.Background(), command.DataFolderCreateInput{ProjectID: "p-1", Name: "raw"})
@@ -307,10 +307,10 @@ func TestDataAssetServiceHandoverDataItems(t *testing.T) {
 		result:   map[string]any{"updated": true},
 	}
 	svc := NewDataAssetService(repo, repo, &mockStorageProvider{})
-	if got, err := svc.ListHandoverDataItems(context.Background(), "h-1"); err != nil || len(got) != 1 {
+	if got, err := svc.ListHandoverDataItems(context.Background(), "h-1", "u-1", "admin"); err != nil || len(got) != 1 {
 		t.Fatalf("ListHandoverDataItems = %#v err=%v", got, err)
 	}
-	if _, err := svc.ListHandoverDataItems(context.Background(), ""); !errors.Is(err, ErrValidation) {
+	if _, err := svc.ListHandoverDataItems(context.Background(), "", "u-1", "admin"); !errors.Is(err, ErrValidation) {
 		t.Fatalf("empty handover err = %v, want ErrValidation", err)
 	}
 	if got, err := svc.UpdateHandoverDataItems(context.Background(), command.HandoverDataItemUpdateInput{HandoverID: "h-1"}); err != nil || got["updated"] != true {
@@ -319,4 +319,8 @@ func TestDataAssetServiceHandoverDataItems(t *testing.T) {
 	if _, err := svc.UpdateHandoverDataItems(context.Background(), command.HandoverDataItemUpdateInput{}); !errors.Is(err, ErrValidation) {
 		t.Fatalf("empty update handover err = %v, want ErrValidation", err)
 	}
+}
+
+func (m *mockDataAssetRepo) GetDataFolder(context.Context, string) (*query.DataFolderItem, error) {
+	return &query.DataFolderItem{ID: "folder-1", ProjectID: "p-1"}, nil
 }

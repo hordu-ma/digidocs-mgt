@@ -152,6 +152,7 @@ class WorkerDispatcher:
                 "document_id": scope.get("document_id") or task.payload.get("document_id"),
             }
             context = self._build_context(task, normalized_scope)
+            normalized_scope = _as_object_dict(context.get("scope")) or {}
             # Inline document text extraction when scoped to a document
             if _string_value(normalized_scope.get("document_id")):
                 self._ensure_document_text(task, context)
@@ -172,6 +173,7 @@ class WorkerDispatcher:
                 return failure
             if extracted_text:
                 output["extracted_text"] = extracted_text
+                output["version_id"] = context.get("resolved_version_id", "")
             return self._completed(task, output)
 
         if task.task_type in ("handover.summarize", "assistant.generate_suggestion"):
@@ -179,8 +181,9 @@ class WorkerDispatcher:
             return failure or self._completed(task, output)
 
         if task.task_type == "document.extract_text":
+            context = self._build_context(task)
             try:
-                extracted_text = self._resolve_document_text(task, self._build_context(task))
+                extracted_text = self._resolve_document_text(task, context)
             except DocumentTextExtractionError as exc:
                 return self._failed(task, str(exc))
             return self._completed(
@@ -188,6 +191,7 @@ class WorkerDispatcher:
                 {
                     "task_type": "document.extract_text",
                     "extracted_text": extracted_text,
+                    "version_id": context.get("resolved_version_id", ""),
                 },
             )
 
@@ -242,23 +246,33 @@ class WorkerDispatcher:
             "payload": cast(object, task.payload),
         }
 
+        # Queued resource identity is authoritative, never arbitrary payload IDs.
+        normalized_scope: ObjectDict = {}
         if task.related_type == "document" and task.related_id:
-            context["document_context"] = self.context_client.get_document_context(task.related_id)
+            normalized_scope["document_id"] = task.related_id
+        elif task.related_type == "project" and task.related_id:
+            normalized_scope["project_id"] = task.related_id
         elif task.related_type == "handover" and task.related_id:
             context["handover_context"] = self.context_client.get_handover_context(task.related_id)
+        elif task.task_type == "assistant.ask":
+            normalized_scope = scope or {}
 
-        normalized_scope = scope or {}
-        project_id = _string_value(normalized_scope.get("project_id")) or _string_value(
-            task.payload.get("project_id")
-        )
-        document_id = _string_value(normalized_scope.get("document_id")) or _string_value(
-            task.payload.get("document_id")
-        )
-
-        if document_id and "document_context" not in context:
-            context["document_context"] = self.context_client.get_document_context(document_id)
+        document_id = _string_value(normalized_scope.get("document_id"))
+        project_id = _string_value(normalized_scope.get("project_id"))
+        if document_id:
+            version_id = _string_value(task.payload.get("version_id"))
+            doc_context = self.context_client.get_document_context(document_id, version_id)
+            if doc_context.get("available") is False:
+                raise DocumentTextExtractionError("文档或版本上下文不可用")
+            context["document_context"] = doc_context
+            document_scope = _as_object_dict(doc_context.get("scope")) or {}
+            project_id = _string_value(document_scope.get("project_id"))
+            normalized_scope = {"document_id": document_id}
+            if project_id:
+                normalized_scope["project_id"] = project_id
         if project_id:
             context["project_context"] = self.context_client.get_project_context(project_id)
+        context["scope"] = normalized_scope
 
         return context
 
@@ -266,9 +280,6 @@ class WorkerDispatcher:
         """If document is in scope but extracted_text is empty, try inline extraction."""
         doc_ctx = _as_object_dict(context.get("document_context"))
         if doc_ctx is None:
-            return
-        existing = _string_value(doc_ctx.get("extracted_text"))
-        if existing:
             return
         try:
             text = self._resolve_document_text(task, context)
@@ -283,17 +294,24 @@ class WorkerDispatcher:
         task: WorkerTask,
         context: ObjectDict,
     ) -> str:
-        document_context = _as_object_dict(context.get("document_context"))
-        if document_context is not None:
+        document_context = _as_object_dict(context.get("document_context")) or {}
+        version_id = _string_value(task.payload.get("version_id"))
+        if not version_id:
+            version_id = _string_value(document_context.get("version_id")) or _latest_version_id(document_context)
+        if not version_id:
+            raise DocumentTextExtractionError("缺少 version_id，无法抽取正文")
+        verified_id = _string_value(document_context.get("version_id"))
+        versions = document_context.get("versions")
+        known_ids = {
+            item.get("id") for item in versions if isinstance(item, dict)
+        } if isinstance(versions, list) else set()
+        if version_id != verified_id and version_id not in known_ids:
+            raise DocumentTextExtractionError("版本不属于当前文档")
+        context["resolved_version_id"] = version_id
+        if document_context.get("extracted_text_version_id") == version_id:
             existing_text = _string_value(document_context.get("extracted_text"))
             if existing_text:
                 return existing_text
-
-        version_id = _string_value(task.payload.get("version_id"))
-        if version_id == "":
-            version_id = _latest_version_id(document_context)
-        if version_id == "":
-            raise DocumentTextExtractionError("缺少 version_id，无法抽取正文")
 
         headers, content = self.context_client.download_version_file(version_id)
         file_name = _extract_filename(
@@ -321,14 +339,11 @@ def _latest_version_id(document_context: ObjectDict | None) -> str:
     versions = document_context.get("versions")
     if not isinstance(versions, list) or not versions:
         return ""
-    # versions are ordered by version_no; pick the last (latest)
-    for candidate in reversed(cast(list[object], versions)):
-        d = _as_object_dict(candidate)
-        if d is not None:
-            vid = _string_value(d.get("id"))
-            if vid:
-                return vid
-    return ""
+    candidates = [item for item in versions if isinstance(item, dict) and item.get("id")]
+    if not candidates:
+        return ""
+    latest = max(candidates, key=lambda item: int(item.get("version_no") or 0))
+    return _string_value(latest.get("id"))
 
 
 def _extract_filename(content_disposition: str, fallback: str) -> str:

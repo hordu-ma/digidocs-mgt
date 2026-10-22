@@ -25,6 +25,15 @@ func NewDataAssetRepository(db *sql.DB) DataAssetRepository {
 
 // ─────────────────────────── folders ────────────────────────────
 
+func (r DataAssetRepository) GetDataFolder(ctx context.Context, id string) (*query.DataFolderItem, error) {
+	var item query.DataFolderItem
+	err := r.db.QueryRowContext(ctx, `SELECT id::text, project_id::text FROM data_folders WHERE id::text=$1`, id).Scan(&item.ID, &item.ProjectID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, service.ErrNotFound
+	}
+	return &item, err
+}
+
 func (r DataAssetRepository) ListDataFolders(ctx context.Context, projectID string) ([]query.DataFolderItem, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT
@@ -382,6 +391,34 @@ func (r DataAssetRepository) UpdateHandoverDataItems(ctx context.Context, input 
 	}
 	defer tx.Rollback()
 
+	var status, projectID, memberID string
+	if err := tx.QueryRowContext(ctx, `SELECT status::text, COALESCE(project_id::text, ''), target_user_id::text FROM graduation_handovers WHERE id::text=$1 FOR UPDATE`, input.HandoverID).Scan(&status, &projectID, &memberID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, service.ErrNotFound
+		}
+		return nil, err
+	}
+	if status != "generated" {
+		return nil, fmt.Errorf("%w: only generated handovers can be edited", service.ErrValidation)
+	}
+	seen := map[string]bool{}
+	for _, item := range input.Items {
+		if item.DataAssetID == "" || seen[item.DataAssetID] {
+			return nil, service.ErrValidation
+		}
+		seen[item.DataAssetID] = true
+		var assetProject, creator string
+		if err := tx.QueryRowContext(ctx, `SELECT project_id::text, created_by::text FROM data_assets WHERE id::text=$1 AND is_deleted=false FOR SHARE`, item.DataAssetID).Scan(&assetProject, &creator); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, service.ErrValidation
+			}
+			return nil, err
+		}
+		if (projectID != "" && assetProject != projectID) || (projectID == "" && creator != memberID) {
+			return nil, service.ErrValidation
+		}
+	}
+
 	if _, err := tx.ExecContext(ctx,
 		`DELETE FROM graduation_handover_data_items WHERE handover_id::text = $1`,
 		input.HandoverID,
@@ -396,6 +433,10 @@ func (r DataAssetRepository) UpdateHandoverDataItems(ctx context.Context, input 
 		`, newID(), input.HandoverID, item.DataAssetID, item.Selected, nullString(item.Note)); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := insertAuditEvent(ctx, tx, "", "", "admin_update", input.ActorID, map[string]any{"handover_id": input.HandoverID, "data_item_count": len(input.Items)}); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Commit(); err != nil {

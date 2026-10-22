@@ -2,11 +2,9 @@
 #
 # 本地容器联调烟测。
 #
-# 注意：本脚本会往 BACKEND_BASE_URL 指向的数据库**写入一次性数据**——smoke 文档
-# 版本、"请用一句话确认 smoke 已打通" 会话、`@digidocs.test` 注册账号、邀请链接。
-# 默认地址 127.0.0.1:18081 就是演示环境，因此每跑一次都会污染演示库；客户演示前
-# 请执行 `make clean-demo-data-apply` 清理。根治办法是把 smoke 指向独立数据库
-# （见 TASKS.md「售卖前审阅遗留项」）。
+# 默认目标为独立烟测后端 127.0.0.1:18083，脚本先验证 APP_ENV=smoke。
+# 会创建临时业务数据；非烟测目标必须显式 ALLOW_SMOKE_ON_SHARED=1。
+# NAS 写入预检仅在 RUN_SYNOLOGY_PREFLIGHT=1 时执行，不从生产 .env 自动推断。
 #
 set -euo pipefail
 
@@ -426,7 +424,9 @@ else
   echo "[SKIP] backend not reachable, skipping business endpoint smoke"
 fi
 
-if is_truthy "${RUN_SYNOLOGY_PREFLIGHT:-0}" || [[ "${STORAGE_BACKEND:-}" == "synology" ]]; then
+# NAS preflight writes temporary files: it must be explicitly requested.
+# The local .env may describe production even when the target is the smoke stack.
+if is_truthy "${RUN_SYNOLOGY_PREFLIGHT:-0}"; then
   echo '== synology preflight =='
   synology_scheme="http"
   synology_port="${SYNOLOGY_PORT:-5000}"

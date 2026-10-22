@@ -622,7 +622,7 @@ func TestAssistant_DocumentSummarize_PersistsSuggestionAfterWorkerCallback(t *te
 
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, authedRequest("POST", "/api/v1/assistant/documents/doc-1/summarize", jsonBody(map[string]string{
-		"version_id": "ver-1",
+		"skill_name": "document_summary",
 	}), token))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("queue status = %d, want 200; body = %s", rec.Code, rec.Body.String())

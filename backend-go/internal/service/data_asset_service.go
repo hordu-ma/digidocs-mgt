@@ -42,9 +42,12 @@ func NewDataAssetService(
 
 // ─────────────────────────── folders ────────────────────────────
 
-func (s DataAssetService) ListDataFolders(ctx context.Context, projectID string) ([]query.DataFolderItem, error) {
+func (s DataAssetService) ListDataFolders(ctx context.Context, projectID, actorID, actorRole string) ([]query.DataFolderItem, error) {
 	if projectID == "" {
 		return nil, fmt.Errorf("%w: project_id is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureViewProject(ctx, actorID, actorRole, projectID); err != nil {
+		return nil, err
 	}
 	return s.reader.ListDataFolders(ctx, projectID)
 }
@@ -69,8 +72,13 @@ func (s DataAssetService) DeleteDataFolder(ctx context.Context, id string, actor
 	if id == "" {
 		return fmt.Errorf("%w: id is required", ErrValidation)
 	}
-	// Folder deletion requires project-level contributor access; reuse asset manage permission via folder's project.
-	// The writer validates emptiness before deleting.
+	folder, err := s.reader.GetDataFolder(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := s.permissions.EnsureUploadDataAsset(ctx, actorID, actorRole, folder.ProjectID); err != nil {
+		return err
+	}
 	return s.writer.DeleteDataFolder(ctx, id)
 }
 
@@ -175,9 +183,12 @@ func (s DataAssetService) DownloadDataAsset(ctx context.Context, id string, acto
 
 // ─────────────────────── handover data items ─────────────────────
 
-func (s DataAssetService) ListHandoverDataItems(ctx context.Context, handoverID string) ([]query.HandoverDataLine, error) {
+func (s DataAssetService) ListHandoverDataItems(ctx context.Context, handoverID, actorID, actorRole string) ([]query.HandoverDataLine, error) {
 	if handoverID == "" {
 		return nil, fmt.Errorf("%w: handover_id is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureViewHandover(ctx, actorID, actorRole, handoverID); err != nil {
+		return nil, err
 	}
 	return s.reader.ListHandoverDataItems(ctx, handoverID)
 }
@@ -185,6 +196,9 @@ func (s DataAssetService) ListHandoverDataItems(ctx context.Context, handoverID 
 func (s DataAssetService) UpdateHandoverDataItems(ctx context.Context, input command.HandoverDataItemUpdateInput) (map[string]any, error) {
 	if input.HandoverID == "" {
 		return nil, fmt.Errorf("%w: handover_id is required", ErrValidation)
+	}
+	if err := s.permissions.EnsureUpdateHandoverItems(ctx, input.ActorID, input.ActorRole, input.HandoverID); err != nil {
+		return nil, err
 	}
 	return s.writer.UpdateHandoverDataItems(ctx, input)
 }

@@ -65,6 +65,17 @@ func (r *DataAssetRepository) nextID() string {
 
 // ─────────────────────────── folders ────────────────────────────
 
+func (r *DataAssetRepository) GetDataFolder(_ context.Context, id string) (*query.DataFolderItem, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, f := range r.folders {
+		if f.id == id {
+			return &query.DataFolderItem{ID: f.id, ProjectID: f.projectID}, nil
+		}
+	}
+	return nil, service.ErrNotFound
+}
+
 func (r *DataAssetRepository) ListDataFolders(_ context.Context, projectID string) ([]query.DataFolderItem, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

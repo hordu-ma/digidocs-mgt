@@ -10,6 +10,7 @@ import (
 	"digidocs-mgt/backend-go/internal/bootstrap"
 	"digidocs-mgt/backend-go/internal/config"
 	"digidocs-mgt/backend-go/internal/domain/auth"
+	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 	noopqueue "digidocs-mgt/backend-go/internal/queue/noop"
 	"digidocs-mgt/backend-go/internal/repository/memory"
@@ -172,10 +173,13 @@ func lockedDownServer(t *testing.T) (http.Handler, *scopeSpy, string) {
 	docRepo := memory.NewDocumentRepository()
 	versionWorkflow := memory.NewVersionWorkflow(storageProvider)
 	dataAssetRepo := memory.NewDataAssetRepository()
+	if _, err := dataAssetRepo.CreateDataFolder(context.Background(), command.DataFolderCreateInput{ProjectID: "foreign-project", Name: "private"}); err != nil {
+		t.Fatal(err)
+	}
 	codeRepo := memory.NewCodeRepositoryRepository()
 
 	container.DocumentService = service.NewDocumentService(docRepo, docRepo, nil, versionWorkflow, permissions)
-	container.AssistantService = service.NewAssistantService(noopqueue.NewPublisher(), memory.NewAssistantRepository(), docRepo, permissions)
+	container.AssistantService = service.NewAssistantService(noopqueue.NewPublisher(), memory.NewAssistantRepository(), docRepo, memory.NewVersionRepository(), permissions)
 	container.VersionService = service.NewVersionService(nil, versionWorkflow, storageProvider, permissions)
 	container.FlowService = service.NewFlowService(memory.NewFlowRepository(), actionRepo, permissions)
 	container.HandoverService = service.NewHandoverService(spy, actionRepo, permissions)
@@ -213,6 +217,8 @@ func TestReadEndpointsDenyNonMember(t *testing.T) {
 		name string
 		path string
 	}{
+		{"data folders", "/api/v1/projects/foreign-project/data-folders"},
+		{"handover data items", "/api/v1/handovers/" + handoverID + "/data-items"},
 		{"document detail", "/api/v1/documents/" + docID},
 		{"version list", "/api/v1/documents/" + docID + "/versions"},
 		{"flow history", "/api/v1/documents/" + docID + "/flows"},
@@ -336,5 +342,19 @@ func TestAggregateEndpointsScopeAdmin(t *testing.T) {
 	}
 	if !spy.dashboardScope.IsAdmin {
 		t.Error("scope.IsAdmin = false for an admin token, want true")
+	}
+}
+
+func TestDataMutationsDenyNonMember(t *testing.T) {
+	handler, _, token := lockedDownServer(t)
+	for _, tc := range []struct{ method, path string }{
+		{"DELETE", "/api/v1/data-folders/mem-da-1"},
+		{"PUT", "/api/v1/handovers/foreign/data-items"},
+	} {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, authedRequest(tc.method, tc.path, jsonBody(map[string]any{"items": []any{}}), token))
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("%s %s = %d: %s", tc.method, tc.path, rec.Code, rec.Body.String())
+		}
 	}
 }

@@ -187,11 +187,11 @@ func TestAssistantRepositoryFailedAndExtractedTextPaths(t *testing.T) {
 	if err := repo.CompleteAssistantRequest(ctx, task.Result{
 		RequestID: "extract-1",
 		Status:    "completed",
-		Output:    map[string]any{"extracted_text": "正文"},
+		Output:    map[string]any{"extracted_text": "正文", "version_id": "v-1"},
 	}); err != nil {
 		t.Fatalf("complete extract request: %v", err)
 	}
-	text, err := repo.GetLatestDocumentExtractedText(ctx, "doc-1")
+	text, err := repo.GetDocumentVersionExtractedText(ctx, "doc-1", "v-1")
 	if err != nil || text != "正文" {
 		t.Fatalf("latest text = (%q, %v)", text, err)
 	}

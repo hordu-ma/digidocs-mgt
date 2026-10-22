@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DocumentTransferDialog from "@/components/DocumentTransferDialog.vue";
 import {
   ArrowLeft,
   Clock,
@@ -761,34 +762,7 @@ onBeforeUnmount(() => {
       </template>
     </ElDialog>
 
-    <ElDialog v-model="showTransferDialog" title="转交文档" width="420px">
-      <ElForm label-position="top">
-        <ElFormItem label="接收人" required>
-          <ElSelect
-            v-model="transferForm.to_user_id"
-            filterable
-            placeholder="选择接收人"
-          >
-            <ElOption
-              v-for="item in selectableUsers"
-              :key="item.id"
-              :label="`${item.display_name} (${item.role})`"
-              :value="item.id"
-            />
-          </ElSelect>
-        </ElFormItem>
-      </ElForm>
-      <template #footer>
-        <ElButton @click="showTransferDialog = false">取消</ElButton>
-        <ElButton
-          type="primary"
-          :loading="transferLoading"
-          @click="submitTransfer"
-        >
-          确认转交
-        </ElButton>
-      </template>
-    </ElDialog>
+    <DocumentTransferDialog v-model="showTransferDialog" v-model:form="transferForm" :selectable-users="selectableUsers" :transfer-loading="transferLoading" @submit="submitTransfer" />
   </AppLayout>
 </template>
 

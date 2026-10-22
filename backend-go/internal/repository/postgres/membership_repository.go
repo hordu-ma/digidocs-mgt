@@ -27,22 +27,68 @@ func (r MembershipRepository) AddProjectMember(ctx context.Context, projectID, u
 	return r.admin.AddProjectMember(ctx, projectID, userID, projectRole)
 }
 
-func (r MembershipRepository) UpdateProjectMember(ctx context.Context, memberID, projectRole string) (*query.ProjectMemberItem, error) {
-	return r.admin.UpdateProjectMember(ctx, memberID, projectRole)
+// Serialize owner changes per project; membership IDs are never accepted without a parent.
+func (r MembershipRepository) changeMember(ctx context.Context, projectID, memberID, role string, remove bool) (*query.ProjectMemberItem, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	var lockedID string
+	if err = tx.QueryRowContext(ctx, `SELECT id::text FROM projects WHERE id::text=$1 FOR UPDATE`, projectID).Scan(&lockedID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, service.ErrNotFound
+		}
+		return nil, err
+	}
+	var item query.ProjectMemberItem
+	if err = tx.QueryRowContext(ctx, `SELECT pm.id::text, pm.user_id::text, pm.project_role, u.display_name, COALESCE(u.username, '') FROM project_members pm JOIN users u ON u.id=pm.user_id WHERE pm.project_id::text=$1 AND pm.id::text=$2 FOR UPDATE OF pm`, projectID, memberID).Scan(&item.ID, &item.UserID, &item.ProjectRole, &item.DisplayName, &item.Username); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, service.ErrNotFound
+		}
+		return nil, err
+	}
+	if item.ProjectRole == "owner" && (remove || role != "owner") {
+		var owners int
+		if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM project_members WHERE project_id::text=$1 AND project_role='owner'`, projectID).Scan(&owners); err != nil {
+			return nil, err
+		}
+		if owners <= 1 {
+			return nil, service.ErrValidation
+		}
+	}
+	if remove {
+		_, err = tx.ExecContext(ctx, `DELETE FROM project_members WHERE project_id::text=$1 AND id::text=$2`, projectID, memberID)
+	} else {
+		_, err = tx.ExecContext(ctx, `UPDATE project_members SET project_role=$3, updated_at=NOW() WHERE project_id::text=$1 AND id::text=$2`, projectID, memberID, role)
+		item.ProjectRole = role
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	return &item, nil
 }
 
-func (r MembershipRepository) RemoveProjectMember(ctx context.Context, memberID string) error {
-	return r.admin.RemoveProjectMember(ctx, memberID)
+func (r MembershipRepository) UpdateProjectMember(ctx context.Context, projectID, memberID, projectRole string) (*query.ProjectMemberItem, error) {
+	return r.changeMember(ctx, projectID, memberID, projectRole, false)
 }
 
-func (r MembershipRepository) GetProjectMember(ctx context.Context, memberID string) (*query.ProjectMemberItem, error) {
+func (r MembershipRepository) RemoveProjectMember(ctx context.Context, projectID, memberID string) error {
+	_, err := r.changeMember(ctx, projectID, memberID, "", true)
+	return err
+}
+
+func (r MembershipRepository) GetProjectMember(ctx context.Context, projectID, memberID string) (*query.ProjectMemberItem, error) {
 	var item query.ProjectMemberItem
 	err := r.db.QueryRowContext(ctx, `
 		SELECT pm.id::text, pm.user_id::text, u.display_name, COALESCE(u.username, ''), pm.project_role
 		FROM project_members pm
 		JOIN users u ON u.id = pm.user_id
-		WHERE pm.id = $1
-	`, memberID).Scan(&item.ID, &item.UserID, &item.DisplayName, &item.Username, &item.ProjectRole)
+		WHERE pm.id::text = $1 AND pm.project_id::text = $2
+	`, memberID, projectID).Scan(&item.ID, &item.UserID, &item.DisplayName, &item.Username, &item.ProjectRole)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, service.ErrNotFound
 	}

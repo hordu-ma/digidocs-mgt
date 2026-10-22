@@ -6,6 +6,8 @@
 
 ## 已完成
 
+- 2026-10-22 审查整改：8 类问题与本轮优化已修复并部署验证；新增数据库权限/版本隔离、Worker 和前端交互回归。部署验收见 [整改交付记录](docs/review-fixes-20261022.md)。
+
 - 完成**备份服务恢复与可靠性加固**（2026-10-08）：NAS Tailscale 身份由用户恢复；Synology 客户端错误统一去除 URL 查询串及用户信息，保留底层错误类型；`backup-sync upload/verify` 下载校验大小及 SHA-256；`backup.sh` 增加锁、原子发布、目的地/摘要确认标记、历史补传与同步失败暂停清理，后端停止/配置缺失不再静默成功。已部署新后端，30 份历史文件验证通过（8 份重新上传），新增备份服务执行成功；最新备份隔离恢复 23 表 / 259 行，逐表内容摘要及序列与源库一致。Go 全量测试及备份 7 项故障回归通过。证据与回滚见 `docs/backup-repair-20261008.md`。
 
 - 完成**全局优化审阅第三批：DocumentsView 分页修正 + Worker 并发/OCR 上限改造**（2026-08-19）
@@ -747,11 +749,11 @@
 
 ### 前端架构与可维护性（P2）
 
-- [ ] **拆分巨型视图组件** — 5 个 view 超 1000 行：`HandoversView`(1296)、`DataView`(1140)、`DocumentDetailView`(1131)、`AssistantView`(1083)、`DocumentsView`(1000)。按"对话框 / 表格 / 表单"拆子组件，数据请求抽 `composables/`（如 `useHandovers()`）。
+- [x] **拆分巨型视图组件（首轮）** — 2026-10-22 从五个页面提取 DocumentCreateDialog、DocumentTransferDialog、HandoverCreateDialog、DataFolderDialog、AssistantComposer，并抽取 useUploadFile；后续随功能维护继续细分。
 - [ ] **消除 `any`** — 全前端 48 处 `: any` / `as any`，结合已建的 `src/types` 逐步替换为具体类型（接口响应类型尤其值得补全）。
-- [ ] **前端组件级测试缺失** — 目前仅 `stores/auth`、`router` 有测试。为关键交互（登录、文档上传、流转动作、交接编辑）补 Vitest + Testing Library 组件测试。
+- [x] **前端组件级测试** — 2026-10-22 增加创建文档、转交、交接提交、助手防重复发送和文件大小边界测试，复用 Vue 原生挂载，不新增依赖。
 - [ ] **统一时间格式化** — 各 view 的 `formatTime/formatDate` 文案与精度不一（"-"/"暂无更新时间"/"尚未推送"…）。在 `utils/format.ts` 提供带 `fallback` 与精度参数的统一函数，按需迁移（保留各处文案语义）。2026-08-17 复核补充：共 5 套实现，另有 `MembersView.vue` 直接裸调 `new Date(...).toLocaleString("zh-CN")`（输出 `2026/8/24 15:20:16`），与 DashboardView 的 `04/17 21:25`（无年份，跨年歧义）、CodeView 的 `2026-04-19 05:04` 并存。
-- [ ] **「工作流在线」是硬编码假状态** — `AppLayout.vue` 顶栏那枚绿色徽标是写死文案，不对应任何健康检查。演示时被追问「这个在线状态怎么算的」会很难看。要么接 `/healthz` + worker 心跳做成真状态，要么删掉。
+- [x] **移除硬编码在线状态** — 2026-10-22 已移除，避免误导用户。
 - [ ] **空值渲染口径不统一** — 同屏并存 `-`（更新时间）、`未挂接目录`、`暂无文档描述`，交接页还有 `时间待同步`；成员页对自助注册用户的「账号」列显示 `-`，负责人无法辨认「入组验证」到底是谁，应显示脱敏手机号/邮箱。建议随上面的 `format.ts` 收口一起统一成「暂无 XXX」句式。
 - [ ] **版本历史无分页/折叠** — 25 条已占满一屏且只会增长，建议默认展示最近 5 条 + 「展开全部」。
 - [ ] **登录/注册页缺品牌元素** — 大面积留白，无 logo、无版权与备案位；作为对外第一屏偏简陋。
@@ -764,10 +766,10 @@
 
 ### 测试与质量门禁（P2）
 
-> 2026-08-17 复核：**建议把「CI 流水线」上调为 P1**。P0-1 那种「新增读接口忘记挂权限」正是回归测试该拦住的问题，而当时既没有 CI 也没有对应断言。
+> 2026-10-22 复核：CI 已存在，权限回归与真实 PostgreSQL 集成检查已补入；历史“没有 CI”的描述不再代表当前状态。
 
-- [ ] **引入临时 PostgreSQL/testcontainer** — 覆盖真实迁移 schema 与复杂 SQL 写链（事务/action workflow），替代部分 sqlmock。
-- [ ] **CI 流水线** — 将 `make verify`（含三端）接入 `.github/workflows`，PR 自动跑；前端测试需固定 Node 版本（避免 Node 24 实验性 localStorage 覆盖 jsdom 的问题）。
+- [x] **临时 PostgreSQL 集成测试** — 已有 postgres-integration.sh；2026-10-22 增加真实权限、状态、审计和版本隔离回归，并纳入 CI。
+- [x] **CI 流水线** — 仓库已有 verify.yml；2026-10-22 保留三端 make verify 并补真实 PostgreSQL 集成步骤，Node 固定 24。
 
 ### 安全（P2）
 
@@ -778,8 +780,8 @@
 
 ### 性能（P3）
 
-- [ ] **Vite 进一步分包/瘦身** — element-plus 单 chunk 896KB，评估按需路由级懒加载或更细粒度 manualChunks；确认 icon 按需引入。
-- [ ] **前端请求瀑布排查** — 已优化 CodeView；排查其余 view 的 `onMounted` 是否仍有可并行化的串行请求（如 DataView 的 `loadAllProjects` 团队空间循环）。
+- [x] **Vite 分包/瘦身** — 2026-10-22 移除全量 Element Plus CSS 与强制整包 vendor，采用按需样式和自动分包；保留命令式消息/弹窗样式。
+- [x] **数据页请求瀑布优化** — 2026-10-22 团队空间项目查询改 Promise.all，并与资产列表并行，补加载失败提示。
 
 ### 运维/部署（P3）
 

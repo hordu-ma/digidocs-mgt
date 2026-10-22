@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DataFolderDialog from "@/components/DataFolderDialog.vue";
 import {
   Delete,
   Download,
@@ -10,6 +11,7 @@ import {
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 
+import { useUploadFile, DATA_FILE_MAX_BYTES, DATA_FILE_LIMIT_LABEL } from "@/composables/useUploadFile";
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
 import { useAuthStore } from "@/stores/auth";
@@ -166,12 +168,10 @@ async function loadProjects(teamSpaceID: string) {
 }
 
 async function loadAllProjects() {
-  let all: ProjectOption[] = [];
-  for (const ts of teamSpaces.value) {
-    const res = await api.get("/projects", { params: { team_space_id: ts.id } });
-    all = all.concat(res.data?.data ?? []);
-  }
-  allProjects.value = all;
+  const responses = await Promise.all(teamSpaces.value.map((space) =>
+    api.get("/projects", { params: { team_space_id: space.id } }),
+  ));
+  allProjects.value = responses.flatMap((response) => response.data?.data ?? []);
 }
 
 // ─────────────────────────── upload ──────────────────────────────
@@ -186,7 +186,7 @@ const uploadForm = reactive({
   display_name: "",
   description: "",
 });
-const uploadFile = ref<File | null>(null);
+const { file: uploadFile, selectFile } = useUploadFile((message) => ElMessage.warning(message));
 const uploadFolderOptions = ref<FolderItem[]>([]);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const isDragging = ref(false);
@@ -198,7 +198,7 @@ const FILE_NAME_HINT = "建议使用：字母、数字、中文、下划线、�
 function onFileChange(e: Event) {
   const input = e.target as HTMLInputElement;
   if (input.files?.[0]) {
-    uploadFile.value = input.files[0];
+    if (!selectFile(input.files[0])) { input.value = ""; return; }
     if (!uploadForm.display_name) {
       uploadForm.display_name = input.files[0].name;
     }
@@ -228,7 +228,7 @@ function onDrop(e: DragEvent) {
   isDragging.value = false;
   const file = e.dataTransfer?.files?.[0];
   if (file) {
-    uploadFile.value = file;
+    if (!selectFile(file)) return;
     if (!uploadForm.display_name) uploadForm.display_name = file.name;
   }
 }
@@ -283,6 +283,10 @@ async function submitUpload() {
     return;
   }
 
+  if (uploadFile.value.size > DATA_FILE_MAX_BYTES) {
+    ElMessage.warning(`单文件不能超过 ${DATA_FILE_LIMIT_LABEL}`);
+    return;
+  }
   const token = localStorage.getItem("access_token");
   const formData = new FormData();
   formData.append("file", uploadFile.value);
@@ -477,9 +481,12 @@ const assetTypeOptions = [
 // ─────────────────────────── lifecycle ───────────────────────────
 
 onMounted(async () => {
-  await fetchReference();
-  await loadAllProjects();
-  fetchAssets();
+  try {
+    await fetchReference();
+    await Promise.all([loadAllProjects(), fetchAssets()]);
+  } catch (error) {
+    ElMessage.error(extractError(error, "加载课题失败，请刷新重试"));
+  }
 });
 </script>
 
@@ -710,7 +717,7 @@ onMounted(async () => {
                 <div class="dz-body">
                   <div class="dz-icon-wrap"><ElIcon size="28"><Upload /></ElIcon></div>
                   <p class="dz-hint">将文件拖拽到此处，或 <span class="dz-link">点击选择文件</span></p>
-                  <p class="dz-sub">支持所有格式，单文件最大 10 GB</p>
+                  <p class="dz-sub">支持所有格式，单文件最大 {{ DATA_FILE_LIMIT_LABEL }}</p>
                 </div>
               </template>
             </div>
@@ -726,28 +733,7 @@ onMounted(async () => {
       </ElDialog>
 
       <!-- New Folder Dialog -->
-      <ElDialog v-model="showFolderDialog" title="新建文件夹" width="420px">
-        <ElForm label-position="top">
-          <ElFormItem label="课题" required>
-            <ElSelect v-model="newFolderForm.project_id" @change="onFolderProjectChange" style="width:100%">
-              <ElOption v-for="p in folderProjects" :key="p.id" :label="p.name" :value="p.id" />
-            </ElSelect>
-          </ElFormItem>
-          <ElFormItem label="父文件夹">
-            <ElSelect v-model="newFolderForm.parent_id" clearable style="width:100%" placeholder="顶层文件夹">
-              <ElOption v-for="f in folderParentOptions" :key="f.id" :label="f.name" :value="f.id" />
-            </ElSelect>
-            <p class="field-hint">最多 2 层，选择父文件夹后可创建子文件夹</p>
-          </ElFormItem>
-          <ElFormItem label="名称" required>
-            <ElInput v-model="newFolderForm.name" placeholder="文件夹名称" maxlength="128" />
-          </ElFormItem>
-        </ElForm>
-        <template #footer>
-          <ElButton @click="showFolderDialog = false">取消</ElButton>
-          <ElButton type="primary" @click="submitNewFolder">创建</ElButton>
-        </template>
-      </ElDialog>
+      <DataFolderDialog v-model="showFolderDialog" v-model:form="newFolderForm" :folder-projects="folderProjects" :folder-parent-options="folderParentOptions" @project-change="onFolderProjectChange" @submit="submitNewFolder" />
     </div>
   </AppLayout>
 </template>

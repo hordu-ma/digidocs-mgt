@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -27,10 +26,15 @@ func (s AssistantService) normalizeScope(
 		return assistantScope{}, fmt.Errorf("%w: scope is required", ErrValidation)
 	}
 
-	if documentID != "" && projectID == "" && s.documents != nil {
-		if document, err := s.documents.GetDocument(ctx, documentID); err == nil {
-			projectID = documentProjectID(document)
+	if documentID != "" && s.documents != nil {
+		document, err := s.documents.GetDocument(ctx, documentID)
+		if err != nil {
+			return assistantScope{}, err
 		}
+		if projectID != "" && projectID != document.ProjectID {
+			return assistantScope{}, fmt.Errorf("%w: document project mismatch", ErrValidation)
+		}
+		projectID = document.ProjectID
 	}
 
 	sourceScope := map[string]any{}
@@ -299,22 +303,6 @@ func buildConversationTitle(question string) string {
 		return trimmed
 	}
 	return string(runes[:24]) + "..."
-}
-
-func documentProjectID(document *query.DocumentDetail) string {
-	if document == nil {
-		return ""
-	}
-	// DocumentDetail 当前未暴露 project_id，保留此扩展位，避免后续 scope 组装散落修改。
-	raw, err := json.Marshal(document)
-	if err != nil {
-		return ""
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(raw, &payload); err != nil {
-		return ""
-	}
-	return strings.TrimSpace(stringValue(payload["project_id"]))
 }
 
 func clonePayload(payload map[string]any) map[string]any {

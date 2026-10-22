@@ -75,7 +75,22 @@ func (h InternalAssistantContextHandler) GetDocumentContext(w http.ResponseWrite
 		return
 	}
 
-	extractedText, err := h.assistant.GetLatestDocumentExtractedText(r.Context(), documentID)
+	versionID := r.URL.Query().Get("version_id")
+	if versionID == "" {
+		versionID = document.CurrentVersionID
+	}
+	if versionID != "" {
+		version, err := h.versions.Get(r.Context(), versionID, "", "admin")
+		if err != nil {
+			writeServiceError(w, err, "version not found", "failed to load version")
+			return
+		}
+		if version.DocumentID != documentID {
+			response.WriteError(w, http.StatusBadRequest, "validation_error", "version does not belong to document")
+			return
+		}
+	}
+	extractedText, err := h.assistant.GetDocumentVersionExtractedText(r.Context(), documentID, versionID)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to load extracted text context")
 		return
@@ -84,11 +99,14 @@ func (h InternalAssistantContextHandler) GetDocumentContext(w http.ResponseWrite
 	response.WriteData(w, http.StatusOK, map[string]any{
 		"scope": map[string]any{
 			"document_id": documentID,
+			"project_id":  document.ProjectID,
 		},
-		"document":       document,
-		"versions":       versions,
-		"flows":          flows,
-		"extracted_text": extractedText,
+		"document":                  document,
+		"versions":                  versions,
+		"flows":                     flows,
+		"extracted_text":            extractedText,
+		"version_id":                versionID,
+		"extracted_text_version_id": versionID,
 	})
 }
 

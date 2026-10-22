@@ -13,7 +13,7 @@ func TestAssistantServiceAskCreatesConversationQueuesTaskAndMemory(t *testing.T)
 	ctx := context.Background()
 	repo := newFakeAssistantRepo()
 	publisher := &fakePublisher{}
-	svc := NewAssistantService(publisher, repo, nil, PermissionService{})
+	svc := NewAssistantService(publisher, repo, nil, nil, PermissionService{})
 
 	// Seed historical memory in another conversation with the same project scope.
 	oldConv, _ := repo.CreateConversation(ctx, "project", "project-1", map[string]any{"project_id": "project-1"}, "old", "actor-1")
@@ -65,7 +65,7 @@ func TestAssistantServiceAskExistingConversationAndErrors(t *testing.T) {
 	ctx := context.Background()
 	repo := newFakeAssistantRepo()
 	publisher := &fakePublisher{}
-	svc := NewAssistantService(publisher, repo, nil, PermissionService{})
+	svc := NewAssistantService(publisher, repo, nil, nil, PermissionService{})
 
 	if _, err := svc.Ask(ctx, map[string]any{"question": " "}, "actor", "member"); !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected question validation error, got %v", err)
@@ -104,7 +104,7 @@ func TestAssistantServiceDelegatesRepositoryMethods(t *testing.T) {
 	ctx := context.Background()
 	repo := newFakeAssistantRepo()
 	publisher := &fakePublisher{}
-	svc := NewAssistantService(publisher, repo, nil, PermissionService{})
+	svc := NewAssistantService(publisher, repo, nil, nil, PermissionService{})
 
 	conv, err := svc.CreateConversation(ctx, map[string]any{"project_id": "project-1"}, "title", "actor", "member")
 	if err != nil {
@@ -136,7 +136,7 @@ func TestAssistantServiceDelegatesRepositoryMethods(t *testing.T) {
 	if items, total, err := svc.ListRequests(ctx, query.AssistantRequestFilter{}); err != nil || total == 0 || len(items) == 0 {
 		t.Fatalf("list requests = (%+v, %d, %v)", items, total, err)
 	}
-	if text, err := svc.GetLatestDocumentExtractedText(ctx, "doc-1"); err != nil || text != "text" {
+	if text, err := svc.GetDocumentVersionExtractedText(ctx, "doc-1", "v-1"); err != nil || text != "text" {
 		t.Fatalf("latest extracted text = (%q, %v)", text, err)
 	}
 
@@ -178,9 +178,7 @@ func TestAssistantMemoryHelpers(t *testing.T) {
 	if got := mergeScopes(map[string]any{"project_id": "p1"}, map[string]any{"document_id": "d1", "empty": ""}); got["project_id"] != "p1" || got["document_id"] != "d1" {
 		t.Fatalf("merged scope = %+v", got)
 	}
-	if documentProjectID(nil) != "" {
-		t.Fatal("nil document project id should be empty")
-	}
+
 }
 
 type fakePublisher struct {
@@ -369,7 +367,7 @@ func (r *fakeAssistantRepo) GetAssistantRequest(_ context.Context, requestID str
 	return &item, nil
 }
 
-func (r *fakeAssistantRepo) GetLatestDocumentExtractedText(_ context.Context, documentID string) (string, error) {
+func (r *fakeAssistantRepo) GetDocumentVersionExtractedText(_ context.Context, documentID, versionID string) (string, error) {
 	for _, item := range r.requests {
 		if item.RelatedType == "document" && item.RelatedID == documentID {
 			if text := stringValue(item.Output["extracted_text"]); text != "" {
@@ -420,4 +418,40 @@ func (r *fakeAssistantRepo) DismissSuggestion(_ context.Context, suggestionID st
 func memorySourcesFromPayload(payload map[string]any) []map[string]any {
 	raw, _ := payload["memory_sources"].([]map[string]any)
 	return raw
+}
+
+type conversationDenyPermission struct{ mockPermissionReader }
+
+func (conversationDenyPermission) CanViewConversation(context.Context, string, string, string) (bool, error) {
+	return false, nil
+}
+
+func TestAssistantAskRejectsOtherUsersConversationBeforeReadingHistory(t *testing.T) {
+	publisher := &fakePublisher{}
+	svc := NewAssistantService(publisher, newFakeAssistantRepo(), nil, nil, NewPermissionService(conversationDenyPermission{mockPermissionReader{ok: true}}))
+	_, err := svc.Ask(context.Background(), map[string]any{"question": "q", "conversation_id": "other-user", "project_id": "shared"}, "actor", "member")
+	if !errors.Is(err, ErrForbidden) || len(publisher.messages) != 0 {
+		t.Fatalf("err=%v messages=%v", err, publisher.messages)
+	}
+}
+
+func TestSummaryValidatesVersionAndStripsExtraScope(t *testing.T) {
+	publisher := &fakePublisher{}
+	versions := &mockVersionReader{item: &query.VersionDetail{ID: "v-1", DocumentID: "foreign"}}
+	svc := NewAssistantService(publisher, newFakeAssistantRepo(), nil, versions, NewPermissionService(mockPermissionReader{ok: true}))
+	payload := map[string]any{"version_id": "v-1", "project_id": "foreign", "document_id": "foreign", "scope": map[string]any{"project_id": "foreign"}, "skill_name": "document_summary"}
+	if _, err := svc.SummarizeDocument(context.Background(), "mine", payload, "actor", "member"); !errors.Is(err, ErrValidation) {
+		t.Fatalf("foreign version: %v", err)
+	}
+	if len(publisher.messages) != 0 {
+		t.Fatal("unauthorized task queued")
+	}
+	versions.item.DocumentID = "mine"
+	message, err := svc.SummarizeDocument(context.Background(), "mine", payload, "actor", "member")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(message.Payload) != 2 || message.Payload["version_id"] != "v-1" {
+		t.Fatalf("payload=%v", message.Payload)
+	}
 }

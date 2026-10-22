@@ -77,7 +77,7 @@ def test_handle_document_summarize_returns_completed(monkeypatch: MonkeyPatch) -
     monkeypatch.setattr(
         dispatcher.context_client,
         "get_document_context",
-        lambda document_id: {"available": True, "scope": {"document_id": document_id}},
+        lambda document_id, version_id="": {"available": True, "scope": {"document_id": document_id}, "version_id": version_id},
     )
     monkeypatch.setattr(
         dispatcher.context_client,
@@ -126,6 +126,7 @@ def test_handle_document_summarize_returns_completed(monkeypatch: MonkeyPatch) -
 
 def test_handle_generate_suggestion_openclaw_error(monkeypatch: MonkeyPatch) -> None:
     dispatcher = WorkerDispatcher()
+    monkeypatch.setattr(dispatcher.context_client, "get_document_context", lambda doc, version_id="": {"version_id": version_id, "scope": {"document_id": doc}})
 
     monkeypatch.setattr(
         dispatcher.skill_adapter,
@@ -149,6 +150,7 @@ def test_handle_generate_suggestion_openclaw_error(monkeypatch: MonkeyPatch) -> 
 
 def test_handle_document_extract_text_task(monkeypatch: MonkeyPatch) -> None:
     dispatcher = WorkerDispatcher()
+    monkeypatch.setattr(dispatcher.context_client, "get_document_context", lambda doc, version_id="": {"version_id": version_id, "scope": {"document_id": doc}})
 
     monkeypatch.setattr(
         dispatcher.context_client,
@@ -213,6 +215,7 @@ def test_resolve_document_text_falls_back_to_latest_context_version(monkeypatch:
 
 def test_document_extract_text_reports_empty_extraction(monkeypatch: MonkeyPatch) -> None:
     dispatcher = WorkerDispatcher()
+    monkeypatch.setattr(dispatcher.context_client, "get_document_context", lambda doc, version_id="": {"version_id": version_id, "scope": {"document_id": doc}})
     monkeypatch.setattr(
         dispatcher.context_client,
         "download_version_file",
@@ -240,7 +243,7 @@ def test_assistant_ask_inline_extraction_updates_context(monkeypatch: MonkeyPatc
     monkeypatch.setattr(
         dispatcher.context_client,
         "get_document_context",
-        lambda document_id: {
+        lambda document_id, version_id="": {
             "scope": {"document_id": document_id},
             "extracted_text": "",
             "versions": [{"id": "ver-1", "version_no": 1}],

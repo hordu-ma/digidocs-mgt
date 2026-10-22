@@ -79,11 +79,11 @@ func (r *MembershipRepository) AddProjectMember(_ context.Context, projectID, us
 	return &item, nil
 }
 
-func (r *MembershipRepository) UpdateProjectMember(_ context.Context, memberID, projectRole string) (*query.ProjectMemberItem, error) {
+func (r *MembershipRepository) UpdateProjectMember(_ context.Context, projectID, memberID, projectRole string) (*query.ProjectMemberItem, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for i, m := range r.members {
-		if m.ID == memberID {
+		if m.ID == memberID && m.ProjectID == projectID {
 			r.members[i].ProjectRole = projectRole
 			item := r.members[i].ProjectMemberItem
 			return &item, nil
@@ -92,11 +92,11 @@ func (r *MembershipRepository) UpdateProjectMember(_ context.Context, memberID, 
 	return nil, service.ErrNotFound
 }
 
-func (r *MembershipRepository) RemoveProjectMember(_ context.Context, memberID string) error {
+func (r *MembershipRepository) RemoveProjectMember(_ context.Context, projectID, memberID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for i, m := range r.members {
-		if m.ID == memberID {
+		if m.ID == memberID && m.ProjectID == projectID {
 			r.members = append(r.members[:i], r.members[i+1:]...)
 			return nil
 		}
@@ -104,11 +104,11 @@ func (r *MembershipRepository) RemoveProjectMember(_ context.Context, memberID s
 	return service.ErrNotFound
 }
 
-func (r *MembershipRepository) GetProjectMember(_ context.Context, memberID string) (*query.ProjectMemberItem, error) {
+func (r *MembershipRepository) GetProjectMember(_ context.Context, projectID, memberID string) (*query.ProjectMemberItem, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	for _, m := range r.members {
-		if m.ID == memberID {
+		if m.ID == memberID && m.ProjectID == projectID {
 			item := m.ProjectMemberItem
 			return &item, nil
 		}
