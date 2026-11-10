@@ -16,6 +16,12 @@ import { useRoute } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+import {
+  documentStatusClass,
+  documentStatusLabel,
+  handoverStatusClass as statusClass,
+  handoverStatusLabel as statusLabel,
+} from "@/utils/labels";
 import { extractError } from "@/utils/error";
 import { useAuthStore } from "@/stores/auth";
 import { formatFileSize } from "@/utils/format";
@@ -98,37 +104,9 @@ const form = reactive({
   remark: "",
 });
 
-const statusLabel: Record<string, string> = {
-  generated: "已生成",
-  pending_confirm: "待确认",
-  completed: "已完成",
-  cancelled: "已取消",
-};
 
-const statusClass: Record<string, string> = {
-  generated: "handover-generated",
-  pending_confirm: "handover-pending",
-  completed: "handover-completed",
-  cancelled: "handover-cancelled",
-};
 
-const documentStatusLabel: Record<string, string> = {
-  draft: "草稿",
-  in_progress: "处理中",
-  pending_handover: "待交接",
-  handed_over: "已交接",
-  finalized: "定稿",
-  archived: "已归档",
-};
 
-const documentStatusClass: Record<string, string> = {
-  draft: "status-draft",
-  in_progress: "status-in-progress",
-  pending_handover: "status-pending-handover",
-  handed_over: "status-handed-over",
-  finalized: "status-finalized",
-  archived: "status-archived",
-};
 
 const canEditItems = computed(() => activeHandover.value?.status === "generated");
 const selectedItemCount = computed(
@@ -358,10 +336,19 @@ async function submitCreate() {
 
   formLoading.value = true;
   try {
-    await api.post("/handovers", form);
-    ElMessage.success("交接单已创建");
+    const res = await api.post("/handovers", form);
+    const created = res.data?.data ?? {};
+    const docs = Number(created.document_item_count ?? 0);
+    const data = Number(created.data_item_count ?? 0);
+    ElMessage.success(
+      docs + data > 0
+        ? `交接单已创建，已自动带入 ${docs} 份文档、${data} 项数据，请核对清单`
+        : "交接单已创建。被交接人名下没有可交接的文档或数据，请手动勾选",
+    );
     showDialog.value = false;
     await fetchHandovers();
+    // Land on the pre-filled checklist: reviewing it is the manager's next step.
+    if (created.id) await openDetail(created.id);
   } catch (err) {
     const msg = extractError(err, "创建失败");
     ElMessage.error(msg);
@@ -501,8 +488,8 @@ watch(() => route.query.id, () => void openFromQuery());
       <div class="page-header">
         <div>
           <div class="page-eyebrow">交接工作台</div>
-          <h1>工作交接</h1>
-          <p>围绕成员离组、资料清单和接收确认推进交接闭环。</p>
+          <h1>成员交接</h1>
+          <p>成员毕业、离组或换题时，把其名下的文档与数据完整移交给接收人。</p>
         </div>
         <ElButton type="primary" @click="openCreate">
           <ElIcon><DocumentAdd /></ElIcon>
@@ -513,7 +500,7 @@ watch(() => route.query.id, () => void openFromQuery());
       <section class="handover-summary page-card">
         <div class="handover-summary-copy">
           <h2 class="section-title">交接任务概览</h2>
-          <p class="section-note">重点关注待确认和刚生成的交接单，避免资料交接断档。</p>
+          <p class="section-note">创建时系统会自动带入被交接人名下的文档与数据，负责人核对清单后交给接收人确认。</p>
         </div>
         <div class="handover-metrics">
           <div class="handover-metric">
@@ -521,11 +508,11 @@ watch(() => route.query.id, () => void openFromQuery());
             <strong>{{ handoverMetrics.total }}</strong>
           </div>
           <div class="handover-metric warning">
-            <span>待确认</span>
+            <span>待负责人完成</span>
             <strong>{{ handoverMetrics.pending }}</strong>
           </div>
           <div class="handover-metric primary">
-            <span>已生成</span>
+            <span>待接收人确认</span>
             <strong>{{ handoverMetrics.generated }}</strong>
           </div>
           <div class="handover-metric success">
@@ -539,8 +526,8 @@ watch(() => route.query.id, () => void openFromQuery());
         <div class="segmented-filters">
           <button class="segment-chip" :class="{ active: quickFilter === 'all' }" type="button" @click="quickFilter = 'all'">全部交接</button>
           <button class="segment-chip" :class="{ active: quickFilter === 'mine' }" type="button" @click="quickFilter = 'mine'">与我相关</button>
-          <button class="segment-chip" :class="{ active: quickFilter === 'pending' }" type="button" @click="quickFilter = 'pending'">待确认</button>
-          <button class="segment-chip" :class="{ active: quickFilter === 'generated' }" type="button" @click="quickFilter = 'generated'">新生成</button>
+          <button class="segment-chip" :class="{ active: quickFilter === 'pending' }" type="button" @click="quickFilter = 'pending'">待负责人完成</button>
+          <button class="segment-chip" :class="{ active: quickFilter === 'generated' }" type="button" @click="quickFilter = 'generated'">待接收人确认</button>
           <button class="segment-chip" :class="{ active: quickFilter === 'completed' }" type="button" @click="quickFilter = 'completed'">已完成</button>
         </div>
         <ElSelect v-model="sortBy" class="handover-sort">

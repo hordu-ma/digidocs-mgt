@@ -106,14 +106,26 @@ func TestPostgresIntegrationNotificationsAndInbox(t *testing.T) {
 		t.Fatal(err)
 	}
 	handoverID := created["id"].(string)
-	if inboxKinds(carol)["confirm_handover"] != 1 || inboxKinds(lead)["fill_handover_items"] != 1 {
+	// bob owns the accepted document, so the checklist arrives pre-filled (M3).
+	if created["document_item_count"] != 1 {
+		t.Fatalf("expected bob's document to be auto-collected: %#v", created)
+	}
+	if inboxKinds(carol)["confirm_handover"] != 1 || inboxKinds(lead)["fill_handover_items"] != 0 {
 		t.Fatalf("after create: carol=%v lead=%v", inboxKinds(carol), inboxKinds(lead))
 	}
-	if _, err := handovers.UpdateItems(ctx, command.HandoverItemUpdateInput{HandoverID: handoverID, ActorID: lead, ActorRole: "member", Items: []command.HandoverItemInput{{DocumentID: docID, Selected: true}}}); err != nil {
+	// carol owns nothing: her handover starts empty and asks the lead to fill it.
+	empty, err := handovers.Create(ctx, command.HandoverCreateInput{TargetUserID: carol, ReceiverUserID: bob, ProjectID: integrationProjectID, ActorID: lead, ActorRole: "member"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if empty["document_item_count"] != 0 || inboxKinds(lead)["fill_handover_items"] != 1 {
+		t.Fatalf("empty handover: %#v lead=%v", empty, inboxKinds(lead))
+	}
+	if _, err := handovers.ApplyAction(ctx, command.HandoverActionInput{HandoverID: empty["id"].(string), Action: "cancel", ActorID: lead, ActorRole: "member"}); err != nil {
 		t.Fatal(err)
 	}
 	if inboxKinds(lead)["fill_handover_items"] != 0 {
-		t.Fatal("filled handover must leave the lead inbox")
+		t.Fatal("cancelled handover must leave the lead inbox")
 	}
 	leadBefore := unread(lead)
 	if _, err := handovers.ApplyAction(ctx, command.HandoverActionInput{HandoverID: handoverID, Action: "confirm", ActorID: carol, ActorRole: "member"}); err != nil {

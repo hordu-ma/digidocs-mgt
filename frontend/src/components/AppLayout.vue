@@ -118,7 +118,7 @@ const routeMeta = computed(() => {
   }
   if (path.startsWith("/handovers")) {
     return {
-      title: "工作交接",
+      title: "成员交接",
       caption: "确认资料范围与接收责任",
     };
   }

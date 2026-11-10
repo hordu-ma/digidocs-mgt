@@ -149,11 +149,17 @@ type RecentFlowItem struct {
 	CreatedAt  string `json:"created_at"`
 }
 
+// RiskDocumentItem is one dashboard risk. Despite the name it can point at a
+// handover (risk_type handover_overdue): document_id is then empty and
+// related_type/related_id/link identify the handover.
 type RiskDocumentItem struct {
 	DocumentID  string `json:"document_id"`
 	Title       string `json:"title"`
 	RiskType    string `json:"risk_type"`
 	RiskMessage string `json:"risk_message"`
+	RelatedType string `json:"related_type"`
+	RelatedID   string `json:"related_id"`
+	Link        string `json:"link"`
 }
 
 type DocumentListItem struct {

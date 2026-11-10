@@ -10,6 +10,7 @@ import (
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/domain/task"
+	"digidocs-mgt/backend-go/internal/repository"
 	"digidocs-mgt/backend-go/internal/storage"
 )
 
@@ -362,4 +363,41 @@ func TestDataAssetServiceHandoverDataItems(t *testing.T) {
 
 func (m *mockDataAssetRepo) GetDataFolder(context.Context, string) (*query.DataFolderItem, error) {
 	return &query.DataFolderItem{ID: "folder-1", ProjectID: "p-1"}, nil
+}
+
+type auditFilterSpy struct{ got query.AuditEventFilter }
+
+func (s *auditFilterSpy) ListAuditEvents(_ context.Context, f query.AuditEventFilter) ([]query.AuditEventItem, int, error) {
+	s.got = f
+	return nil, 0, nil
+}
+func (s *auditFilterSpy) GetAuditSummary(context.Context, string, query.ActorScope) (query.AuditSummary, error) {
+	return query.AuditSummary{}, nil
+}
+
+type docViewPermission struct {
+	repository.PermissionReader
+	allowed string
+}
+
+func (p docViewPermission) CanViewDocument(_ context.Context, _ string, _ string, documentID string) (bool, error) {
+	return documentID == p.allowed, nil
+}
+
+func TestAuditQueryWidensScopeOnlyForViewableDocument(t *testing.T) {
+	spy := &auditFilterSpy{}
+	svc := NewAuditQueryService(spy).WithPermissions(NewPermissionService(docViewPermission{allowed: "doc-ok"}))
+	member := query.ActorScope{ActorID: "u"}
+	_, _, _ = svc.List(context.Background(), query.AuditEventFilter{DocumentID: "doc-ok", Scope: member})
+	if !spy.got.Scope.IsAdmin || spy.got.DocumentID != "doc-ok" {
+		t.Fatalf("viewable document should widen scope but stay pinned: %#v", spy.got)
+	}
+	_, _, _ = svc.List(context.Background(), query.AuditEventFilter{DocumentID: "doc-no", Scope: member})
+	if spy.got.Scope.IsAdmin {
+		t.Fatal("non-viewable document must keep project scoping")
+	}
+	_, _, _ = svc.List(context.Background(), query.AuditEventFilter{Scope: member})
+	if spy.got.Scope.IsAdmin {
+		t.Fatal("no document filter must keep project scoping")
+	}
 }

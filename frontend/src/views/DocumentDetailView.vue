@@ -18,6 +18,11 @@ import { useRoute, useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+import {
+  documentStatusClass as statusClass,
+  documentStatusLabel as statusLabel,
+  flowActionLabel,
+} from "@/utils/labels";
 import { extractError } from "@/utils/error";
 import type { UserOption } from "@/types";
 
@@ -47,33 +52,8 @@ let summaryPollTimer: number | null = null;
 const users = ref<UserOption[]>([]);
 const folderOptions = ref<FolderOption[]>([]);
 
-const statusLabel: Record<string, string> = {
-  draft: "草稿",
-  in_progress: "处理中",
-  pending_handover: "待交接",
-  handed_over: "已交接",
-  finalized: "定稿",
-  archived: "已归档",
-};
 
-const statusClass: Record<string, string> = {
-  draft: "status-draft",
-  in_progress: "status-in-progress",
-  pending_handover: "status-pending-handover",
-  handed_over: "status-handed-over",
-  finalized: "status-finalized",
-  archived: "status-archived",
-};
 
-const flowActionLabel: Record<string, string> = {
-  transfer: "转交",
-  accept_transfer: "接受转交",
-  finalize: "定稿",
-  archive: "归档",
-  unarchive: "取消归档",
-  mark_in_progress: "开始处理",
-  create: "创建",
-};
 
 const suggestionStatusLabel: Record<string, string> = {
   pending: "待确认",

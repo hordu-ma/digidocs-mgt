@@ -187,6 +187,11 @@ func (r ActionRepository) CreateHandover(ctx context.Context, input command.Hand
 		return nil, err
 	}
 
+	documentCount, dataCount, err := collectHandoverCandidates(ctx, tx, id, input.TargetUserID, input.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := insertAuditEvent(
 		ctx,
 		tx,
@@ -195,11 +200,13 @@ func (r ActionRepository) CreateHandover(ctx context.Context, input command.Hand
 		"handover_generate",
 		input.ActorID,
 		map[string]any{
-			"handover_id":      id,
-			"target_user_id":   input.TargetUserID,
-			"receiver_user_id": input.ReceiverUserID,
-			"project_id":       input.ProjectID,
-			"remark":           input.Remark,
+			"handover_id":         id,
+			"target_user_id":      input.TargetUserID,
+			"receiver_user_id":    input.ReceiverUserID,
+			"project_id":          input.ProjectID,
+			"remark":              input.Remark,
+			"candidate_documents": documentCount,
+			"candidate_data":      dataCount,
 		},
 	); err != nil {
 		return nil, err
@@ -216,7 +223,55 @@ func (r ActionRepository) CreateHandover(ctx context.Context, input command.Hand
 		"project_id":       input.ProjectID,
 		"remark":           input.Remark,
 		"status":           "generated",
+		// Pre-selected candidates collected for the manager to review.
+		"document_item_count": documentCount,
+		"data_item_count":     dataCount,
 	}, nil
+}
+
+// collectHandoverCandidates pre-fills a new handover with everything the
+// leaving member is still responsible for (design §7 steps 2–3): documents
+// they own that are not archived or deleted, and data assets they uploaded.
+// Items are pre-selected; the manager unticks what should stay. The note
+// flags the cases the design calls out — not filed into a folder, or long
+// untouched — so the manager reviews those first.
+//
+// An empty projectID (admin-created, cross-project handover) collects across
+// all projects.
+func collectHandoverCandidates(ctx context.Context, tx *sql.Tx, handoverID, targetUserID, projectID string) (int, int, error) {
+	docRes, err := tx.ExecContext(ctx, `
+		INSERT INTO graduation_handover_items (handover_id, document_id, selected, note)
+		SELECT $1::uuid, d.id, TRUE,
+			CASE
+				WHEN d.folder_id IS NULL THEN '未挂接目录'
+				WHEN d.updated_at < NOW() - INTERVAL '30 days' THEN '超过 30 天未更新'
+				ELSE NULL
+			END
+		FROM documents d
+		WHERE d.current_owner_id::text = $2
+		  AND d.is_deleted = FALSE
+		  AND d.current_status <> 'archived'::document_status
+		  AND ($3 = '' OR d.project_id::text = $3)
+		ON CONFLICT (handover_id, document_id) DO NOTHING
+	`, handoverID, targetUserID, projectID)
+	if err != nil {
+		return 0, 0, err
+	}
+	dataRes, err := tx.ExecContext(ctx, `
+		INSERT INTO graduation_handover_data_items (handover_id, data_asset_id, selected)
+		SELECT $1::uuid, a.id, TRUE
+		FROM data_assets a
+		WHERE a.created_by::text = $2
+		  AND a.is_deleted = FALSE
+		  AND ($3 = '' OR a.project_id::text = $3)
+		ON CONFLICT (handover_id, data_asset_id) DO NOTHING
+	`, handoverID, targetUserID, projectID)
+	if err != nil {
+		return 0, 0, err
+	}
+	docs, _ := docRes.RowsAffected()
+	data, _ := dataRes.RowsAffected()
+	return int(docs), int(data), nil
 }
 
 func (r ActionRepository) UpdateHandoverItems(
@@ -299,15 +354,16 @@ func (r ActionRepository) ApplyHandover(ctx context.Context, input command.Hando
 	defer tx.Rollback()
 
 	var currentStatus string
+	var handoverProjectID string
 	if err := tx.QueryRowContext(
 		ctx,
 		`
-		SELECT status::text
+		SELECT status::text, COALESCE(project_id::text, '')
 		FROM graduation_handovers
 		WHERE id::text = $1 FOR UPDATE
 		`,
 		input.HandoverID,
-	).Scan(&currentStatus); err != nil {
+	).Scan(&currentStatus, &handoverProjectID); err != nil {
 		return nil, err
 	}
 
@@ -374,6 +430,7 @@ func (r ActionRepository) ApplyHandover(ctx context.Context, input command.Hando
 		mappedHandoverAuditAction(input.Action),
 		input.ActorID,
 		map[string]any{
+			"project_id":  handoverProjectID,
 			"handover_id": input.HandoverID,
 			"note":        input.Note,
 			"reason":      input.Reason,

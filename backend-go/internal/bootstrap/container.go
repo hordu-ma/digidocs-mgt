@@ -111,7 +111,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			AdminService:          service.NewAdminService(pgrepo.NewAdminRepository(postgresDB)),
 			AssistantService:      service.NewAssistantService(noopqueue.NewPublisher(), pgrepo.NewAssistantRepository(postgresDB), docRepo, versionRepo, permissionService).WithNotifications(notificationService),
 			DocumentService:       service.NewDocumentService(docRepo, docRepo, storageProvider, versionWorkflow, permissionService),
-			AuditQueryService:     service.NewAuditQueryService(pgrepo.NewAuditRepository(postgresDB)),
+			AuditQueryService:     service.NewAuditQueryService(pgrepo.NewAuditRepository(postgresDB)).WithPermissions(permissionService),
 			DashboardQueryService: service.NewDashboardQueryService(pgrepo.NewDashboardRepository(postgresDB)),
 			VersionService:        service.NewVersionService(storageProvider, versionWorkflow, versionRepo, permissionService),
 			FlowService:           service.NewFlowService(pgrepo.NewFlowRepository(postgresDB), actionRepo, permissionService).WithNotifications(notificationService),

@@ -62,7 +62,7 @@ const quickActions = computed(() => {
       icon: Coin,
     },
     {
-      title: "工作交接",
+      title: "成员交接",
       caption: "推进交接清单和确认流程",
       route: "/handovers",
       icon: Connection,

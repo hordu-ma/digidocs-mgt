@@ -12,6 +12,11 @@ import { useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+import {
+  documentStatusClass as statusClass,
+  documentStatusLabel as statusLabel,
+  flowActionLabel as actionLabel,
+} from "@/utils/labels";
 import { formatDateTime } from "@/utils/format";
 
 const router = useRouter();
@@ -42,6 +47,13 @@ interface AuditSummary {
 // Download activity is a secondary panel: if the summary call fails the rest
 // of the dashboard must still render, so it is loaded independently.
 const auditSummary = ref<AuditSummary | null>(null);
+
+const riskTypeLabel: Record<string, string> = {
+  owner_inactive: "责任人停用",
+  transfer_unaccepted: "转交未接收",
+  handover_overdue: "交接超期",
+  stale: "长期未更新",
+};
 
 interface InboxItem {
   kind: string;
@@ -76,33 +88,8 @@ const inboxKindTone: Record<string, string> = {
   stale_document: "status-risk",
 };
 
-const statusLabel: Record<string, string> = {
-  draft: "草稿",
-  in_progress: "处理中",
-  pending_handover: "待交接",
-  handed_over: "已交接",
-  finalized: "定稿",
-  archived: "已归档",
-};
 
-const actionLabel: Record<string, string> = {
-  transfer: "移交",
-  accept_transfer: "接收移交",
-  finalize: "定稿",
-  archive: "归档",
-  unarchive: "取消归档",
-  mark_in_progress: "标记处理中",
-  create: "创建",
-};
 
-const statusClass: Record<string, string> = {
-  draft: "status-draft",
-  in_progress: "status-in-progress",
-  pending_handover: "status-pending-handover",
-  handed_over: "status-handed-over",
-  finalized: "status-finalized",
-  archived: "status-archived",
-};
 
 const activeDocumentCount = computed(
   () =>
@@ -128,21 +115,21 @@ const summaryItems = computed(() => [
   {
     label: "处理中",
     value: activeDocumentCount.value,
-    hint: "仍处于草稿、处理中和待交接状态",
+    hint: "仍处于草稿、处理中和待接收状态",
     icon: Timer,
     tone: "blue",
     to: "/documents",
   },
   {
-    label: "待交接",
+    label: "进行中交接",
     value: overview.value.handover_pending_count,
-    hint: "需要负责人继续确认接收与闭环",
+    hint: "尚未完成的成员交接单",
     icon: Connection,
     tone: "amber",
     to: "/handovers",
   },
   {
-    label: "风险文档",
+    label: "风险事项",
     value: overview.value.risk_document_count,
     hint: "长期未更新或交接异常",
     icon: WarningFilled,
@@ -251,7 +238,7 @@ function openDocument(id?: string) {
         <div class="command-copy">
           <div class="section-title">今日关注</div>
           <p class="section-note">
-            当前有 {{ activeDocumentCount }} 份文档仍处于草稿、处理中或待交接状态。
+            当前有 {{ activeDocumentCount }} 份文档仍处于草稿、处理中或待接收状态。
           </p>
         </div>
         <div class="status-distribution">
@@ -334,12 +321,12 @@ function openDocument(id?: string) {
           <div class="risk-list">
             <button
               v-for="item in riskDocs"
-              :key="item.document_id"
+              :key="`${item.risk_type}-${item.related_id}`"
               class="risk-item"
               type="button"
-              @click="openDocument(item.document_id)"
+              @click="router.push(item.link)"
             >
-              <span class="status-pill status-risk">需关注</span>
+              <span class="status-pill status-risk">{{ riskTypeLabel[item.risk_type] ?? "需关注" }}</span>
               <div class="risk-title">{{ item.title }}</div>
               <div class="risk-message">{{ item.risk_message }}</div>
             </button>

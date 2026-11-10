@@ -15,6 +15,7 @@ import { useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+import { documentStatusClass as statusClass, documentStatusLabel as statusLabel } from "@/utils/labels";
 import { extractError } from "@/utils/error";
 import { useAuthStore } from "@/stores/auth";
 import type { ProjectOption, UserOption } from "@/types";
@@ -53,23 +54,7 @@ const collapsedGroups = ref<Set<string>>(new Set());
 const allProjects = ref<{ id: string; name: string }[]>([]);
 const selectedProjectName = ref("");
 
-const statusLabel: Record<string, string> = {
-  draft: "草稿",
-  in_progress: "处理中",
-  pending_handover: "待交接",
-  handed_over: "已交接",
-  finalized: "定稿",
-  archived: "已归档",
-};
 
-const statusClass: Record<string, string> = {
-  draft: "status-draft",
-  in_progress: "status-in-progress",
-  pending_handover: "status-pending-handover",
-  handed_over: "status-handed-over",
-  finalized: "status-finalized",
-  archived: "status-archived",
-};
 
 // 后端分页上限是 200（backend-go/internal/transport/http/handlers/documents.go
 // 的 maxPageSize），请求更大的 page_size 也只会被静默截到 200——之前这里传
@@ -112,7 +97,7 @@ function isRecent(row: any) {
 const quickFilters = [
   { key: "all", label: "全部文档" },
   { key: "mine", label: "我负责的" },
-  { key: "pending_handover", label: "待交接" },
+  { key: "pending_handover", label: "待接收" },
   { key: "in_progress", label: "处理中" },
   { key: "recent", label: "最近更新" },
 ];

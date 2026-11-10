@@ -876,11 +876,17 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
   "data": {
     "id": "uuid",
     "status": "generated",
-    "candidate_count": 12,
-    "generated_at": "2026-04-03T15:00:00Z"
+    "document_item_count": 12,
+    "data_item_count": 3
   }
 }
 ```
+
+候选自动归集（2026-11-10）：创建交接单的同一事务内，系统把被交接人名下的候选写入清单并默认勾选，负责人只需取消不该交接的项。
+
+- 文档：被交接人是当前责任人、未删除、未归档；指定 `project_id` 时只取该课题，不指定（仅 `admin`）时跨课题。备注标出 `未挂接目录` 或 `超过 30 天未更新`，提示负责人优先核对。
+- 数据资产：被交接人上传、未删除，课题范围同上。
+- `document_item_count` / `data_item_count` 为自动带入的数量；为 0 时清单为空，「我的待办」会提示负责人补全。
 
 ### 7.2 交接列表
 
@@ -1005,6 +1011,11 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 }
 ```
 
+口径（2026-11-10）：
+
+- `handover_pending_count`：尚未完成的交接单数，即状态为 `generated` 或 `pending_confirm`。此前只统计 `pending_confirm`，会漏掉刚创建、等接收人确认的交接单。
+- `risk_document_count`：与 8.3 风险列表使用同一条 SQL 计数，两者在列表截断前完全一致。
+
 ### 8.2 近期流转
 
 `GET /api/v1/dashboard/recent-flows?project_id={id}`
@@ -1022,11 +1033,25 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
       "document_id": "uuid",
       "title": "阶段报告",
       "risk_type": "stale",
-      "risk_message": "超过30天未更新"
+      "risk_message": "41 天未更新",
+      "related_type": "document",
+      "related_id": "uuid",
+      "link": "/documents/uuid"
     }
   ]
 }
 ```
+
+风险规则（2026-11-10）。同一文档只按最严重的一条出现，列表按严重程度、再按时间排序，最多 50 条：
+
+| `risk_type` | 条件 | 严重度 |
+| --- | --- | --- |
+| `owner_inactive` | 未定稿/未归档文档的责任人账号已停用 | 1 |
+| `transfer_unaccepted` | 状态为 `pending_handover`（待接收）超过 7 天 | 2 |
+| `handover_overdue` | 交接单创建超过 14 天仍未完成；此时 `document_id` 为空，`related_type=handover` | 3 |
+| `stale` | 未定稿/未归档文档超过 30 天未更新 | 4 |
+
+前端统一用 `link` 跳转，不再自行拼接文档地址。
 
 ### 8.4 审计事件列表
 
@@ -1043,7 +1068,7 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 - `page`
 - `page_size`
 
-响应项字段：`id`、`document_id`、`version_id`、`user_id`、`action_type`、`request_id`、`ip_address`、`terminal_info`、`created_at`，以及展示用的 `user_display_name`、`document_title`（2026-11-10 新增）。文档详情页「访问记录」使用 `document_id` + `page_size=10` 调用本接口。
+响应项字段：`id`、`document_id`、`version_id`、`user_id`、`action_type`、`request_id`、`ip_address`、`terminal_info`、`created_at`，以及展示用的 `user_display_name`、`document_title`（2026-11-10 新增）。文档详情页「访问记录」使用 `document_id` + `page_size=10` 调用本接口。带 `document_id` 查询时，只要调用者有权查看该文档（例如跨课题转交后的当前责任人），即可看到这份文档的全部审计事件；结果仍只限于这一份文档。
 
 ### 8.5 审计摘要
 

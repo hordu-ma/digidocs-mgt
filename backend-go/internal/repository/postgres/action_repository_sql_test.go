@@ -88,6 +88,12 @@ func TestActionRepositoryCreateHandoverCommitsAudit(t *testing.T) {
 	mock.ExpectExec("INSERT INTO graduation_handovers").
 		WithArgs(sqlmock.AnyArg(), "u-target", "u-receiver", "p-1", "毕业交接", "actor-1", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO graduation_handover_items").
+		WithArgs(sqlmock.AnyArg(), "u-target", "p-1").
+		WillReturnResult(sqlmock.NewResult(0, 3))
+	mock.ExpectExec("INSERT INTO graduation_handover_data_items").
+		WithArgs(sqlmock.AnyArg(), "u-target", "p-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	expectAuditInsert(mock, "", "", "actor-1", "handover_generate", "req-handover")
 	mock.ExpectCommit()
 
@@ -147,7 +153,7 @@ func TestActionRepositoryApplyHandoverCompleteUpdatesDocuments(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery("SELECT status::text").
 		WithArgs("handover-1").
-		WillReturnRows(sqlmock.NewRows([]string{"status"}).AddRow("pending_confirm"))
+		WillReturnRows(sqlmock.NewRows([]string{"status", "project_id"}).AddRow("pending_confirm", "p-1"))
 	mock.ExpectExec("UPDATE graduation_handovers").
 		WithArgs("handover-1", "completed", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -183,7 +189,7 @@ func TestActionRepositoryApplyHandoverInvalidTransitionRollsBack(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery("SELECT status::text").
 		WithArgs("handover-1").
-		WillReturnRows(sqlmock.NewRows([]string{"status"}).AddRow("generated"))
+		WillReturnRows(sqlmock.NewRows([]string{"status", "project_id"}).AddRow("generated", "p-1"))
 	mock.ExpectRollback()
 
 	_, err := repo.ApplyHandover(ctx, command.HandoverActionInput{

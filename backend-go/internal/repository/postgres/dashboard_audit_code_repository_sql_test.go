@@ -23,7 +23,7 @@ func TestDashboardRepositoryMethods(t *testing.T) {
 	mock.ExpectQuery("SELECT d.current_status::text").WithArgs("p-1", false, "u-9").
 		WillReturnRows(sqlmock.NewRows([]string{"status", "count"}).AddRow("draft", 2).AddRow("in_progress", 3))
 	mock.ExpectQuery("FROM graduation_handovers gh").WithArgs("p-1", false, "u-9").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	mock.ExpectQuery("AND d.current_status NOT IN").WithArgs("p-1", false, "u-9").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(4))
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM \\(").WithArgs("p-1", false, "u-9").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(4))
 	overview, err := repo.GetOverview(ctx, "p-1", memberScope)
 	if err != nil || overview.DocumentTotal != 10 || overview.StatusCounts["in_progress"] != 3 || overview.RiskDocumentCount != 4 {
 		t.Fatalf("GetOverview got %#v err=%v", overview, err)
@@ -37,9 +37,9 @@ func TestDashboardRepositoryMethods(t *testing.T) {
 		t.Fatalf("ListRecentFlows got %#v err=%v", flows, err)
 	}
 
-	mock.ExpectQuery("'超过30天未更新'").WithArgs("p-1", false, "u-9").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "risk_type", "risk_message"}).
-			AddRow("doc-1", "Report", "stale", "超过30天未更新"))
+	mock.ExpectQuery("ORDER BY severity").WithArgs("p-1", false, "u-9").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "risk_type", "risk_message", "related_type", "related_id", "link"}).
+			AddRow("doc-1", "Report", "stale", "31 天未更新", "document", "doc-1", "/documents/doc-1"))
 	risks, err := repo.ListRiskDocuments(ctx, "p-1", memberScope)
 	if err != nil || len(risks) != 1 || risks[0].RiskType != "stale" {
 		t.Fatalf("ListRiskDocuments got %#v err=%v", risks, err)

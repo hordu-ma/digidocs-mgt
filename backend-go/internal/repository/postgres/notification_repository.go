@@ -148,7 +148,7 @@ func (r NotificationRepository) ListInbox(ctx context.Context, userID string, is
 			-- 1. 转交给我、等我接收的文档（转交后责任人即为接收人）
 			SELECT 'accept_transfer' AS kind, d.title,
 				COALESCE((
-					SELECT fu.display_name || ' 转交给你'
+					SELECT '来自 ' || fu.display_name || '（原责任人）'
 					FROM flow_records fr JOIN users fu ON fu.id = fr.from_user_id
 					WHERE fr.document_id = d.id AND fr.action = 'transfer'
 					ORDER BY fr.created_at DESC LIMIT 1
