@@ -14,10 +14,11 @@ import (
 type VersionHandler struct {
 	service   service.VersionService
 	assistant service.AssistantService
+	audit     service.AuditService
 }
 
-func NewVersionHandler(svc service.VersionService, assistant service.AssistantService) VersionHandler {
-	return VersionHandler{service: svc, assistant: assistant}
+func NewVersionHandler(svc service.VersionService, assistant service.AssistantService, audit service.AuditService) VersionHandler {
+	return VersionHandler{service: svc, assistant: assistant, audit: audit}
 }
 
 func (h VersionHandler) Upload(w http.ResponseWriter, r *http.Request) {

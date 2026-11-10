@@ -148,6 +148,10 @@ func (r *RateLimiter) LimitKeyed(next http.HandlerFunc, keyFn func(*http.Request
 // Do not raise TrustedProxyDepth beyond the number of proxies that actually
 // rewrite the header: every extra step of trust hands one more entry of
 // attacker-controlled data to the limiter.
+// ClientIP is the caller address used for audit records; it follows the same
+// TRUSTED_PROXY_DEPTH rule as rate limiting.
+func ClientIP(r *http.Request) string { return clientIP(r) }
+
 func clientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		parts := strings.Split(xff, ",")

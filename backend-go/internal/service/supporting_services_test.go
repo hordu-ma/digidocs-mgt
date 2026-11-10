@@ -46,8 +46,47 @@ func TestTaskServicePublishPropagatesPublisherError(t *testing.T) {
 }
 
 func TestAuditServiceRecord(t *testing.T) {
-	if err := NewAuditService().Record(context.Background(), "download", "u-1", "doc-1", map[string]any{"k": "v"}); err != nil {
+	if err := NewAuditService().Record(context.Background(), command.AuditEventInput{
+		ActionType: "download", UserID: "u-1", DocumentID: "doc-1", Extra: map[string]any{"k": "v"},
+	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+type recordingAuditWriter struct {
+	events []command.AuditEventInput
+	err    error
+}
+
+func (w *recordingAuditWriter) RecordAuditEvent(_ context.Context, e command.AuditEventInput) error {
+	w.events = append(w.events, e)
+	return w.err
+}
+
+func TestAuditServiceRecordDelegatesAndDefaultsViewDedup(t *testing.T) {
+	w := &recordingAuditWriter{}
+	svc := NewAuditService(w)
+	if err := svc.Record(context.Background(), command.AuditEventInput{ActionType: AuditActionView, UserID: "u", DocumentID: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(w.events) != 1 || w.events[0].DedupWindowSeconds != viewDedupWindowSeconds {
+		t.Fatalf("view should default to dedup window, got %+v", w.events)
+	}
+	if err := svc.Record(context.Background(), command.AuditEventInput{ActionType: AuditActionDownload}); err != nil {
+		t.Fatal(err)
+	}
+	if w.events[1].DedupWindowSeconds != 0 {
+		t.Fatal("download must never be deduplicated")
+	}
+}
+
+func TestAuditServiceRecordPropagatesWriterError(t *testing.T) {
+	svc := NewAuditService(&recordingAuditWriter{err: errors.New("db down")})
+	if err := svc.Record(context.Background(), command.AuditEventInput{ActionType: AuditActionDownload}); err == nil {
+		t.Fatal("download audit failure must surface so the handler can fail closed")
+	}
+	if err := svc.Record(context.Background(), command.AuditEventInput{}); err == nil {
+		t.Fatal("empty action must be rejected")
 	}
 }
 

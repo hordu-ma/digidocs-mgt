@@ -435,6 +435,15 @@
 
 ## 进行中
 
+- 2026-11-10 产品与工程优化轮（过程记录见 `docs/optimization-20261110.md`）
+  - [x] M1 访问审计：查看/预览/下载写入审计，下载与预览审计失败拒绝出文件；总览「下载活跃度」；文档「访问记录」
+  - [ ] M2 待办收件箱与通知
+  - [ ] M3 交接候选自动归集、风险规则扩充、转交状态命名拆分
+  - [ ] M4 AI：正文截断分块、自动摘要、流式输出、结构化输出、建议可执行、向量检索
+  - [ ] M5 全文检索与服务端分页筛选
+  - [ ] M6 体验收口
+  - [ ] M7 工程与运维收口
+
 - 部署验收收口（2026-04-12）
   - 已确认 p14s 当前容器形态可运行：`backend-go / frontend / backend-py-worker / postgres` 存活
   - 已确认核心业务链路通过：`healthz / auth/login / documents / dashboard/overview / handovers / audit-events / audit-events/summary`

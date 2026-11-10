@@ -57,8 +57,8 @@ func TestAuditRepositoryMethods(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(7))
 	mock.ExpectQuery("SELECT\\s+ae.id::text").
 		WithArgs("p-1", "doc-1", "download", "u-1", "2026-05-01", "2026-05-01", false, "u-9", 5, 5).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "document_id", "version_id", "user_id", "action_type", "request_id", "ip", "terminal", "created_at"}).
-			AddRow("ae-1", "doc-1", "v-1", "u-1", "download", "req-1", "127.0.0.1", "web", "2026-05-01T00:00:00Z"))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "document_id", "version_id", "user_id", "action_type", "request_id", "ip", "terminal", "created_at", "user", "title"}).
+			AddRow("ae-1", "doc-1", "v-1", "u-1", "download", "req-1", "127.0.0.1", "web", "2026-05-01T00:00:00Z", "张三", "开题报告"))
 	events, total, err := repo.ListAuditEvents(ctx, filter)
 	if err != nil || total != 7 || len(events) != 1 || events[0].IPAddress != "127.0.0.1" {
 		t.Fatalf("ListAuditEvents got %#v total=%d err=%v", events, total, err)
@@ -66,12 +66,15 @@ func TestAuditRepositoryMethods(t *testing.T) {
 
 	mock.ExpectQuery("COUNT\\(\\*\\) FILTER").
 		WithArgs("p-1", false, "u-9").
-		WillReturnRows(sqlmock.NewRows([]string{"upload", "download", "transfer", "archive"}).AddRow(1, 2, 3, 4))
+		WillReturnRows(sqlmock.NewRows([]string{"upload", "download", "transfer", "archive", "view", "preview", "recent"}).AddRow(1, 2, 3, 4, 5, 6, 2))
 	mock.ExpectQuery("GROUP BY ae.user_id").
 		WithArgs("p-1", false, "u-9").
 		WillReturnRows(sqlmock.NewRows([]string{"user_id", "display_name", "count"}).AddRow("u-1", "张三", 9))
+	mock.ExpectQuery("GROUP BY d.id, d.title").
+		WithArgs("p-1", false, "u-9").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "count", "users", "last"}).AddRow("doc-1", "开题报告", 2, 1, "2026-05-01T00:00:00Z"))
 	summary, err := repo.GetAuditSummary(ctx, "p-1", memberScope)
-	if err != nil || summary.DownloadCount != 2 || len(summary.TopActiveUsers) != 1 {
+	if err != nil || summary.DownloadCount != 2 || summary.ViewCount != 5 || len(summary.TopActiveUsers) != 1 || len(summary.TopDownloads) != 1 {
 		t.Fatalf("GetAuditSummary got %#v err=%v", summary, err)
 	}
 	assertExpectations(t, mock)

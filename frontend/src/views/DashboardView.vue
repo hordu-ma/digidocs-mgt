@@ -24,6 +24,24 @@ const overview = ref({
 const recentFlows = ref<any[]>([]);
 const riskDocs = ref<any[]>([]);
 
+interface DownloadMetric {
+  document_id: string;
+  title: string;
+  download_count: number;
+  user_count: number;
+  last_downloaded_at: string;
+}
+interface AuditSummary {
+  view_count: number;
+  preview_count: number;
+  download_count: number;
+  recent_download_count: number;
+  top_downloads: DownloadMetric[];
+}
+// Download activity is a secondary panel: if the summary call fails the rest
+// of the dashboard must still render, so it is loaded independently.
+const auditSummary = ref<AuditSummary | null>(null);
+
 const statusLabel: Record<string, string> = {
   draft: "草稿",
   in_progress: "处理中",
@@ -128,6 +146,19 @@ onMounted(async () => {
   recentFlows.value = flowsRes.data?.data ?? [];
   riskDocs.value = riskRes.data?.data ?? [];
 });
+
+onMounted(async () => {
+  try {
+    const res = await api.get("/audit-events/summary");
+    auditSummary.value = res.data?.data ?? null;
+  } catch {
+    auditSummary.value = null;
+  }
+});
+
+function openDocument(id?: string) {
+  if (id) void router.push(`/documents/${id}`);
+}
 </script>
 
 <template>
@@ -226,20 +257,54 @@ onMounted(async () => {
             <span class="status-pill status-risk">{{ riskDocs.length }}</span>
           </div>
           <div class="risk-list">
-            <div
+            <button
               v-for="item in riskDocs"
               :key="item.document_id"
               class="risk-item"
+              type="button"
+              @click="openDocument(item.document_id)"
             >
               <span class="status-pill status-risk">需关注</span>
               <div class="risk-title">{{ item.title }}</div>
               <div class="risk-message">{{ item.risk_message }}</div>
-            </div>
+            </button>
             <div v-if="riskDocs.length === 0" class="empty-state compact">
               <p class="empty-title">暂无风险文档</p>
               <p class="empty-hint">当前没有需要负责人立即处理的文档风险</p>
             </div>
           </div>
+        </section>
+
+        <section v-if="auditSummary" class="page-card download-panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="section-title">下载活跃度</h2>
+              <p class="section-note">近 30 天文档被下载的情况，来自访问审计</p>
+            </div>
+          </div>
+          <div class="download-stats">
+            <div><strong>{{ auditSummary.recent_download_count }}</strong><span>近 30 天下载</span></div>
+            <div><strong>{{ auditSummary.download_count }}</strong><span>累计下载</span></div>
+            <div><strong>{{ auditSummary.preview_count }}</strong><span>累计预览</span></div>
+            <div><strong>{{ auditSummary.view_count }}</strong><span>累计查看</span></div>
+          </div>
+          <div v-if="auditSummary.top_downloads.length === 0" class="empty-state compact">
+            <p class="empty-title">近 30 天暂无下载</p>
+            <p class="empty-hint">成员下载文档后，这里会列出下载最多的文档</p>
+          </div>
+          <button
+            v-for="item in auditSummary.top_downloads"
+            v-else
+            :key="item.document_id"
+            class="download-item"
+            type="button"
+            @click="openDocument(item.document_id)"
+          >
+            <span class="download-title">{{ item.title }}</span>
+            <span class="download-meta">
+              {{ item.download_count }} 次 · {{ item.user_count }} 人 · 最近 {{ formatTime(item.last_downloaded_at) }}
+            </span>
+          </button>
         </section>
       </div>
     </div>
@@ -247,6 +312,70 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.risk-item,
+.download-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.download-panel {
+  grid-column: 1 / -1;
+  padding: 20px;
+}
+
+.download-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.download-stats div {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--dd-line);
+  border-radius: 8px;
+}
+
+.download-stats strong {
+  font-size: 20px;
+}
+
+.download-stats span,
+.download-meta {
+  color: var(--dd-subtle);
+  font-size: 12px;
+}
+
+.download-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--dd-line);
+}
+
+.download-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .download-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .download-item {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
 .command-strip {
   display: grid;
   grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.2fr);

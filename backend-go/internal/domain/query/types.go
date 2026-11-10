@@ -80,15 +80,33 @@ type AuditEventItem struct {
 	IPAddress    string `json:"ip_address,omitempty"`
 	TerminalInfo string `json:"terminal_info,omitempty"`
 	CreatedAt    string `json:"created_at"`
+	// Display fields joined for the document access panel.
+	UserDisplayName string `json:"user_display_name,omitempty"`
+	DocumentTitle   string `json:"document_title,omitempty"`
 }
 
 type AuditSummary struct {
-	ProjectID      string            `json:"project_id,omitempty"`
-	DownloadCount  int               `json:"download_count"`
-	UploadCount    int               `json:"upload_count"`
-	TransferCount  int               `json:"transfer_count"`
-	ArchiveCount   int               `json:"archive_count"`
-	TopActiveUsers []AuditUserMetric `json:"top_active_users"`
+	ProjectID     string `json:"project_id,omitempty"`
+	DownloadCount int    `json:"download_count"`
+	UploadCount   int    `json:"upload_count"`
+	TransferCount int    `json:"transfer_count"`
+	ArchiveCount  int    `json:"archive_count"`
+	// ViewCount / PreviewCount / RecentDownloadCount come from access events
+	// recorded since 2026-11 (migration-free: audit_events.action_type is text).
+	ViewCount           int                   `json:"view_count"`
+	PreviewCount        int                   `json:"preview_count"`
+	RecentDownloadCount int                   `json:"recent_download_count"`
+	TopActiveUsers      []AuditUserMetric     `json:"top_active_users"`
+	TopDownloads        []AuditDownloadMetric `json:"top_downloads"`
+}
+
+// AuditDownloadMetric is one row of the 30-day download ranking.
+type AuditDownloadMetric struct {
+	DocumentID       string `json:"document_id"`
+	Title            string `json:"title"`
+	DownloadCount    int    `json:"download_count"`
+	UserCount        int    `json:"user_count"`
+	LastDownloadedAt string `json:"last_downloaded_at"`
 }
 
 type AuditUserMetric struct {

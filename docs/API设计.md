@@ -406,7 +406,7 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 | 接口 | 收敛口径 |
 | --- | --- |
 | `GET /dashboard/overview`、`/recent-flows`、`/risk-documents` | 仅统计调用者拥有或所属项目下的文档与交接单；省略 `project_id` 时不再返回全库数据 |
-| `GET /audit-events`、`GET /audit-events/summary` | 仅返回可见项目下文档产生的事件；无关联文档的事件对非 `admin` 不可见 |
+| `GET /audit-events`、`GET /audit-events/summary` | 仅返回可见项目下的事件；项目先按文档归属判定，无文档时按 `extra_data.project_id`；两者都没有的事件对非 `admin` 不可见 |
 | `GET /handovers` | 仅返回调用者可见项目的交接单，外加本人作为被交接人/接收人的交接单 |
 
 已知例外：`GET /users` 仍对全部登录用户返回精简用户名录（`id` / `username` / `display_name` / `role` / `status`，不含联系方式）。课题负责人的「添加成员」需要按姓名检索尚未加入本课题的账号，收敛该接口会直接破坏该功能，因此保持现状。
@@ -709,11 +709,13 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 
 响应：文件流。
 
+审计（2026-11-10）：每次下载在返回文件前写入一条 `download` 审计事件。审计写入失败时接口返回 `500 audit_failed`，不输出文件（fail closed），保证「谁下载了什么」可查。
+
 ### 5.5 版本预览信息
 
 `GET /api/v1/versions/{version_id}/preview`
 
-当前实现：响应文件流，行为与下载接口类似，但以浏览器内联打开为目标。
+当前实现：响应文件流，行为与下载接口类似，但以浏览器内联打开为目标。返回文件前写入 `preview` 审计事件，失败同样返回 `500 audit_failed`。
 
 - `Content-Disposition: inline`
 - `Content-Type: 根据文件名或存储元数据推断`
@@ -1041,6 +1043,8 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 - `page`
 - `page_size`
 
+响应项字段：`id`、`document_id`、`version_id`、`user_id`、`action_type`、`request_id`、`ip_address`、`terminal_info`、`created_at`，以及展示用的 `user_display_name`、`document_title`（2026-11-10 新增）。文档详情页「访问记录」使用 `document_id` + `page_size=10` 调用本接口。
+
 ### 8.5 审计摘要
 
 `GET /api/v1/audit-events/summary?project_id={id}`
@@ -1054,16 +1058,30 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
     "upload_count": 23,
     "transfer_count": 14,
     "archive_count": 6,
+    "view_count": 40,
+    "preview_count": 9,
+    "recent_download_count": 7,
     "top_active_users": [
       {
         "user_id": "uuid",
         "display_name": "张三",
-        "count": 12
+        "action_count": 12
+      }
+    ],
+    "top_downloads": [
+      {
+        "document_id": "uuid",
+        "title": "开题报告",
+        "download_count": 4,
+        "user_count": 2,
+        "last_downloaded_at": "2026-11-10T06:00:00Z"
       }
     ]
   }
 }
 ```
+
+说明：`recent_download_count` 与 `top_downloads` 统计近 30 天；`download_count` 含数据资产下载。总览页「下载活跃度」面板使用本接口。
 
 ---
 
@@ -1635,7 +1653,7 @@ Body: `{ "display_name": "...", "description": "...", "folder_id": "..." }`
 #### 下载数据资产
 `GET /api/v1/data-assets/{id}/download`
 
-流式返回文件内容，`Content-Disposition: attachment`，`Content-Length` 按文件实际大小设置。
+流式返回文件内容，`Content-Disposition: attachment`，`Content-Length` 按文件实际大小设置。返回前写入 `download` 审计事件（`extra_data` 含 `data_asset_id`、`project_id`），写入失败返回 `500 audit_failed`。
 
 ### 13.3 文件夹端点
 

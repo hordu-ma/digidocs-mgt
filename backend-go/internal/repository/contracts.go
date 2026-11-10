@@ -49,6 +49,13 @@ type AuditReader interface {
 	GetAuditSummary(ctx context.Context, projectID string, scope query.ActorScope) (query.AuditSummary, error)
 }
 
+// AuditWriter persists access events (view / preview / download) that are not
+// a side effect of a transactional business write. Business actions such as
+// flow transitions keep writing their audit rows inside their own transaction.
+type AuditWriter interface {
+	RecordAuditEvent(ctx context.Context, event command.AuditEventInput) error
+}
+
 type DashboardReader interface {
 	GetOverview(ctx context.Context, projectID string, scope query.ActorScope) (query.DashboardOverview, error)
 	ListRecentFlows(ctx context.Context, projectID string, scope query.ActorScope) ([]query.RecentFlowItem, error)

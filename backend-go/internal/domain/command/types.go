@@ -168,3 +168,17 @@ type CodePushEventCreateInput struct {
 	SyncStatus    string
 	ErrorMessage  string
 }
+
+// AuditEventInput is one access event. DedupWindowSeconds > 0 suppresses a
+// repeat of the same (user, action, document, version) inside the window, so
+// that re-rendering a detail page does not flood the log with "view" rows.
+type AuditEventInput struct {
+	DocumentID         string
+	VersionID          string
+	UserID             string
+	ActionType         string
+	IPAddress          string
+	TerminalInfo       string
+	Extra              map[string]any
+	DedupWindowSeconds int
+}

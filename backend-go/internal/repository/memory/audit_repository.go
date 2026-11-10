@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 
+	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 )
 
@@ -34,4 +35,12 @@ func (r AuditRepository) GetAuditSummary(ctx context.Context, projectID string, 
 		ArchiveCount:   0,
 		TopActiveUsers: []query.AuditUserMetric{},
 	}, nil
+}
+
+// RecordAuditEvent is a no-op in memory mode; the in-memory audit log is
+// always empty (see ListAuditEvents), matching the rest of this repository.
+func (r AuditRepository) RecordAuditEvent(ctx context.Context, event command.AuditEventInput) error {
+	_ = ctx
+	_ = event
+	return nil
 }

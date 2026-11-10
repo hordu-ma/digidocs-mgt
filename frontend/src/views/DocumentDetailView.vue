@@ -211,7 +211,40 @@ async function loadData() {
   versions.value = versionsRes.data?.data ?? [];
   flows.value = flowsRes.data?.data ?? [];
   suggestions.value = suggestionsRes.data?.data ?? [];
+  void loadAccessEvents();
   await loadFolders();
+}
+
+interface AccessEvent {
+  id: string;
+  action_type: string;
+  user_display_name?: string;
+  created_at: string;
+}
+const accessEvents = ref<AccessEvent[]>([]);
+const accessActionLabel: Record<string, string> = {
+  view: "查看",
+  preview: "预览",
+  download: "下载",
+  upload: "上传",
+  replace_version: "上传新版本",
+  transfer: "转交",
+  archive: "归档",
+  finalize: "定稿",
+  delete: "删除",
+  restore: "恢复",
+};
+
+// Access history is informational; a failure here must not break the page.
+async function loadAccessEvents() {
+  try {
+    const res = await api.get("/audit-events", {
+      params: { document_id: documentID, page_size: 10 },
+    });
+    accessEvents.value = res.data?.data ?? [];
+  } catch {
+    accessEvents.value = [];
+  }
 }
 
 async function loadUsers() {
@@ -642,6 +675,26 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </section>
+
+          <section class="page-card timeline-panel">
+            <div class="panel-head">
+              <div>
+                <h2 class="section-title">访问记录</h2>
+                <p class="section-note">最近 10 条查看、预览与下载记录，来自审计日志</p>
+              </div>
+              <ElIcon :size="20"><Clock /></ElIcon>
+            </div>
+            <div v-if="accessEvents.length === 0" class="empty-state compact">
+              <p class="empty-title">暂无访问记录</p>
+            </div>
+            <ul v-else class="access-list">
+              <li v-for="item in accessEvents" :key="item.id">
+                <span>{{ item.user_display_name || "系统" }}</span>
+                <span class="status-pill">{{ accessActionLabel[item.action_type] ?? item.action_type }}</span>
+                <span class="access-time">{{ formatTime(item.created_at) }}</span>
+              </li>
+            </ul>
+          </section>
         </main>
 
         <aside class="detail-side">
@@ -767,6 +820,26 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.access-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.access-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.access-time {
+  color: var(--dd-subtle);
+}
+
 .document-detail-shell {
   display: grid;
   gap: 18px;

@@ -81,6 +81,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 
 		dataAssetRepo := pgrepo.NewDataAssetRepository(postgresDB)
 		codeRepo := pgrepo.NewCodeRepositoryRepository(postgresDB)
+		auditService := service.NewAuditService(pgrepo.NewAuditRepository(postgresDB))
 		return Container{
 			DB:            postgresDB,
 			QueueConsumer: pgqueue.NewConsumer(postgresDB),

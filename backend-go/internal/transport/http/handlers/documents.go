@@ -18,10 +18,11 @@ import (
 type DocumentHandler struct {
 	service   service.DocumentService
 	assistant service.AssistantService
+	audit     service.AuditService
 }
 
-func NewDocumentHandler(svc service.DocumentService, assistant service.AssistantService) DocumentHandler {
-	return DocumentHandler{service: svc, assistant: assistant}
+func NewDocumentHandler(svc service.DocumentService, assistant service.AssistantService, audit service.AuditService) DocumentHandler {
+	return DocumentHandler{service: svc, assistant: assistant, audit: audit}
 }
 
 func (h DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -149,6 +150,9 @@ func (h DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.audit.RecordBestEffort(r.Context(), accessEvent(r, service.AuditActionView, item.ID, "", map[string]any{
+		"project_id": item.ProjectID,
+	}))
 	response.WriteData(w, http.StatusOK, item)
 }
 

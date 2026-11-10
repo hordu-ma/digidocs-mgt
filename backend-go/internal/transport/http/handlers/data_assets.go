@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -16,10 +17,11 @@ import (
 
 type DataAssetHandler struct {
 	service service.DataAssetService
+	audit   service.AuditService
 }
 
-func NewDataAssetHandler(svc service.DataAssetService) DataAssetHandler {
-	return DataAssetHandler{service: svc}
+func NewDataAssetHandler(svc service.DataAssetService, audit service.AuditService) DataAssetHandler {
+	return DataAssetHandler{service: svc, audit: audit}
 }
 
 // ─────────────────────────── folders ────────────────────────────
@@ -224,6 +226,14 @@ func (h DataAssetHandler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer out.Reader.Close()
+
+	if err := h.audit.Record(r.Context(), accessEvent(r, service.AuditActionDownload, "", "", map[string]any{
+		"data_asset_id": asset.ID, "project_id": asset.ProjectID, "file_name": asset.FileName,
+	})); err != nil {
+		log.Printf("[audit] data asset download not recorded, refusing to serve asset=%s: %v", asset.ID, err)
+		response.WriteError(w, http.StatusInternalServerError, "audit_failed", "下载记录写入失败，请稍后重试")
+		return
+	}
 
 	contentType := asset.MimeType
 	if contentType == "" {

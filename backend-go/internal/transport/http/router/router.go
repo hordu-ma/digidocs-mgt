@@ -40,10 +40,10 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	teamSpaceHandler := handlers.NewTeamSpaceHandler(container.QueryService)
 	userHandler := handlers.NewUserHandler(container.QueryService)
 	projectHandler := handlers.NewProjectHandler(container.QueryService)
-	documentHandler := handlers.NewDocumentHandler(container.DocumentService, container.AssistantService)
-	versionHandler := handlers.NewVersionHandler(container.VersionService, container.AssistantService)
+	documentHandler := handlers.NewDocumentHandler(container.DocumentService, container.AssistantService, container.AuditService)
+	versionHandler := handlers.NewVersionHandler(container.VersionService, container.AssistantService, container.AuditService)
 	adminHandler := handlers.NewAdminHandler(container.AdminService)
-	dataAssetHandler := handlers.NewDataAssetHandler(container.DataAssetService)
+	dataAssetHandler := handlers.NewDataAssetHandler(container.DataAssetService, container.AuditService)
 	codeRepositoryHandler := handlers.NewCodeRepositoryHandler(container.CodeRepositoryService, cfg.APIV1Prefix)
 	membershipHandler := handlers.NewMembershipHandler(container.MembershipService)
 

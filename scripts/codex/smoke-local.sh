@@ -378,6 +378,18 @@ if [[ "$backend_ready" == "1" ]]; then
         else
           require_or_skip "version preview smoke failed (status=$preview_status version_id=$version_id)"
         fi
+
+        # Access audit (2026-11-10): the download and preview above must each
+        # have left an audit row for this version.
+        for audit_action in download preview; do
+          audit_resp=$(smoke_curl -sS --max-time 5 -H "$auth_header" \
+            "$backend_url/api/v1/audit-events?document_id=$document_id&action_type=$audit_action&page_size=50" 2>/dev/null || true)
+          if echo "$audit_resp" | grep -q "\"version_id\":\"$version_id\""; then
+            echo "[OK] audit $audit_action recorded for version $version_id"
+          else
+            require_or_skip "audit $audit_action missing for version $version_id; body=$audit_resp"
+          fi
+        done
       else
         require_or_skip "version smoke did not return expected version id; body=$version_resp"
       fi

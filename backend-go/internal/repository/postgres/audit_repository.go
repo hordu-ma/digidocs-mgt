@@ -14,6 +14,12 @@ func NewAuditRepository(db DBTX) AuditRepository {
 	return AuditRepository{db: db}
 }
 
+// auditProjectSQL resolves the project an audit row belongs to: through its
+// document when it has one, otherwise through extra_data.project_id (data
+// asset downloads, handover events). The regex guard keeps a malformed value
+// from aborting the whole query with a cast error.
+const auditProjectSQL = `COALESCE(d.project_id, CASE WHEN ae.extra_data->>'project_id' ~ '^[0-9a-fA-F-]{36}$' THEN (ae.extra_data->>'project_id')::uuid END)`
+
 func (r AuditRepository) ListAuditEvents(
 	ctx context.Context,
 	filter query.AuditEventFilter,
@@ -28,13 +34,13 @@ func (r AuditRepository) ListAuditEvents(
 		SELECT COUNT(*)
 		FROM audit_events ae
 		LEFT JOIN documents d ON d.id = ae.document_id
-		WHERE ($1 = '' OR d.project_id::text = $1)
+		WHERE ($1 = '' OR `+auditProjectSQL+`::text = $1)
 		  AND ($2 = '' OR ae.document_id::text = $2)
 		  AND ($3 = '' OR ae.action_type::text = $3)
 		  AND ($4 = '' OR ae.user_id::text = $4)
 		  AND ($5 = '' OR ae.created_at >= $5::timestamptz)
 		  AND ($6 = '' OR ae.created_at < $6::timestamptz + interval '1 day')
-		  AND `+projectScopeSQL("d.project_id", "$7", "$8")+`
+		  AND `+projectScopeSQL(auditProjectSQL, "$7", "$8")+`
 		`,
 		filter.ProjectID,
 		filter.DocumentID,
@@ -60,16 +66,19 @@ func (r AuditRepository) ListAuditEvents(
 			COALESCE(ae.request_id, ''),
 			COALESCE(host(ae.ip_address), ''),
 			COALESCE(ae.terminal_info, ''),
-			TO_CHAR(ae.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+			TO_CHAR(ae.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+			COALESCE(u.display_name, ''),
+			COALESCE(d.title, '')
 		FROM audit_events ae
 		LEFT JOIN documents d ON d.id = ae.document_id
-		WHERE ($1 = '' OR d.project_id::text = $1)
+		LEFT JOIN users u ON u.id = ae.user_id
+		WHERE ($1 = '' OR `+auditProjectSQL+`::text = $1)
 		  AND ($2 = '' OR ae.document_id::text = $2)
 		  AND ($3 = '' OR ae.action_type::text = $3)
 		  AND ($4 = '' OR ae.user_id::text = $4)
 		  AND ($5 = '' OR ae.created_at >= $5::timestamptz)
 		  AND ($6 = '' OR ae.created_at < $6::timestamptz + interval '1 day')
-		  AND `+projectScopeSQL("d.project_id", "$7", "$8")+`
+		  AND `+projectScopeSQL(auditProjectSQL, "$7", "$8")+`
 		ORDER BY ae.created_at DESC
 		OFFSET $9 LIMIT $10
 		`,
@@ -102,6 +111,8 @@ func (r AuditRepository) ListAuditEvents(
 			&item.IPAddress,
 			&item.TerminalInfo,
 			&item.CreatedAt,
+			&item.UserDisplayName,
+			&item.DocumentTitle,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -116,6 +127,7 @@ func (r AuditRepository) GetAuditSummary(ctx context.Context, projectID string, 
 	summary := query.AuditSummary{
 		ProjectID:      projectID,
 		TopActiveUsers: make([]query.AuditUserMetric, 0),
+		TopDownloads:   make([]query.AuditDownloadMetric, 0),
 	}
 
 	if err := r.db.QueryRowContext(
@@ -125,11 +137,14 @@ func (r AuditRepository) GetAuditSummary(ctx context.Context, projectID string, 
 			COUNT(*) FILTER (WHERE ae.action_type IN ('upload', 'replace_version')),
 			COUNT(*) FILTER (WHERE ae.action_type = 'download'),
 			COUNT(*) FILTER (WHERE ae.action_type IN ('transfer', 'receive_transfer')),
-			COUNT(*) FILTER (WHERE ae.action_type = 'archive')
+			COUNT(*) FILTER (WHERE ae.action_type = 'archive'),
+			COUNT(*) FILTER (WHERE ae.action_type = 'view'),
+			COUNT(*) FILTER (WHERE ae.action_type = 'preview'),
+			COUNT(*) FILTER (WHERE ae.action_type = 'download' AND ae.created_at >= NOW() - INTERVAL '30 days')
 		FROM audit_events ae
 		LEFT JOIN documents d ON d.id = ae.document_id
-		WHERE ($1 = '' OR d.project_id::text = $1)
-		  AND `+projectScopeSQL("d.project_id", "$2", "$3")+`
+		WHERE ($1 = '' OR `+auditProjectSQL+`::text = $1)
+		  AND `+projectScopeSQL(auditProjectSQL, "$2", "$3")+`
 		`,
 		projectID, isAdmin, actorID,
 	).Scan(
@@ -137,6 +152,9 @@ func (r AuditRepository) GetAuditSummary(ctx context.Context, projectID string, 
 		&summary.DownloadCount,
 		&summary.TransferCount,
 		&summary.ArchiveCount,
+		&summary.ViewCount,
+		&summary.PreviewCount,
+		&summary.RecentDownloadCount,
 	); err != nil {
 		return query.AuditSummary{}, err
 	}
@@ -152,8 +170,8 @@ func (r AuditRepository) GetAuditSummary(ctx context.Context, projectID string, 
 		LEFT JOIN documents d ON d.id = ae.document_id
 		LEFT JOIN users u ON u.id = ae.user_id
 		WHERE ae.user_id IS NOT NULL
-		  AND ($1 = '' OR d.project_id::text = $1)
-		  AND `+projectScopeSQL("d.project_id", "$2", "$3")+`
+		  AND ($1 = '' OR `+auditProjectSQL+`::text = $1)
+		  AND `+projectScopeSQL(auditProjectSQL, "$2", "$3")+`
 		GROUP BY ae.user_id, u.display_name
 		ORDER BY COUNT(*) DESC, COALESCE(u.display_name, '') ASC
 		LIMIT 5
@@ -173,5 +191,43 @@ func (r AuditRepository) GetAuditSummary(ctx context.Context, projectID string, 
 		summary.TopActiveUsers = append(summary.TopActiveUsers, item)
 	}
 
-	return summary, rows.Err()
+	if err := rows.Err(); err != nil {
+		return query.AuditSummary{}, err
+	}
+
+	// Most downloaded documents in the last 30 days: the "download activity"
+	// panel of the lead dashboard.
+	topRows, err := r.db.QueryContext(
+		ctx,
+		`
+		SELECT
+			d.id::text,
+			d.title,
+			COUNT(*)::int,
+			COUNT(DISTINCT ae.user_id)::int,
+			MAX(ae.created_at)
+		FROM audit_events ae
+		JOIN documents d ON d.id = ae.document_id
+		WHERE ae.action_type = 'download'
+		  AND ae.created_at >= NOW() - INTERVAL '30 days'
+		  AND ($1 = '' OR d.project_id::text = $1)
+		  AND `+projectScopeSQL("d.project_id", "$2", "$3")+`
+		GROUP BY d.id, d.title
+		ORDER BY COUNT(*) DESC, MAX(ae.created_at) DESC
+		LIMIT 5
+		`,
+		projectID, isAdmin, actorID,
+	)
+	if err != nil {
+		return query.AuditSummary{}, err
+	}
+	defer topRows.Close()
+	for topRows.Next() {
+		var item query.AuditDownloadMetric
+		if err := topRows.Scan(&item.DocumentID, &item.Title, &item.DownloadCount, &item.UserCount, &item.LastDownloadedAt); err != nil {
+			return query.AuditSummary{}, err
+		}
+		summary.TopDownloads = append(summary.TopDownloads, item)
+	}
+	return summary, topRows.Err()
 }
