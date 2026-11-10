@@ -163,6 +163,7 @@ docker compose --profile app up -d backend-go backend-py-worker frontend
 - 应用节点与群晖在同一局域网时，群晖 File Station / PostgreSQL 主链路优先使用群晖局域网 IP，Tailscale 仅用于远程运维或应急排障；
 - 仓库当前把 compose 应用网络固定为 `172.29.0.0/24`，避免重启或重建后漂移到新的 Docker bridge 子网并与 `tailscaled` 的 `table 52` 发生竞争；
 - 当前目标部署分层为：`DGX Spark` 承载应用层与 OpenClaw，`群晖 DS925+` 承载数据库层（`Container Manager` 中的 PostgreSQL 容器）和文件层（DSM / File Station 原生服务）。
+- **当前实际部署（2026-11-10，暂不迁移）**：PostgreSQL 与应用同机运行在 DGX Spark 本机 Docker（`digidocs-postgres`，pgvector 镜像），群晖只承担文件存储与数据库备份副本。详见 [部署说明 2.1 节](docs/部署准备与运行说明.md)。
 
 部署前配置模板：
 
