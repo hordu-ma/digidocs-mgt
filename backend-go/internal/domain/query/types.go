@@ -543,6 +543,17 @@ type TextSearchHit struct {
 	Score       int    `json:"score"`
 	// MatchedChunks is set by document-level search: how many passages matched.
 	MatchedChunks int `json:"matched_chunks,omitempty"`
+	// Similarity is the cosine similarity for semantic hits (0 for keyword-only).
+	Similarity float64 `json:"similarity,omitempty"`
+	// Match tells which retrieval found it: keyword, semantic or both.
+	Match string `json:"match,omitempty"`
+}
+
+// ChunkForEmbedding is one chunk waiting for (re)embedding.
+type ChunkForEmbedding struct {
+	ID      string
+	Title   string
+	Content string
 }
 
 // DocumentText is the readable text of a document's current version, rebuilt

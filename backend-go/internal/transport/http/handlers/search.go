@@ -53,7 +53,7 @@ func (h SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 		Query:     r.URL.Query().Get("q"),
 		ProjectID: r.URL.Query().Get("project_id"),
 		Scope:     scopeFrom(r),
-		Limit:     parseIntOrDefault(r.URL.Query().Get("limit"), 20),
+		Limit:     min(parseIntOrDefault(r.URL.Query().Get("limit"), 20), 50),
 	})
 	if err != nil {
 		writeServiceError(w, err, "not found", "failed to search documents")

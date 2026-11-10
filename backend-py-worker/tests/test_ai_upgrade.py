@@ -247,3 +247,38 @@ def test_summaries_report_token_usage_including_map_steps(monkeypatch) -> None:
     out = OpenClawClient().summarize_document("r", {}, {"document_text": "字" * 500})
     assert out["usage"] == {"prompt_tokens": 30, "completion_tokens": 6, "total_tokens": 36}
     assert "_usage" not in out
+
+
+def test_long_document_ask_prefers_backend_hybrid_search(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "max_context_chars", 200)
+    dispatcher = WorkerDispatcher()
+    long_text = "无关内容。" * 200
+    monkeypatch.setattr(dispatcher.context_client, "get_document_context", lambda doc, version_id="": {
+        "scope": {"document_id": doc, "project_id": "p1"}, "extracted_text": long_text,
+        "extracted_text_version_id": "v1", "version_id": "v1", "versions": [{"id": "v1", "version_no": 1}],
+        "document": {"title": "方案"}})
+    monkeypatch.setattr(dispatcher.context_client, "get_project_context", lambda pid: {})
+    calls: list[tuple] = []
+
+    def fake_search(project_id, query, document_id="", limit=8):
+        calls.append((project_id, document_id))
+        return [{"document_id": "d1", "title": "方案", "version_no": 1, "chunk_no": 7, "content": "回报信号由距离惩罚构成"}]
+
+    monkeypatch.setattr(dispatcher.context_client, "search_project_text", fake_search)
+    captured: dict[str, object] = {}
+
+    def fake_run(task, context, scope=None, on_delta=None):
+        captured["context"] = context
+        return {"answer": "ok"}
+
+    monkeypatch.setattr(dispatcher.skill_adapter, "run", fake_run)
+    result = dispatcher.handle_task(WorkerTask(request_id="r", task_type="assistant.ask", related_type="document", related_id="d1", payload={"question": "奖励怎么设计"}))
+    assert result.status == "completed" and calls == [("p1", "d1")]
+    passages = cast(list[ObjectDict], cast(ObjectDict, captured["context"])["passages"])
+    assert passages[0]["content"] == "回报信号由距离惩罚构成"
+
+    # Nothing indexed yet: fall back to local ranking of the document text.
+    monkeypatch.setattr(dispatcher.context_client, "search_project_text", lambda *a, **k: [])
+    dispatcher.handle_task(WorkerTask(request_id="r2", task_type="assistant.ask", related_type="document", related_id="d1", payload={"question": "奖励怎么设计"}))
+    passages = cast(list[ObjectDict], cast(ObjectDict, captured["context"])["passages"])
+    assert passages and passages[0]["content"].startswith("无关内容")

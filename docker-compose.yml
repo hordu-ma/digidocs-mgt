@@ -1,6 +1,9 @@
 services:
   postgres:
-    image: postgres:17
+    # pgvector 镜像（2026-11-10）：PostgreSQL 17.11 + pgvector 0.8.7，基于 Debian 13，
+    # glibc 与原 postgres:17 生产镜像一致，数据目录可直接沿用。按摘要固定，避免
+    # 浮动标签在重建时悄悄换掉数据库版本。
+    image: pgvector/pgvector:pg17-trixie@sha256:01215e09bd4bd582d20230e025b6c971deeeffee49ceef1aae167e839cb62a7e
     container_name: digidocs-postgres
     restart: unless-stopped
     # json-file 默认不轮转。后端对每个请求打一行访问日志、worker 每 5 秒轮询一次，
@@ -60,6 +63,9 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
       AUTO_SUMMARIZE_ON_UPLOAD: ${AUTO_SUMMARIZE_ON_UPLOAD:-true}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
+      EMBEDDING_MIN_SIMILARITY: ${EMBEDDING_MIN_SIMILARITY:-0.45}
       SELF_REGISTRATION: ${SELF_REGISTRATION:-open}
       METRICS_TOKEN: ${METRICS_TOKEN:-}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-memory}

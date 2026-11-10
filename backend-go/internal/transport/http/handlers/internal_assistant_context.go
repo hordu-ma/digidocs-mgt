@@ -53,7 +53,7 @@ func (h InternalAssistantContextHandler) SearchProjectText(w http.ResponseWriter
 		ProjectID:  projectID,
 		DocumentID: r.URL.Query().Get("document_id"),
 		Scope:      workerScope,
-		Limit:      parseIntOrDefault(r.URL.Query().Get("limit"), 8),
+		Limit:      min(parseIntOrDefault(r.URL.Query().Get("limit"), 8), 50),
 	})
 	if err != nil {
 		writeServiceError(w, err, "project not found", "failed to search project text")

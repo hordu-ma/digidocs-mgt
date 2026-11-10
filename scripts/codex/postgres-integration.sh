@@ -18,7 +18,7 @@ docker run --rm -d \
   -e POSTGRES_USER=postgres \
   -e POSTGRES_PASSWORD=postgres \
   -p 127.0.0.1::5432 \
-  postgres:17 >/dev/null
+  pgvector/pgvector:pg17-trixie@sha256:01215e09bd4bd582d20230e025b6c971deeeffee49ceef1aae167e839cb62a7e >/dev/null
 
 for _ in $(seq 1 60); do
   if docker exec "$container" pg_isready -U postgres -d digidocs_mgt >/dev/null 2>&1; then

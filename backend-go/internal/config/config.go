@@ -60,6 +60,12 @@ type Config struct {
 
 	// MetricsToken enables GET /metrics (Bearer auth); empty disables it.
 	MetricsToken string
+
+	// Semantic search (2026-11-10). Empty EmbeddingBaseURL disables it and
+	// search stays keyword-only.
+	EmbeddingBaseURL       string  // Ollama, e.g. http://172.29.0.1:11502
+	EmbeddingModel         string  // bge-m3
+	EmbeddingMinSimilarity float64 // cosine similarity floor for semantic hits
 }
 
 func Load() Config {
@@ -99,6 +105,9 @@ func Load() Config {
 		AutoSummarizeOnUpload:      getEnv("AUTO_SUMMARIZE_ON_UPLOAD", "true") == "true",
 		SelfRegistration:           getEnv("SELF_REGISTRATION", "open"),
 		MetricsToken:               getEnv("METRICS_TOKEN", ""),
+		EmbeddingBaseURL:           getEnv("EMBEDDING_BASE_URL", ""),
+		EmbeddingModel:             getEnv("EMBEDDING_MODEL", "bge-m3"),
+		EmbeddingMinSimilarity:     getEnvFloat("EMBEDDING_MIN_SIMILARITY", 0.45),
 	}
 
 	if cfg.AppEnv == "production" {
@@ -131,6 +140,18 @@ func getEnvInt(key string, fallback int) int {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func getEnvFloat(key string, fallback float64) float64 {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
 	if err != nil {
 		return fallback
 	}

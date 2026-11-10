@@ -69,7 +69,7 @@ func (r TextSearchRepository) SearchChunks(ctx context.Context, filter query.Tex
 		return []query.TextSearchHit{}, nil
 	}
 	limit := filter.Limit
-	if limit <= 0 || limit > 50 {
+	if limit <= 0 || limit > 200 {
 		limit = 8
 	}
 	isAdmin, actorID := scopeArgs(filter.Scope)
@@ -113,7 +113,7 @@ func (r TextSearchRepository) SearchDocuments(ctx context.Context, filter query.
 		return []query.TextSearchHit{}, nil
 	}
 	limit := filter.Limit
-	if limit <= 0 || limit > 50 {
+	if limit <= 0 || limit > 200 {
 		limit = 20
 	}
 	isAdmin, actorID := scopeArgs(filter.Scope)
@@ -201,4 +201,92 @@ func (r TextSearchRepository) GetDocumentText(ctx context.Context, documentID st
 	out.Available = out.Chunks > 0
 	out.Truncated = out.Chunks >= textsearch.MaxChunks
 	return out, nil
+}
+
+// VectorEnabled reports whether migration 016 created the embedding column,
+// i.e. whether the database has pgvector.
+func (r TextSearchRepository) VectorEnabled(ctx context.Context) (bool, error) {
+	var ok bool
+	err := r.db.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_name = 'document_text_chunks' AND column_name = 'embedding'
+		)
+	`).Scan(&ok)
+	return ok, err
+}
+
+// ChunksNeedingEmbedding returns current-version chunks without a vector from
+// the given model, oldest first.
+func (r TextSearchRepository) ChunksNeedingEmbedding(ctx context.Context, model string, limit int) ([]query.ChunkForEmbedding, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT c.id::text, d.title, c.content
+		FROM document_text_chunks c
+		JOIN documents d ON d.id = c.document_id AND d.current_version_id = c.version_id
+		WHERE d.is_deleted = false
+		  AND (c.embedding IS NULL OR c.embedding_model IS DISTINCT FROM $1)
+		ORDER BY c.created_at, c.chunk_no
+		LIMIT $2
+	`, model, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]query.ChunkForEmbedding, 0, limit)
+	for rows.Next() {
+		var c query.ChunkForEmbedding
+		if err := rows.Scan(&c.ID, &c.Title, &c.Content); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// SetChunkEmbedding stores a vector given as a pgvector text literal.
+func (r TextSearchRepository) SetChunkEmbedding(ctx context.Context, chunkID string, vectorLiteral string, model string) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE document_text_chunks SET embedding = $2::vector, embedding_model = $3 WHERE id::text = $1
+	`, chunkID, vectorLiteral, model)
+	return err
+}
+
+// VectorChunks returns the chunks nearest to the query vector (cosine), with
+// the same visibility filters as keyword search, keeping only hits at or above
+// minSimilarity.
+func (r TextSearchRepository) VectorChunks(ctx context.Context, filter query.TextSearchFilter, vectorLiteral string, model string, limit int, minSimilarity float64) ([]query.TextSearchHit, error) {
+	isAdmin, actorID := scopeArgs(filter.Scope)
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT d.id::text, d.title, d.project_id::text, COALESCE(p.name, ''),
+			v.id::text, v.version_no, c.chunk_no, c.content,
+			1 - (c.embedding <=> $1::vector) AS similarity
+		FROM document_text_chunks c
+		JOIN documents d ON d.id = c.document_id AND d.current_version_id = c.version_id
+		JOIN document_versions v ON v.id = c.version_id
+		LEFT JOIN projects p ON p.id = d.project_id
+		WHERE d.is_deleted = false
+		  AND c.embedding IS NOT NULL
+		  AND c.embedding_model = $2
+		  AND ($3 = '' OR d.project_id::text = $3)
+		  AND ($4 = '' OR d.id::text = $4)
+		  AND `+projectScopeSQL("d.project_id", "$5", "$6")+`
+		ORDER BY c.embedding <=> $1::vector
+		LIMIT $7
+	`, vectorLiteral, model, filter.ProjectID, filter.DocumentID, isAdmin, actorID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	hits := make([]query.TextSearchHit, 0, limit)
+	for rows.Next() {
+		var h query.TextSearchHit
+		if err := rows.Scan(&h.DocumentID, &h.Title, &h.ProjectID, &h.ProjectName, &h.VersionID, &h.VersionNo, &h.ChunkNo, &h.Content, &h.Similarity); err != nil {
+			return nil, err
+		}
+		if h.Similarity < minSimilarity {
+			continue
+		}
+		hits = append(hits, h)
+	}
+	return hits, rows.Err()
 }

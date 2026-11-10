@@ -134,6 +134,11 @@ def select_passages(
             continue
         chosen.append(i)
         used += len(chunks[i])
+    if not chosen:
+        # Budget smaller than one chunk: keep the most relevant chunk, cut to
+        # the budget, rather than sending no text at all.
+        best = ranked[0]
+        return [Passage(label="片段1", content=chunks[best][:budget_chars], chunk_no=best, **meta)]
     chosen.sort()
     return [
         Passage(label=f"片段{n + 1}", content=chunks[i], chunk_no=i, **meta)

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -16,6 +17,9 @@ func NewServer(cfg config.Config) (*http.Server, error) {
 	}
 
 	handler := httprouter.New(cfg, container)
+	for _, job := range container.Background {
+		go job(context.Background())
+	}
 
 	return &http.Server{
 		Addr:              cfg.HTTPAddr,

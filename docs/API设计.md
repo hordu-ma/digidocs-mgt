@@ -566,7 +566,9 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 
 在调用者所属课题的文档**当前版本正文**中检索，每篇文档返回一条，代表片段为命中查询词最多的一段。查询词规则与 AI 检索相同（中文两字一组、英文按单词），正文来自 `document_text_chunks`，尚未抽取正文的文档搜不到。
 
-响应：`[{document_id, title, project_id, project_name, version_id, version_no, chunk_no, snippet, score, matched_chunks}]`，按命中词数、命中片段数、更新时间排序，`limit` 上限 50。
+响应：`[{document_id, title, project_id, project_name, version_id, version_no, chunk_no, snippet, score, matched_chunks, match}]`，`limit` 上限 50。
+
+混合检索（2026-11-10，迁移 016）：向量可用时，同时做关键词检索（按命中词数排序）与语义检索（`bge-m3` 向量余弦相似度，低于阈值的结果丢弃），两路各取前 100 个分块，按 RRF（`1/(60+名次)` 之和）融合后再按文档归并。`match` 取 `keyword`、`semantic` 或 `both`，表示该文档由哪一路检索命中。向量不可用（数据库无扩展、未配置嵌入服务、嵌入超时）时自动退回纯关键词，响应结构不变。AI 问答使用的内部检索 `GET /internal/assistant-context/projects/{id}/search` 采用同一套规则。
 
 ### 4.3 文档详情
 

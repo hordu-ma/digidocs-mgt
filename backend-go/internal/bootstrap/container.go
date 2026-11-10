@@ -1,12 +1,15 @@
 package bootstrap
 
 import (
+	"context"
 	"database/sql"
+	"digidocs-mgt/backend-go/internal/embedding"
 	"digidocs-mgt/backend-go/internal/notify"
 	"fmt"
 	"log"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"digidocs-mgt/backend-go/internal/config"
 	"digidocs-mgt/backend-go/internal/db"
@@ -42,6 +45,8 @@ type Container struct {
 	MembershipService     service.MembershipService
 	NotificationService   service.NotificationService
 	SearchService         service.SearchService
+	// Background jobs started with the HTTP server (e.g. the embedding indexer).
+	Background []func(context.Context)
 }
 
 // buildNotificationChannels returns the external channels enabled by config.
@@ -101,6 +106,8 @@ func BuildContainer(cfg config.Config) (Container, error) {
 		auditService := service.NewAuditService(pgrepo.NewAuditRepository(postgresDB))
 		notificationService := service.NewNotificationService(pgrepo.NewNotificationRepository(postgresDB), cfg.PublicBaseURL, buildNotificationChannels(cfg)...)
 		log.Printf("[bootstrap] notification channels: %v", notificationService.Channels())
+		textSearchRepo := pgrepo.NewTextSearchRepository(postgresDB)
+		searchService, background := buildSearch(cfg, textSearchRepo)
 		flowService := service.NewFlowService(pgrepo.NewFlowRepository(postgresDB), actionRepo, permissionService).WithNotifications(notificationService)
 		return Container{
 			DB:            postgresDB,
@@ -120,7 +127,8 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			DashboardQueryService: service.NewDashboardQueryService(pgrepo.NewDashboardRepository(postgresDB)),
 			VersionService:        service.NewVersionService(storageProvider, versionWorkflow, versionRepo, permissionService),
 			FlowService:           flowService,
-			SearchService:         service.NewSearchService(pgrepo.NewTextSearchRepository(postgresDB)),
+			SearchService:         searchService,
+			Background:            background,
 			HandoverService:       service.NewHandoverService(pgrepo.NewHandoverRepository(postgresDB), actionRepo, permissionService).WithNotifications(notificationService),
 			DataAssetService:      service.NewDataAssetService(dataAssetRepo, dataAssetRepo, storageProvider, permissionService),
 			CodeRepositoryService: service.NewCodeRepositoryService(codeRepo, codeRepo, permissionService, cfg.CodeRepoRoot, storageProvider),
@@ -207,4 +215,27 @@ func buildStorageProvider(cfg config.Config) storage.Provider {
 		log.Println("[bootstrap] using memory storage")
 		return memstorage.NewProvider()
 	}
+}
+
+// buildSearch enables hybrid retrieval when an embedding server is configured
+// and the database has pgvector (migration 016 created the column); otherwise
+// search stays keyword-only and no indexer runs.
+func buildSearch(cfg config.Config, repo pgrepo.TextSearchRepository) (service.SearchService, []func(context.Context)) {
+	search := service.NewSearchService(repo)
+	if cfg.EmbeddingBaseURL == "" {
+		log.Printf("[bootstrap] semantic search disabled: EMBEDDING_BASE_URL not set")
+		return search, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	enabled, err := repo.VectorEnabled(ctx)
+	if err != nil || !enabled {
+		log.Printf("[bootstrap] semantic search disabled: pgvector column unavailable (err=%v)", err)
+		return search, nil
+	}
+	embedder := embedding.NewOllamaClient(cfg.EmbeddingBaseURL, cfg.EmbeddingModel, 1024)
+	search = search.WithSemantic(repo, embedder, cfg.EmbeddingMinSimilarity)
+	indexer := service.NewEmbeddingIndexer(repo, embedder)
+	log.Printf("[bootstrap] semantic search enabled model=%s min_similarity=%.2f", cfg.EmbeddingModel, cfg.EmbeddingMinSimilarity)
+	return search, []func(context.Context){indexer.Run}
 }

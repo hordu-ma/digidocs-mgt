@@ -243,9 +243,17 @@ class WorkerDispatcher:
                 version_no = _current_version_no(doc_ctx)
             else:
                 title, version_no = "", 0
-            passages = select_passages(
-                text, question, budget, document_id=document_id, title=title, version_no=version_no
-            )
+            # Long documents: prefer the backend's hybrid (keyword + semantic)
+            # retrieval over this document's indexed chunks, so a paraphrased
+            # question still finds the right passage. Fall back to local keyword
+            # ranking when the text is not indexed yet or nothing came back.
+            if len(text) > budget and project_id and question:
+                hits = self.context_client.search_project_text(project_id, question, document_id, limit=16)
+                passages = passages_from_hits(hits, budget)
+            if not passages:
+                passages = select_passages(
+                    text, question, budget, document_id=document_id, title=title, version_no=version_no
+                )
         elif project_id and question:
             hits = self.context_client.search_project_text(project_id, question)
             passages = passages_from_hits(hits, budget)

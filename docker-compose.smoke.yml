@@ -52,6 +52,9 @@ services:
       WORKER_CALLBACK_TOKEN: ${SMOKE_WORKER_CALLBACK_TOKEN:-smoke-only-worker-token}
       # 烟测会连续注册/登录，放宽限流以免自己把自己限掉。
       LOGIN_RATE_LIMIT_PER_MIN: "0"
+      # 烟测网段 172.30.0.0/24 未放行模型桥接端口；显式关闭语义检索，避免每次
+      # 检索都等嵌入超时再回退。语义检索由 postgres-integration 用 pgvector 覆盖。
+      EMBEDDING_BASE_URL: ""
       REGISTER_RATE_LIMIT_PER_MIN: "0"
       CORS_ALLOW_ORIGINS: "*"
     ports: !override

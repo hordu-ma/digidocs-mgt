@@ -58,3 +58,8 @@ def test_split_for_summary_samples_evenly() -> None:
     assert sampled and len(pieces) == 4
     pieces, sampled = split_for_summary("x" * 300, 100, 4)
     assert not sampled and len(pieces) == 3
+
+
+def test_budget_smaller_than_a_chunk_still_returns_text() -> None:
+    out = select_passages("甲" * 2000, "问题", 100)
+    assert len(out) == 1 and len(out[0].content) == 100
