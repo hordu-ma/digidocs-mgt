@@ -42,7 +42,7 @@ func (r MembershipRepository) changeMember(ctx context.Context, projectID, membe
 		return nil, err
 	}
 	var item query.ProjectMemberItem
-	if err = tx.QueryRowContext(ctx, `SELECT pm.id::text, pm.user_id::text, pm.project_role, u.display_name, COALESCE(u.username, '') FROM project_members pm JOIN users u ON u.id=pm.user_id WHERE pm.project_id::text=$1 AND pm.id::text=$2 FOR UPDATE OF pm`, projectID, memberID).Scan(&item.ID, &item.UserID, &item.ProjectRole, &item.DisplayName, &item.Username); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT pm.id::text, pm.user_id::text, pm.project_role, u.display_name, COALESCE(u.username, ''), `+memberAccountSQL+` FROM project_members pm JOIN users u ON u.id=pm.user_id WHERE pm.project_id::text=$1 AND pm.id::text=$2 FOR UPDATE OF pm`, projectID, memberID).Scan(&item.ID, &item.UserID, &item.ProjectRole, &item.DisplayName, &item.Username, &item.Account); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, service.ErrNotFound
 		}
@@ -84,11 +84,11 @@ func (r MembershipRepository) RemoveProjectMember(ctx context.Context, projectID
 func (r MembershipRepository) GetProjectMember(ctx context.Context, projectID, memberID string) (*query.ProjectMemberItem, error) {
 	var item query.ProjectMemberItem
 	err := r.db.QueryRowContext(ctx, `
-		SELECT pm.id::text, pm.user_id::text, u.display_name, COALESCE(u.username, ''), pm.project_role
+		SELECT pm.id::text, pm.user_id::text, u.display_name, COALESCE(u.username, ''), `+memberAccountSQL+`, pm.project_role
 		FROM project_members pm
 		JOIN users u ON u.id = pm.user_id
 		WHERE pm.id::text = $1 AND pm.project_id::text = $2
-	`, memberID, projectID).Scan(&item.ID, &item.UserID, &item.DisplayName, &item.Username, &item.ProjectRole)
+	`, memberID, projectID).Scan(&item.ID, &item.UserID, &item.DisplayName, &item.Username, &item.Account, &item.ProjectRole)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, service.ErrNotFound
 	}
@@ -101,11 +101,11 @@ func (r MembershipRepository) GetProjectMember(ctx context.Context, projectID, m
 func (r MembershipRepository) FindProjectMember(ctx context.Context, projectID, userID string) (*query.ProjectMemberItem, error) {
 	var item query.ProjectMemberItem
 	err := r.db.QueryRowContext(ctx, `
-		SELECT pm.id::text, pm.user_id::text, u.display_name, COALESCE(u.username, ''), pm.project_role
+		SELECT pm.id::text, pm.user_id::text, u.display_name, COALESCE(u.username, ''), `+memberAccountSQL+`, pm.project_role
 		FROM project_members pm
 		JOIN users u ON u.id = pm.user_id
 		WHERE pm.project_id::text = $1 AND pm.user_id::text = $2
-	`, projectID, userID).Scan(&item.ID, &item.UserID, &item.DisplayName, &item.Username, &item.ProjectRole)
+	`, projectID, userID).Scan(&item.ID, &item.UserID, &item.DisplayName, &item.Username, &item.Account, &item.ProjectRole)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, service.ErrNotFound
 	}
@@ -253,3 +253,12 @@ func (r MembershipRepository) GetInvitePreview(ctx context.Context, token string
 	preview.Expired = time.Now().UTC().After(expires.UTC())
 	return &preview, nil
 }
+
+// memberAccountSQL is what the member list shows as the account: the username,
+// or for self-registered users (no username) a masked phone / email, so a
+// project lead can tell members apart without exposing contact details.
+const memberAccountSQL = `CASE
+			WHEN COALESCE(u.username, '') <> '' THEN u.username
+			WHEN COALESCE(u.phone, '') <> '' THEN left(u.phone, 3) || '****' || right(u.phone, 4)
+			WHEN COALESCE(u.email, '') <> '' THEN left(u.email, 1) || '***' || substring(u.email from position('@' in u.email))
+			ELSE '' END`

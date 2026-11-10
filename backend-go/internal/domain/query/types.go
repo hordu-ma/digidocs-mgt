@@ -192,6 +192,22 @@ type DocumentDetail struct {
 	CurrentOwner     *UserSummary `json:"current_owner,omitempty"`
 	CurrentVersionID string       `json:"current_version_id,omitempty"`
 	IsArchived       bool         `json:"is_archived"`
+	// 2026-11-10: fields the detail page displayed but never received.
+	ProjectName      string `json:"project_name,omitempty"`
+	FolderID         string `json:"folder_id,omitempty"`
+	FolderPath       string `json:"folder_path,omitempty"`
+	CurrentVersionNo *int   `json:"current_version_no,omitempty"`
+	CreatedAt        string `json:"created_at,omitempty"`
+	UpdatedAt        string `json:"updated_at,omitempty"`
+	// Actions lists the flow actions valid in the current status, and whether
+	// the caller may run each; the UI shows denied ones disabled with Reason.
+	Actions []FlowActionState `json:"actions"`
+}
+
+type FlowActionState struct {
+	Action  string `json:"action"`
+	Allowed bool   `json:"allowed"`
+	Reason  string `json:"reason,omitempty"`
 }
 
 type DocumentListFilter struct {
@@ -250,6 +266,8 @@ type ProjectMemberItem struct {
 	UserID      string `json:"user_id"`
 	DisplayName string `json:"display_name"`
 	Username    string `json:"username"`
+	// Account is the username, or a masked phone/email for self-registered users.
+	Account     string `json:"account"`
 	ProjectRole string `json:"project_role"`
 }
 

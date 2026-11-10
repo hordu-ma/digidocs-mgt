@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { RecentFlowItem, RiskItem } from "@/types";
 import {
   ArrowRight,
   Connection,
@@ -27,8 +28,8 @@ const overview = ref({
   handover_pending_count: 0,
   risk_document_count: 0,
 });
-const recentFlows = ref<any[]>([]);
-const riskDocs = ref<any[]>([]);
+const recentFlows = ref<RecentFlowItem[]>([]);
+const riskDocs = ref<RiskItem[]>([]);
 
 interface DownloadMetric {
   document_id: string;
@@ -297,8 +298,8 @@ function openDocument(id?: string) {
                   <span>{{ formatTime(row.created_at) }}</span>
                 </div>
                 <div class="flow-status">
-                  <span class="status-pill" :class="statusClass[row.from_status]">
-                    {{ statusLabel[row.from_status] ?? row.from_status ?? "原状态" }}
+                  <span class="status-pill" :class="statusClass[row.from_status ?? '']">
+                    {{ statusLabel[row.from_status ?? ""] ?? row.from_status ?? "原状态" }}
                   </span>
                   <span class="flow-arrow">→</span>
                   <span class="status-pill" :class="statusClass[row.to_status]">

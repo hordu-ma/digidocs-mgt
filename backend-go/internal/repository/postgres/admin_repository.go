@@ -168,7 +168,7 @@ func (r AdminRepository) ListAllUsers(ctx context.Context) ([]query.UserOption, 
 // ListProjectMembers returns all members of a project with user info.
 func (r AdminRepository) ListProjectMembers(ctx context.Context, projectID string) ([]query.ProjectMemberItem, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT pm.id::text, pm.user_id::text, u.display_name, COALESCE(u.username, ''), pm.project_role
+		SELECT pm.id::text, pm.user_id::text, u.display_name, COALESCE(u.username, ''), `+memberAccountSQL+`, pm.project_role
 		FROM project_members pm
 		JOIN users u ON u.id = pm.user_id
 		WHERE pm.project_id::text = $1
@@ -184,7 +184,7 @@ func (r AdminRepository) ListProjectMembers(ctx context.Context, projectID strin
 	items := make([]query.ProjectMemberItem, 0)
 	for rows.Next() {
 		var item query.ProjectMemberItem
-		if err := rows.Scan(&item.ID, &item.UserID, &item.DisplayName, &item.Username, &item.ProjectRole); err != nil {
+		if err := rows.Scan(&item.ID, &item.UserID, &item.DisplayName, &item.Username, &item.Account, &item.ProjectRole); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
@@ -212,6 +212,7 @@ func (r AdminRepository) AddProjectMember(ctx context.Context, projectID, userID
 	// Populate user display info
 	_ = r.db.QueryRowContext(ctx, `SELECT display_name, COALESCE(username, '') FROM users WHERE id = $1::uuid`,
 		userID).Scan(&item.DisplayName, &item.Username)
+	item.Account = item.Username
 
 	return &item, nil
 }
@@ -232,7 +233,7 @@ func (r AdminRepository) UpdateProjectMember(ctx context.Context, memberID, proj
 	}
 
 	_ = r.db.QueryRowContext(ctx, `SELECT display_name, COALESCE(username, '') FROM users WHERE id = $1::uuid`,
-		item.UserID).Scan(&item.DisplayName, &item.Username)
+		item.UserID).Scan(&item.DisplayName, &item.Username, &item.Account)
 
 	return &item, nil
 }

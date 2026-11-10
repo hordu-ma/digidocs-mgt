@@ -3,6 +3,7 @@ import { ElMessage } from "element-plus";
 import { onMounted, reactive, ref } from "vue";
 
 import api from "@/api";
+import { formatDateTime } from "@/utils/format";
 import { extractError } from "@/utils/error";
 import AppLayout from "@/components/AppLayout.vue";
 import { useAuthStore } from "@/stores/auth";
@@ -62,9 +63,7 @@ function displayStatus(status?: string): string {
 }
 
 function displayLastLogin(value?: string | null): string {
-  if (!value) return "尚未登录";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
+  return formatDateTime(value, "暂无登录记录");
 }
 
 function fillForm(data: UserProfile) {
@@ -167,7 +166,7 @@ onMounted(loadProfile);
           <div class="readonly-list">
             <div class="readonly-item">
               <span>登录账号</span>
-              <strong>{{ profile?.username || profile?.email || profile?.phone || "-" }}</strong>
+              <strong>{{ profile?.username || profile?.email || profile?.phone || "暂无账号" }}</strong>
             </div>
             <div class="readonly-item">
               <span>全局角色</span>

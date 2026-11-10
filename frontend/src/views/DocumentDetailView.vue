@@ -18,13 +18,14 @@ import { useRoute, useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+import { formatDateTime } from "@/utils/format";
 import {
   documentStatusClass as statusClass,
   documentStatusLabel as statusLabel,
   flowActionLabel,
 } from "@/utils/labels";
 import { extractError } from "@/utils/error";
-import type { UserOption } from "@/types";
+import type { DocumentDetail, FlowItem, SuggestionItem, UserOption, VersionItem } from "@/types";
 
 type FolderNode = {
   id: string;
@@ -41,10 +42,10 @@ const route = useRoute();
 const router = useRouter();
 const documentID = route.params.id as string;
 
-const doc = ref<any>(null);
-const versions = ref<any[]>([]);
-const flows = ref<any[]>([]);
-const suggestions = ref<any[]>([]);
+const doc = ref<DocumentDetail | null>(null);
+const versions = ref<VersionItem[]>([]);
+const flows = ref<FlowItem[]>([]);
+const suggestions = ref<SuggestionItem[]>([]);
 const actionLoading = ref(false);
 const summaryLoading = ref(false);
 const summaryPolling = ref(false);
@@ -89,44 +90,50 @@ function suggestionTypeText(type?: string): string {
   return suggestionTypeLabel[type] ?? type;
 }
 
-// Map current status → available flow actions
-const flowActions: Record<
-  string,
-  { action: string; label: string; endpoint: string }[]
-> = {
-  draft: [
-    {
-      action: "mark_in_progress",
-      label: "开始处理",
-      endpoint: "mark-in-progress",
-    },
-  ],
-  in_progress: [
-    { action: "transfer", label: "转交", endpoint: "transfer" },
-    { action: "finalize", label: "定稿", endpoint: "finalize" },
-  ],
-  pending_handover: [
-    {
-      action: "accept_transfer",
-      label: "接受转交",
-      endpoint: "accept-transfer",
-    },
-  ],
-  finalized: [{ action: "archive", label: "归档", endpoint: "archive" }],
-  archived: [{ action: "unarchive", label: "取消归档", endpoint: "unarchive" }],
+// Flow buttons come from the backend (doc.actions): the actions valid in the
+// current status, each with whether *this user* may run it and why not. The
+// page used to keep its own status table, which had drifted from the backend
+// state machine (handed_over documents showed no buttons at all) and showed
+// buttons that then failed with 403.
+const flowActionEndpoint: Record<string, string> = {
+  mark_in_progress: "mark-in-progress",
+  transfer: "transfer",
+  accept_transfer: "accept-transfer",
+  finalize: "finalize",
+  archive: "archive",
+  unarchive: "unarchive",
 };
 
-const availableActions = computed(() => {
-  const status = doc.value?.current_status;
-  return status ? (flowActions[status] ?? []) : [];
-});
+interface FlowActionState {
+  action: string;
+  allowed: boolean;
+  reason?: string;
+}
+
+const availableActions = computed(() =>
+  ((doc.value?.actions ?? []) as FlowActionState[])
+    .filter((a) => flowActionEndpoint[a.action])
+    .map((a) => ({
+      ...a,
+      endpoint: flowActionEndpoint[a.action],
+      label: flowActionLabel[a.action] ?? a.action,
+    })),
+);
 
 const selectableUsers = computed(() =>
   users.value.filter((item) => item.id !== doc.value?.current_owner?.id),
 );
 
-const currentVersionNo = computed(
-  () => doc.value?.current_version_no ?? versions.value[0]?.version_no ?? "-",
+// Version history shows the latest few by default; long histories filled the
+// whole screen before (25+ rows) and only grow.
+const VERSION_PREVIEW = 5;
+const versionsExpanded = ref(false);
+const visibleVersions = computed(() =>
+  versionsExpanded.value ? versions.value : versions.value.slice(0, VERSION_PREVIEW),
+);
+
+const currentVersionNo = computed<number | null>(
+  () => doc.value?.current_version_no ?? versions.value[0]?.version_no ?? null,
 );
 
 const latestSummaryText = computed(() => {
@@ -150,14 +157,7 @@ function inferFileType(value?: string) {
 }
 
 function formatTime(value?: string) {
-  if (!value) return "-";
-  return new Date(value).toLocaleString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTime(value, "暂无");
 }
 
 async function downloadVersion(versionID: string, fileName: string) {
@@ -526,15 +526,15 @@ onBeforeUnmount(() => {
               </span>
               <span class="person-chip">
                 <span class="person-avatar">{{ ownerInitial() }}</span>
-                {{ doc.current_owner?.display_name ?? "-" }}
+                {{ doc.current_owner?.display_name ?? "暂无责任人" }}
               </span>
-              <span class="version-chip">当前版本 v{{ currentVersionNo }}</span>
+              <span class="version-chip">{{ currentVersionNo === null ? "暂无版本" : `当前版本 v${currentVersionNo}` }}</span>
             </div>
           </div>
         </div>
         <div class="hero-actions">
           <ElButton
-            v-for="act in availableActions"
+            v-for="act in availableActions.filter((a) => a.allowed)"
             :key="act.action"
             type="primary"
             :loading="actionLoading"
@@ -542,13 +542,23 @@ onBeforeUnmount(() => {
           >
             {{ act.label }}
           </ElButton>
+          <ElTooltip
+            v-for="act in availableActions.filter((a) => !a.allowed)"
+            :key="act.action"
+            :content="act.reason || '你没有执行该操作的权限'"
+            placement="bottom"
+          >
+            <span class="disabled-action-wrap">
+              <ElButton disabled>{{ act.label }}</ElButton>
+            </span>
+          </ElTooltip>
           <ElButton @click="openEdit">
             <ElIcon><EditPen /></ElIcon>
             档案编辑
           </ElButton>
           <ElButton
             v-if="doc.current_version_id"
-            @click="downloadVersion(doc.current_version_id, versions[0]?.file_name)"
+            @click="downloadVersion(doc.current_version_id ?? '', versions[0]?.file_name ?? '')"
           >
             <ElIcon><Download /></ElIcon>
             下载当前版本
@@ -578,7 +588,7 @@ onBeforeUnmount(() => {
               </div>
               <div class="fact-item">
                 <span>当前责任人</span>
-                <strong>{{ doc.current_owner?.display_name ?? "-" }}</strong>
+                <strong>{{ doc.current_owner?.display_name ?? "暂无责任人" }}</strong>
               </div>
               <div class="fact-item">
                 <span>当前状态</span>
@@ -586,7 +596,7 @@ onBeforeUnmount(() => {
               </div>
               <div class="fact-item">
                 <span>当前版本</span>
-                <strong>v{{ currentVersionNo }}</strong>
+                <strong>{{ currentVersionNo === null ? "暂无版本" : `v${currentVersionNo}` }}</strong>
               </div>
               <div class="fact-item">
                 <span>更新时间</span>
@@ -594,7 +604,7 @@ onBeforeUnmount(() => {
               </div>
               <div class="fact-item">
                 <span>所属目录</span>
-                <strong>{{ doc.folder_path || doc.folder_name || "未挂接目录" }}</strong>
+                <strong>{{ doc.folder_path || "未挂接目录" }}</strong>
               </div>
               <div class="fact-item">
                 <span>归档状态</span>
@@ -620,7 +630,7 @@ onBeforeUnmount(() => {
               <p class="empty-hint">上传首个文件版本后会出现在这里</p>
             </div>
             <div v-else class="version-timeline">
-              <div v-for="item in versions" :key="item.id || item.version_no" class="version-item">
+              <div v-for="item in visibleVersions" :key="item.id || item.version_no" class="version-item">
                 <span class="version-chip">v{{ item.version_no }}</span>
                 <div class="version-body">
                   <strong>{{ item.file_name || "未命名文件" }}</strong>
@@ -637,11 +647,20 @@ onBeforeUnmount(() => {
                   size="small"
                   text
                   title="下载此版本"
-                  @click="downloadVersion(item.id, item.file_name)"
+                  @click="downloadVersion(item.id, item.file_name ?? '')"
                 >
                   <ElIcon><Download /></ElIcon>
                 </ElButton>
               </div>
+              <ElButton
+                v-if="versions.length > VERSION_PREVIEW"
+                link
+                type="primary"
+                class="version-toggle"
+                @click="versionsExpanded = !versionsExpanded"
+              >
+                {{ versionsExpanded ? "收起" : `展开全部 ${versions.length} 个版本` }}
+              </ElButton>
             </div>
           </section>
 
@@ -665,8 +684,8 @@ onBeforeUnmount(() => {
                 <div class="flow-history-body">
                   <strong>{{ flowActionLabel[item.action] ?? item.action }}</strong>
                   <div class="flow-status-row">
-                    <span class="status-pill" :class="statusClass[item.from_status]">
-                      {{ statusLabel[item.from_status] ?? (item.from_status || "原状态") }}
+                    <span class="status-pill" :class="statusClass[item.from_status ?? '']">
+                      {{ statusLabel[item.from_status ?? ""] ?? (item.from_status || "原状态") }}
                     </span>
                     <span>→</span>
                     <span class="status-pill" :class="statusClass[item.to_status]">
@@ -831,6 +850,15 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.disabled-action-wrap {
+  display: inline-flex;
+  cursor: not-allowed;
+}
+
+.version-toggle {
+  margin-top: 8px;
+}
+
 .access-list {
   display: grid;
   gap: 8px;

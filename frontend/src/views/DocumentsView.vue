@@ -15,10 +15,11 @@ import { useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+import { formatDate } from "@/utils/format";
 import { documentStatusClass as statusClass, documentStatusLabel as statusLabel } from "@/utils/labels";
 import { extractError } from "@/utils/error";
 import { useAuthStore } from "@/stores/auth";
-import type { ProjectOption, UserOption } from "@/types";
+import type { DocumentListItem, ProjectOption, UserOption } from "@/types";
 
 type TeamSpaceOption = {
   id: string;
@@ -39,7 +40,7 @@ type FolderOption = {
 
 const router = useRouter();
 const auth = useAuthStore();
-const rows = ref<any[]>([]);
+const rows = ref<DocumentListItem[]>([]);
 const total = ref(0);
 const keyword = ref("");
 const showArchived = ref(false);
@@ -150,14 +151,10 @@ function parseDateValue(value?: string) {
 }
 
 function formatShortTime(value?: string) {
-  if (!value) return "暂无更新时间";
-  return new Date(value).toLocaleDateString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-  });
+  return formatDate(value, "暂无更新时间");
 }
 
-function isRecent(row: any) {
+function isRecent(row: DocumentListItem) {
   const updatedAt = parseDateValue(row.updated_at);
   return updatedAt > 0 && Date.now() - updatedAt <= 7 * 24 * 60 * 60 * 1000;
 }
@@ -173,7 +170,7 @@ const quickFilters = [
 
 type DocumentGroup = {
   projectName: string;
-  documents: any[];
+  documents: DocumentListItem[];
 };
 
 const processedRows = computed(() => rows.value);
@@ -209,18 +206,18 @@ function handleSearch() {
   void fetchContentHits();
 }
 
-function goDetail(row: any) {
+function goDetail(row: DocumentListItem) {
   router.push(`/documents/${row.id}`);
 }
 
-function ownerInitial(row: any) {
+function ownerInitial(row: DocumentListItem) {
   return (row.current_owner?.display_name || "责").slice(0, 1);
 }
 
 // Row menu: delete is a soft delete that only project owners/managers can undo
 // from the 回收站 filter. The menu used to say "移出工作台" and decide on
 // is_archived (never returned by the list), so it always soft-deleted.
-async function deleteRow(row: any) {
+async function deleteRow(row: DocumentListItem) {
   try {
     await ElMessageBox.confirm(
       `删除《${row.title}》？删除后课题负责人可在「回收站」中恢复。`,
@@ -239,7 +236,7 @@ async function deleteRow(row: any) {
   }
 }
 
-async function restoreRow(row: any) {
+async function restoreRow(row: DocumentListItem) {
   try {
     await api.post(`/documents/${row.id}/restore`);
     ElMessage.success("文档已恢复");
@@ -249,7 +246,7 @@ async function restoreRow(row: any) {
   }
 }
 
-async function copyTitle(row: any) {
+async function copyTitle(row: DocumentListItem) {
   try {
     await navigator.clipboard.writeText(row.title || "");
     ElMessage.success("标题已复制");
@@ -258,7 +255,7 @@ async function copyTitle(row: any) {
   }
 }
 
-function inferFileType(row: any) {
+function inferFileType(row: DocumentListItem) {
   const raw = `${row.file_type || row.title || ""}`.toLowerCase();
   const match = raw.match(/\.(docx|xlsx|pptx|pdf|txt|md)$/);
   if (match) return match[1];
@@ -416,7 +413,7 @@ onMounted(async () => {
     fetchReferenceData(),
     api.get("/projects"),
   ]);
-  allProjects.value = (projRes.data?.data ?? []).map((p: any) => ({ id: p.id, name: p.name }));
+  allProjects.value = (projRes.data?.data ?? []).map((p: ProjectOption) => ({ id: p.id, name: p.name }));
 });
 </script>
 
@@ -581,9 +578,9 @@ onMounted(async () => {
                     </span>
                     <span class="person-chip">
                       <span class="person-avatar">{{ ownerInitial(row) }}</span>
-                      {{ row.current_owner?.display_name ?? "-" }}
+                      {{ row.current_owner?.display_name ?? "暂无责任人" }}
                     </span>
-                    <span class="version-chip">v{{ row.current_version_no ?? "-" }}</span>
+                    <span class="version-chip">{{ row.current_version_no ? `v${row.current_version_no}` : "暂无版本" }}</span>
                     <span class="status-pill" :class="statusClass[row.current_status]">
                       {{ statusLabel[row.current_status] ?? row.current_status }}
                     </span>

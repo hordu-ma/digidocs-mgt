@@ -568,22 +568,7 @@ func mappedHandoverAuditAction(action string) string {
 }
 
 func isValidFlowTransition(currentStatus string, action string) bool {
-	switch action {
-	case "mark_in_progress":
-		return currentStatus == "draft" || currentStatus == "handed_over" || currentStatus == "in_progress"
-	case "transfer":
-		return currentStatus == "in_progress"
-	case "accept_transfer":
-		return currentStatus == "pending_handover"
-	case "finalize":
-		return currentStatus == "in_progress" || currentStatus == "handed_over"
-	case "archive":
-		return currentStatus == "finalized" || currentStatus == "handed_over"
-	case "unarchive":
-		return currentStatus == "archived"
-	default:
-		return false
-	}
+	return service.ValidFlowTransition(currentStatus, action)
 }
 
 func isValidHandoverTransition(currentStatus string, action string) bool {

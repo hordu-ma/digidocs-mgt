@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from "vue";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+import { formatDateTime } from "@/utils/format";
 import { extractError } from "@/utils/error";
 import { useAuthStore } from "@/stores/auth";
 
@@ -207,7 +208,7 @@ onMounted(async () => {
         <ElTable :data="members" v-loading="loading" empty-text="暂无成员">
           <ElTableColumn prop="display_name" label="姓名" />
           <ElTableColumn label="账号">
-            <template #default="{ row }">{{ row.username || "-" }}</template>
+            <template #default="{ row }">{{ row.account || row.username || "暂无账号" }}</template>
           </ElTableColumn>
           <ElTableColumn label="课题角色">
             <template #default="{ row }">{{ roleLabel[row.project_role] || row.project_role }}</template>
@@ -235,7 +236,7 @@ onMounted(async () => {
             <template #default="{ row }">{{ inviteStatus(row) }}</template>
           </ElTableColumn>
           <ElTableColumn label="过期时间" width="200">
-            <template #default="{ row }">{{ new Date(row.expires_at).toLocaleString("zh-CN") }}</template>
+            <template #default="{ row }">{{ formatDateTime(row.expires_at) }}</template>
           </ElTableColumn>
           <ElTableColumn label="操作" width="180">
             <template #default="{ row }">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DocumentListItem, TextSearchHit } from "@/types";
 import {
   ChatDotRound,
   Coin,
@@ -29,7 +30,8 @@ const emit = defineEmits<{
 const router = useRouter();
 const keyword = ref("");
 const loading = ref(false);
-const documents = ref<any[]>([]);
+type CommandResult = Partial<DocumentListItem> & { id: string; title: string; snippet?: string };
+const documents = ref<CommandResult[]>([]);
 const isMobile = ref(false);
 let searchTimer: number | null = null;
 
@@ -136,11 +138,12 @@ async function searchDocuments(value: string) {
       api.get("/search", { params: { q: value, limit: 6 } }),
     ]);
     if (value !== keyword.value.trim()) return; // stale response
-    const byTitle: any[] = documentRes.status === "fulfilled" ? documentRes.value.data?.data ?? [] : [];
+    const byTitle: CommandResult[] = documentRes.status === "fulfilled" ? documentRes.value.data?.data ?? [] : [];
     const seen = new Set(byTitle.map((d) => d.id));
-    const byContent: any[] = (contentRes.status === "fulfilled" ? contentRes.value.data?.data ?? [] : [])
-      .filter((hit: any) => !seen.has(hit.document_id))
-      .map((hit: any) => ({ id: hit.document_id, title: hit.title, project_name: hit.project_name, snippet: hit.snippet }));
+    const hits: TextSearchHit[] = contentRes.status === "fulfilled" ? contentRes.value.data?.data ?? [] : [];
+    const byContent: CommandResult[] = hits
+      .filter((hit) => !seen.has(hit.document_id))
+      .map((hit) => ({ id: hit.document_id, title: hit.title, project_name: hit.project_name, snippet: hit.snippet }));
     documents.value = [...byTitle, ...byContent];
   } finally {
     loading.value = false;

@@ -52,7 +52,31 @@ func (s DocumentService) GetDocument(ctx context.Context, documentID string, act
 	if err := s.permissions.EnsureViewDocument(ctx, actorID, actorRole, documentID); err != nil {
 		return nil, err
 	}
-	return s.reader.GetDocument(ctx, documentID)
+	item, err := s.reader.GetDocument(ctx, documentID)
+	if err != nil {
+		return nil, err
+	}
+	item.Actions = s.flowActionStates(ctx, item, actorID, actorRole)
+	return item, nil
+}
+
+// flowActionStates evaluates every action valid in the document's status
+// against the caller's permission, using the same checks the flow endpoint
+// applies, so an enabled button never ends in a 403.
+func (s DocumentService) flowActionStates(ctx context.Context, item *query.DocumentDetail, actorID, actorRole string) []query.FlowActionState {
+	states := make([]query.FlowActionState, 0, 3)
+	for _, action := range flowActionOrder {
+		if !ValidFlowTransition(item.CurrentStatus, action) {
+			continue
+		}
+		state := query.FlowActionState{Action: action, Allowed: true}
+		if err := s.permissions.EnsureFlowDocument(ctx, actorID, actorRole, item.ID, action); err != nil {
+			state.Allowed = false
+			state.Reason = flowDeniedReason(action)
+		}
+		states = append(states, state)
+	}
+	return states
 }
 
 func (s DocumentService) UpdateDocument(ctx context.Context, input command.DocumentUpdateInput) (map[string]any, error) {

@@ -206,3 +206,50 @@ func TestPostgresIntegrationDocumentListFilters(t *testing.T) {
 		t.Fatalf("project counts: %#v %v", counts, err)
 	}
 }
+
+func TestPostgresIntegrationDocumentDetailActions(t *testing.T) {
+	ctx := context.Background()
+	database := openIntegrationDB(t)
+	seedIntegrationBaseRows(t, ctx, database)
+	const member = "00000000-0000-0000-0000-000000000801"
+	if _, err := database.ExecContext(ctx, `INSERT INTO users(id,username,password_hash,display_name,role,status) VALUES($1,'m8','h','成员','member','active')`, member); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.ExecContext(ctx, `INSERT INTO project_members(project_id,user_id,project_role) VALUES($1,$2,'contributor')`, integrationProjectID, member); err != nil {
+		t.Fatal(err)
+	}
+	documents := pgrepo.NewDocumentRepository(database)
+	permissions := service.NewPermissionService(pgrepo.NewPermissionRepository(database))
+	docs := service.NewDocumentService(documents, documents, nil, nil, permissions)
+	d, err := documents.CreateDocument(ctx, command.DocumentCreateInput{TeamSpaceID: integrationTeamSpaceID, ProjectID: integrationProjectID, Title: "t", CurrentOwnerID: member, ActorID: member})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := d["id"].(string)
+	if _, err := database.ExecContext(ctx, `UPDATE documents SET current_status='handed_over' WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	states := func(actor string) map[string]query.FlowActionState {
+		t.Helper()
+		item, err := docs.GetDocument(ctx, id, actor, "member")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if item.UpdatedAt == "" || item.ProjectName == "" {
+			t.Fatalf("detail must carry updated_at and project_name: %#v", item)
+		}
+		out := map[string]query.FlowActionState{}
+		for _, s := range item.Actions {
+			out[s.Action] = s
+		}
+		return out
+	}
+	owner := states(member)
+	if len(owner) != 3 || !owner["mark_in_progress"].Allowed || owner["finalize"].Allowed || owner["finalize"].Reason == "" || owner["archive"].Allowed {
+		t.Fatalf("current owner (contributor) on handed_over: %#v", owner)
+	}
+	lead := states(integrationUserID)
+	if !lead["finalize"].Allowed || !lead["archive"].Allowed {
+		t.Fatalf("project owner may finalize/archive: %#v", lead)
+	}
+}

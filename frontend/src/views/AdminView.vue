@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AdminUser, ProjectMember, ProjectOption, TeamSpaceOption } from "@/types";
 import { ref, onMounted, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Setting, User, OfficeBuilding, FolderOpened } from "@element-plus/icons-vue";
@@ -9,7 +10,7 @@ import { extractError } from "@/utils/error";
 const activeTab = ref("team-spaces");
 
 // ───── Team Spaces ─────
-const teamSpaces = ref<any[]>([]);
+const teamSpaces = ref<TeamSpaceOption[]>([]);
 const tsLoading = ref(false);
 const tsDialogVisible = ref(false);
 const tsForm = ref({ name: "", code: "", description: "" });
@@ -43,7 +44,7 @@ async function createTeamSpace() {
 }
 
 // ───── Projects ─────
-const projects = ref<any[]>([]);
+const projects = ref<ProjectOption[]>([]);
 const projLoading = ref(false);
 const projDialogVisible = ref(false);
 const projForm = ref({ team_space_id: "", name: "", code: "", owner_id: "", description: "" });
@@ -77,7 +78,7 @@ async function createProject() {
 }
 
 // ───── Users ─────
-const users = ref<any[]>([]);
+const users = ref<AdminUser[]>([]);
 const userLoading = ref(false);
 const userDialogVisible = ref(false);
 const userEditMode = ref(false);
@@ -102,9 +103,9 @@ function openCreateUser() {
   userDialogVisible.value = true;
 }
 
-function openEditUser(u: any) {
+function openEditUser(u: AdminUser) {
   userEditMode.value = true;
-  userForm.value = { id: u.id, username: u.username, password: "", confirm_password: "", display_name: u.display_name, role: u.role, email: u.email || "", phone: u.phone || "" };
+  userForm.value = { id: u.id, username: u.username ?? "", password: "", confirm_password: "", display_name: u.display_name, role: u.role, email: u.email || "", phone: u.phone || "" };
   userDialogVisible.value = true;
 }
 
@@ -117,7 +118,7 @@ async function submitUser() {
     }
 
     if (userEditMode.value) {
-      const body: any = {};
+      const body: Record<string, unknown> = {};
       if (userForm.value.display_name) body.display_name = userForm.value.display_name;
       if (userForm.value.role) body.role = userForm.value.role;
       if (userForm.value.email !== undefined) body.email = userForm.value.email;
@@ -158,7 +159,7 @@ const statusLabel: Record<string, string> = { active: "活跃", inactive: "已�
 
 // ───── Members ─────
 const memberProjectId = ref("");
-const members = ref<any[]>([]);
+const members = ref<ProjectMember[]>([]);
 const memberLoading = ref(false);
 const memberDialogVisible = ref(false);
 const memberForm = ref({ user_id: "", project_role: "contributor" });
@@ -194,7 +195,7 @@ async function addMember() {
   }
 }
 
-async function updateMemberRole(m: any, newRole: string) {
+async function updateMemberRole(m: ProjectMember, newRole: string) {
   try {
     await api.patch(`/admin/projects/${memberProjectId.value}/members/${m.id}`, { project_role: newRole });
     await loadMembers();
@@ -203,7 +204,7 @@ async function updateMemberRole(m: any, newRole: string) {
   }
 }
 
-async function removeMember(m: any) {
+async function removeMember(m: ProjectMember) {
   try {
     await ElMessageBox.confirm(`确定移除成员 ${m.display_name}？`, "确认", { type: "warning" });
   } catch {
@@ -279,7 +280,7 @@ onMounted(() => {
           <ElTableColumn prop="name" label="项目名称" />
           <ElTableColumn prop="code" label="代码" width="160" />
           <ElTableColumn label="负责人" width="140">
-            <template #default="{ row }">{{ row.owner?.display_name || "-" }}</template>
+            <template #default="{ row }">{{ row.owner?.display_name || "暂无负责人" }}</template>
           </ElTableColumn>
         </ElTable>
 

@@ -24,7 +24,7 @@ import {
 } from "@/utils/labels";
 import { extractError } from "@/utils/error";
 import { useAuthStore } from "@/stores/auth";
-import { formatFileSize } from "@/utils/format";
+import { formatDateTime, formatFileSize } from "@/utils/format";
 import type { ProjectOption, UserOption } from "@/types";
 
 type DocumentOption = {
@@ -164,7 +164,7 @@ const filteredHandovers = computed(() => {
 
 function userLabel(userID?: string) {
   const user = users.value.find((item) => item.id === userID);
-  return user ? user.display_name : userID || "-";
+  return user ? user.display_name : userID || "暂无成员";
 }
 
 function documentTitle(documentID: string) {
@@ -182,11 +182,7 @@ function compactHandoverID(id: string) {
 }
 
 function formatDate(value?: string) {
-  if (!value) return "时间待同步";
-  return new Date(value).toLocaleDateString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-  });
+  return formatDateTime(value, "暂无时间");
 }
 
 function userInitial(userID?: string) {

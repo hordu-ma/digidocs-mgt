@@ -214,9 +214,18 @@ func (r DocumentRepository) GetDocument(ctx context.Context, documentID string) 
 			u.display_name,
 			COALESCE(d.current_version_id::text, ''),
 			d.is_archived,
- d.project_id::text
+			d.project_id::text,
+			COALESCE(p.name, ''),
+			COALESCE(d.folder_id::text, ''),
+			COALESCE(f.path, ''),
+			dv.version_no,
+			TO_CHAR(d.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+			TO_CHAR(d.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
 		FROM documents d
 		LEFT JOIN users u ON u.id = d.current_owner_id
+		LEFT JOIN projects p ON p.id = d.project_id
+		LEFT JOIN folders f ON f.id = d.folder_id
+		LEFT JOIN document_versions dv ON dv.id = d.current_version_id
 		WHERE d.id::text = $1
 		  AND d.is_deleted = false
 		`,
@@ -231,6 +240,12 @@ func (r DocumentRepository) GetDocument(ctx context.Context, documentID string) 
 		&item.CurrentVersionID,
 		&item.IsArchived,
 		&item.ProjectID,
+		&item.ProjectName,
+		&item.FolderID,
+		&item.FolderPath,
+		&item.CurrentVersionNo,
+		&item.CreatedAt,
+		&item.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, service.ErrNotFound

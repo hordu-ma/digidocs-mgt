@@ -117,8 +117,8 @@ func TestAdminRepository_UserAndMemberMethods(t *testing.T) {
 
 	mock.ExpectQuery("FROM project_members pm").
 		WithArgs("p-1").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "display_name", "username", "project_role"}).
-			AddRow("pm-1", "u-1", "张三", "zhangsan", "owner"))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "display_name", "username", "account", "project_role"}).
+			AddRow("pm-1", "u-1", "张三", "zhangsan", "zhangsan", "owner"))
 	members, err := repo.ListProjectMembers(ctx, "p-1")
 	if err != nil || len(members) != 1 || members[0].ProjectRole != "owner" {
 		t.Fatalf("ListProjectMembers got %#v err=%v", members, err)

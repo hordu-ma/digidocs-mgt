@@ -15,9 +15,10 @@ import {
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import api from "@/api";
+import { formatDate } from "@/utils/format";
 import { extractError } from "@/utils/error";
 import AppLayout from "@/components/AppLayout.vue";
-import type { ProjectOption } from "@/types";
+import type { DocumentListItem, ProjectOption } from "@/types";
 
 /* ---------- types ---------- */
 
@@ -221,7 +222,7 @@ function relativeTime(iso: string | undefined) {
   const diffDay = Math.floor(diffHour / 24);
   if (diffDay === 1) return "昨天";
   if (diffDay < 30) return `${diffDay} 天前`;
-  return date.toLocaleDateString("zh-CN");
+  return formatDate(iso);
 }
 
 function formatScopeDisplay(item: AssistantConversationItem) {
@@ -243,7 +244,7 @@ function formatMemorySourcesFriendly(metadata?: Record<string, any>) {
     historical_answers: "历史问答",
   };
   return raw
-    .map((item: any) => {
+    .map((item: { type?: unknown; count?: unknown }) => {
       const type = typeof item?.type === "string" ? item.type : "memory";
       const label = typeLabels[type] || type;
       const count = Number(item?.count ?? 0);
@@ -257,7 +258,7 @@ function formatMemorySourcesFriendly(metadata?: Record<string, any>) {
 async function loadProjects() {
   try {
     const res = await api.get("/projects");
-    projects.value = (res.data?.data ?? []).map((p: any) => ({
+    projects.value = (res.data?.data ?? []).map((p: ProjectOption) => ({
       id: p.id,
       name: p.name,
     }));
@@ -275,7 +276,7 @@ async function loadDocuments(projectID: string) {
     const res = await api.get("/documents", {
       params: { project_id: projectID, page_size: 200 },
     });
-    documents.value = (res.data?.data ?? []).map((d: any) => ({
+    documents.value = (res.data?.data ?? []).map((d: DocumentListItem) => ({
       id: d.id,
       title: d.title,
     }));

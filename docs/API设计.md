@@ -588,6 +588,19 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 }
 ```
 
+补充字段（2026-11-10）：`project_name`、`folder_id`、`folder_path`、`current_version_no`、`created_at`、`updated_at`，以及 `actions`。此前详情页显示的「更新时间」「所属目录」从未由接口返回，页面上总是空。
+
+`actions` 列出当前状态下状态机允许的流转动作，并按调用者身份标注能否执行：
+
+```json
+"actions": [
+  { "action": "mark_in_progress", "allowed": true },
+  { "action": "finalize", "allowed": false, "reason": "仅课题负责人或协管人可以执行" }
+]
+```
+
+状态机只有一份定义（`service.ValidFlowTransition`），流转写入与按钮计算共用；权限判断与流转接口相同。前端只显示这些动作，不可执行的显示为禁用并提示原因。
+
 ### 4.4 更新文档基础信息
 
 `PATCH /api/v1/documents/{document_id}`

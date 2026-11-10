@@ -13,6 +13,7 @@ import { ElMessage } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 
 import api from "@/api";
+import { formatDateTime } from "@/utils/format";
 import { extractError } from "@/utils/error";
 import AppLayout from "@/components/AppLayout.vue";
 import type { ProjectOption, TeamSpaceOption } from "@/types";
@@ -100,12 +101,13 @@ function eventStatusLabel(status: string) {
 }
 
 function shortSHA(value?: string) {
-  return value ? value.slice(0, 8) : "-";
+  return value ? value.slice(0, 8) : "暂无提交";
 }
 
+// Timestamps are UTC from the API; this used to print them verbatim, i.e.
+// eight hours behind local time.
 function formatTime(value?: string) {
-  if (!value) return "尚未推送";
-  return value.replace("T", " ").replace("Z", "").slice(0, 16);
+  return formatDateTime(value, "暂无推送");
 }
 
 function remoteWithToken(repo: CodeRepository | null) {

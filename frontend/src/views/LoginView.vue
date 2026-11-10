@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AuthShell from "@/components/AuthShell.vue";
 import { ElMessage } from "element-plus";
 import { reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -47,7 +48,7 @@ async function submit() {
 </script>
 
 <template>
-  <div class="login-page">
+  <AuthShell>
     <ElCard class="login-card">
       <div class="login-title">课题组文档资产平台</div>
       <div class="login-subtitle">
@@ -69,10 +70,7 @@ async function submit() {
         <RouterLink to="/register">去注册</RouterLink>
       </div>
     </ElCard>
-    <footer class="auth-footer">
-      系统管理员：<a href="mailto:maliguo@outlook.com">maliguo@outlook.com</a>
-    </footer>
-  </div>
+  </AuthShell>
 </template>
 
 <style scoped>
@@ -84,7 +82,7 @@ async function submit() {
 }
 
 .login-card {
-  width: min(420px, 100%);
+  width: 100%;
   border-radius: 24px;
 }
 

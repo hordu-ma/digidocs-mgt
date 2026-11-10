@@ -401,3 +401,19 @@ func TestAuditQueryWidensScopeOnlyForViewableDocument(t *testing.T) {
 		t.Fatal("no document filter must keep project scoping")
 	}
 }
+
+func TestValidFlowTransitionMatchesProductRules(t *testing.T) {
+	cases := map[[2]string]bool{
+		{"handed_over", "finalize"}:         true,
+		{"handed_over", "mark_in_progress"}: true,
+		{"handed_over", "archive"}:          true,
+		{"draft", "archive"}:                false,
+		{"pending_handover", "finalize"}:    false,
+		{"archived", "unarchive"}:           true,
+	}
+	for c, want := range cases {
+		if got := ValidFlowTransition(c[0], c[1]); got != want {
+			t.Fatalf("%s/%s = %v, want %v", c[0], c[1], got, want)
+		}
+	}
+}

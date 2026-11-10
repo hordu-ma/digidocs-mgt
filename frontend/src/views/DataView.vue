@@ -14,6 +14,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useUploadFile, DATA_FILE_MAX_BYTES, DATA_FILE_LIMIT_LABEL } from "@/composables/useUploadFile";
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+import { formatDate as formatDateOnly } from "@/utils/format";
 import { useAuthStore } from "@/stores/auth";
 import { formatFileSize } from "@/utils/format";
 import { extractError } from "@/utils/error";
@@ -444,8 +445,7 @@ async function deleteFolder(node: FolderItem) {
 // ─────────────────────────── utils ───────────────────────────────
 
 function formatDate(s: string): string {
-  if (!s) return "";
-  return s.slice(0, 10);
+  return formatDateOnly(s, "暂无");
 }
 
 function inferAssetFileType(fileName: string): string {
