@@ -10,7 +10,7 @@ type CodeRepositoryItem struct {
 	Description      string `json:"description,omitempty"`
 	DefaultBranch    string `json:"default_branch"`
 	TargetFolderPath string `json:"target_folder_path"`
-	RepoStoragePath  string `json:"repo_storage_path,omitempty"`
+	RepoStoragePath  string `json:"-"` // host path; never sent to clients
 	LastCommitSHA    string `json:"last_commit_sha,omitempty"`
 	LastPushedAt     string `json:"last_pushed_at,omitempty"`
 	Status           string `json:"status"`

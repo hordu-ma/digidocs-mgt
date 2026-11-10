@@ -5,6 +5,9 @@ type Claims struct {
 	Username    string `json:"username"`
 	DisplayName string `json:"display_name"`
 	Role        string `json:"role"`
+	// IssuedAt is the token's iat (unix seconds); set by TokenService.Parse,
+	// used to reject tokens issued before the last password change.
+	IssuedAt int64 `json:"-"`
 }
 
 type UserProfile struct {

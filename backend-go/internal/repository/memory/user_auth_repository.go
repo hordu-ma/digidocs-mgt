@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -27,6 +28,8 @@ type memoryUser struct {
 	Phone        string
 	Wechat       string
 	Status       string
+	// PasswordChangedAt mirrors users.password_changed_at.
+	PasswordChangedAt *time.Time
 }
 
 // UserAuthRepository is a stateful in-memory auth store used by handler tests
@@ -227,5 +230,20 @@ func (r *UserAuthRepository) UpdateUserPassword(_ context.Context, userID string
 		return service.ErrNotFound
 	}
 	user.PasswordHash = passwordHash
+	now := time.Now()
+	user.PasswordChangedAt = &now
 	return nil
+}
+
+// SessionState is deliberately not named GetSessionState: memory mode (dev and
+// handler tests that mint tokens for synthetic user ids) skips the session
+// check; postgres mode enforces it.
+func (r *UserAuthRepository) SessionState(_ context.Context, userID string) (string, *time.Time, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	user, ok := r.users[userID]
+	if !ok {
+		return "", nil, service.ErrNotFound
+	}
+	return user.Status, user.PasswordChangedAt, nil
 }

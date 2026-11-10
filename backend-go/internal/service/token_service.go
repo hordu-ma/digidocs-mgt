@@ -71,17 +71,24 @@ func (s TokenService) Parse(token string) (auth.Claims, error) {
 		return auth.Claims{}, fmt.Errorf("invalid token payload: %w", err)
 	}
 
-	if exp, ok := payload["exp"].(float64); ok {
-		if time.Now().Unix() > int64(exp) {
-			return auth.Claims{}, errors.New("token expired")
-		}
+	// A token without exp used to be accepted as never expiring. Every token
+	// this service issues carries exp, so its absence means it was not issued
+	// here (or was crafted with a leaked secret): reject.
+	exp, ok := payload["exp"].(float64)
+	if !ok {
+		return auth.Claims{}, errors.New("token has no expiry")
 	}
+	if time.Now().Unix() > int64(exp) {
+		return auth.Claims{}, errors.New("token expired")
+	}
+	iat, _ := payload["iat"].(float64)
 
 	return auth.Claims{
 		UserID:      stringClaim(payload, "user_id"),
 		Username:    stringClaim(payload, "username"),
 		DisplayName: stringClaim(payload, "display_name"),
 		Role:        stringClaim(payload, "role"),
+		IssuedAt:    int64(iat),
 	}, nil
 }
 

@@ -19,9 +19,13 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	if cfg.TrustedProxyDepth > 0 {
 		middleware.TrustedProxyDepth = cfg.TrustedProxyDepth
 	}
+	if cfg.APIV1Prefix != "" {
+		middleware.APIV1Prefix = cfg.APIV1Prefix
+	}
 
 	systemHandler := handlers.NewSystemHandler(cfg)
-	authHandler := handlers.NewAuthHandler(container.AuthService, container.TokenService)
+	authHandler := handlers.NewAuthHandler(container.AuthService, container.TokenService).
+		WithRegistration(cfg.SelfRegistration, container.MembershipService)
 	assistantHandler := handlers.NewAssistantHandler(container.AssistantService)
 	auditEventHandler := handlers.NewAuditEventHandler(container.AuditQueryService)
 	flowHandler := handlers.NewFlowHandler(container.FlowService)
@@ -49,11 +53,11 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	notificationHandler := handlers.NewNotificationHandler(container.NotificationService)
 	searchHandler := handlers.NewSearchHandler(container.SearchService)
 
-	authMw := middleware.Auth(container.TokenService)
+	authMw := middleware.Auth(container.TokenService, container.AuthService.SessionValid)
 	protect := func(h http.HandlerFunc) http.Handler {
 		return authMw(h)
 	}
-	adminMw := middleware.RequireAdmin(container.TokenService)
+	adminMw := middleware.RequireAdmin(container.TokenService, container.AuthService.SessionValid)
 	protectAdmin := func(h http.HandlerFunc) http.Handler {
 		return adminMw(h)
 	}

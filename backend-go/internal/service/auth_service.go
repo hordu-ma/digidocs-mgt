@@ -19,10 +19,11 @@ var mainlandMobileRE = regexp.MustCompile(`^1[3-9]\d{9}$`)
 type AuthService struct {
 	userRepo repository.UserAuthReader
 	tokenSvc TokenService
+	sessions *sessionCache
 }
 
 func NewAuthService(userRepo repository.UserAuthReader, tokenSvc TokenService) AuthService {
-	return AuthService{userRepo: userRepo, tokenSvc: tokenSvc}
+	return AuthService{userRepo: userRepo, tokenSvc: tokenSvc, sessions: newSessionCache()}
 }
 
 // Login verifies credentials against username, email or phone and returns a signed JWT.
@@ -123,9 +124,9 @@ func isBasicEmail(email string) bool {
 // password is re-verified here rather than trusting the bearer token alone, so a
 // stolen-but-still-valid token cannot be used to lock the owner out.
 //
-// Note: existing tokens stay valid until they expire — this codebase issues
-// stateless JWTs with no revocation list. Session invalidation on password
-// change needs a token version or deny list and is tracked separately.
+// The repository stamps users.password_changed_at; SessionValid then rejects
+// every token issued before it (2026-11-10). Callers reissue a token for the
+// session that made the change (ReissueToken).
 func (s AuthService) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
 	if strings.TrimSpace(userID) == "" {
 		return ErrUnauthorized
@@ -155,7 +156,13 @@ func (s AuthService) ChangePassword(ctx context.Context, userID, currentPassword
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
-	return s.userRepo.UpdateUserPassword(ctx, userID, string(hash))
+	if err := s.userRepo.UpdateUserPassword(ctx, userID, string(hash)); err != nil {
+		return err
+	}
+	if s.sessions != nil {
+		s.sessions.forget(userID)
+	}
+	return nil
 }
 
 func (s AuthService) GetProfile(ctx context.Context, userID string) (*auth.UserProfile, error) {

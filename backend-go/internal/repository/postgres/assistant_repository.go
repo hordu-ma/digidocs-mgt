@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
@@ -338,6 +339,7 @@ func (r AssistantRepository) CompleteAssistantRequest(
 	var conversationID string
 	var payloadText string
 	var createdAt time.Time
+	var currentStatus string
 	if err := tx.QueryRowContext(
 		ctx,
 		`
@@ -347,17 +349,28 @@ func (r AssistantRepository) CompleteAssistantRequest(
 			COALESCE(related_id::text, ''),
 			COALESCE(conversation_id::text, ''),
 			COALESCE(payload::text, '{}'),
-			created_at
+			created_at,
+			status
 		FROM assistant_requests
 		WHERE id::text = $1
 		FOR UPDATE
 		`,
 		result.RequestID,
-	).Scan(&reqType, &relatedType, &relatedID, &conversationID, &payloadText, &createdAt); err != nil {
+	).Scan(&reqType, &relatedType, &relatedID, &conversationID, &payloadText, &createdAt, &currentStatus); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return service.ErrNotFound
 		}
 		return err
+	}
+
+	// Idempotency (2026-11-10): a result for a request that already finished
+	// is a duplicate — the worker retried a callback whose response was lost,
+	// or a task recovered as stuck finished twice. Applying it again would
+	// replace the stored answer, re-create suggestions the user may already
+	// have confirmed, and append a second chat message.
+	if currentStatus == "completed" || currentStatus == "failed" {
+		log.Printf("[assistant] ignoring duplicate result request_id=%s status=%s", result.RequestID, currentStatus)
+		return nil
 	}
 
 	completedAt := time.Now().UTC()

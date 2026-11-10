@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -141,7 +142,9 @@ func (s CodeRepositoryService) AuthenticatePush(ctx context.Context, slug string
 	if err != nil {
 		return nil, false, err
 	}
-	return repo, token != "" && token == repo.PushToken, nil
+	// Constant-time: the push token is a bearer secret checked on every git push.
+	ok := token != "" && repo.PushToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(repo.PushToken)) == 1
+	return repo, ok, nil
 }
 
 func (s CodeRepositoryService) RecordPush(ctx context.Context, repo *query.CodeRepositoryDetail, pusherID string) (*query.CodePushEventItem, error) {
@@ -307,7 +310,9 @@ func validateTargetFolder(path string) error {
 func shortToken(bytesLen int) string {
 	b := make([]byte, bytesLen)
 	if _, err := rand.Read(b); err != nil {
-		return "token"
+		// Never fall back to a fixed string: it would become a guessable slug
+		// suffix or token. crypto/rand failing is an unrecoverable OS error.
+		panic("crypto/rand unavailable: " + err.Error())
 	}
 	return hex.EncodeToString(b)
 }

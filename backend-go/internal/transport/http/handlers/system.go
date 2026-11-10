@@ -22,8 +22,14 @@ func (h SystemHandler) Healthz(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h SystemHandler) Info(w http.ResponseWriter, r *http.Request) {
+	mode := h.cfg.SelfRegistration
+	if mode == "" {
+		mode = "open"
+	}
 	response.WriteData(w, http.StatusOK, map[string]string{
 		"app_name": h.cfg.AppName,
 		"env":      h.cfg.AppEnv,
+		// Public so the login page can hide or reword the register link.
+		"self_registration": mode,
 	})
 }

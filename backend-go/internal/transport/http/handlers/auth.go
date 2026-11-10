@@ -12,8 +12,17 @@ import (
 )
 
 type AuthHandler struct {
-	authService  service.AuthService
-	tokenService service.TokenService
+	authService      service.AuthService
+	tokenService     service.TokenService
+	registrationMode string
+	invites          service.MembershipService
+}
+
+// WithRegistration configures SELF_REGISTRATION (open | invite_only | closed).
+func (h AuthHandler) WithRegistration(mode string, invites service.MembershipService) AuthHandler {
+	h.registrationMode = mode
+	h.invites = invites
+	return h
 }
 
 func NewAuthHandler(authService service.AuthService, tokenService service.TokenService) AuthHandler {
@@ -50,6 +59,17 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid request body")
 		return
+	}
+
+	switch h.registrationMode {
+	case "closed":
+		response.WriteError(w, http.StatusForbidden, "registration_closed", "自助注册已关闭，请联系管理员开通账号")
+		return
+	case "invite_only":
+		if err := h.invites.ValidateInviteToken(r.Context(), payload.InviteToken); err != nil {
+			response.WriteError(w, http.StatusForbidden, "invite_required", "当前仅支持通过有效的课题邀请链接注册")
+			return
+		}
 	}
 
 	token, claims, err := h.authService.Register(r.Context(), payload.Email, payload.Phone, payload.Password, payload.DisplayName)
@@ -168,7 +188,14 @@ func (h AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteData(w, http.StatusOK, map[string]bool{"success": true})
+	// Every token issued before this moment is now rejected, including the one
+	// on this request; hand back a fresh one so this session continues.
+	token, err := h.authService.ReissueToken(r.Context(), actorID)
+	if err != nil {
+		writeServiceError(w, err, "user not found", "failed to issue token")
+		return
+	}
+	response.WriteData(w, http.StatusOK, map[string]any{"success": true, "access_token": token})
 }
 
 func (h AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {

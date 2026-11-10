@@ -53,6 +53,10 @@ type Config struct {
 	// AutoSummarizeOnUpload chains an AI summary after upload-time text
 	// extraction succeeds (2026-11-10, default on).
 	AutoSummarizeOnUpload bool
+
+	// SelfRegistration controls POST /auth/register: open (default),
+	// invite_only (a valid invite token is required) or closed.
+	SelfRegistration string
 }
 
 func Load() Config {
@@ -90,6 +94,7 @@ func Load() Config {
 		SMTPPassword:               getEnv("SMTP_PASSWORD", ""),
 		SMTPFrom:                   getEnv("SMTP_FROM", ""),
 		AutoSummarizeOnUpload:      getEnv("AUTO_SUMMARIZE_ON_UPLOAD", "true") == "true",
+		SelfRegistration:           getEnv("SELF_REGISTRATION", "open"),
 	}
 
 	if cfg.AppEnv == "production" {

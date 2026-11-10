@@ -130,14 +130,17 @@ async function changePassword() {
 
   changingPassword.value = true;
   try {
-    await api.post("/auth/change-password", {
+    const res = await api.post("/auth/change-password", {
       current_password: passwordForm.current_password,
       new_password: passwordForm.new_password,
     });
+    // All other sessions are now revoked; keep this one with the new token.
+    const nextToken = res.data?.data?.access_token;
+    if (typeof nextToken === "string" && nextToken) auth.replaceToken(nextToken);
     passwordForm.current_password = "";
     passwordForm.new_password = "";
     passwordForm.confirm_password = "";
-    ElMessage.success("密码已更新，下次登录请使用新密码");
+    ElMessage.success("密码已更新，其他设备上的登录已失效");
   } catch (err: unknown) {
     ElMessage.error(extractError(err, "修改密码失败"));
   } finally {
@@ -207,7 +210,7 @@ onMounted(loadProfile);
 
         <section class="page-card profile-panel profile-password">
           <div class="section-title">修改密码</div>
-          <p class="section-hint">修改后当前已登录的会话仍然有效，直到自然过期。</p>
+          <p class="section-hint">修改后，你在其他浏览器或设备上的登录会在半分钟内失效，当前页面保持登录。</p>
           <ElForm label-position="top" @submit.prevent="changePassword">
             <ElFormItem label="当前密码" required>
               <ElInput v-model="passwordForm.current_password" type="password" show-password autocomplete="current-password" />

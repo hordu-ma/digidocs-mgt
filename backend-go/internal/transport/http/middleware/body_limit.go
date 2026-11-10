@@ -10,6 +10,10 @@ import (
 // an oversized payload from being buffered into memory.
 const MaxJSONBodySize = 1 << 20 // 1 MB
 
+// APIV1Prefix is the API route prefix used to recognise the exempt git and
+// internal routes; the router sets it from config at startup.
+var APIV1Prefix = "/api/v1"
+
 // LimitBody wraps eligible request bodies with http.MaxBytesReader so an
 // oversized payload is rejected with 413 instead of being read into memory.
 //
@@ -38,6 +42,8 @@ func bodyExempt(r *http.Request) bool {
 	}
 	// Git smart-HTTP (/git/) and worker callbacks (/internal/) are namespaced
 	// path prefixes that legitimately carry large bodies.
-	return strings.Contains(r.URL.Path, "/git/") ||
-		strings.Contains(r.URL.Path, "/internal/")
+	// Prefix match, not Contains: a user-controlled path segment such as
+	// /api/v1/documents/x/internal/... must not opt out of the limit.
+	return strings.HasPrefix(r.URL.Path, APIV1Prefix+"/git/") ||
+		strings.HasPrefix(r.URL.Path, APIV1Prefix+"/internal/")
 }

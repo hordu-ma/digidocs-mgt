@@ -10,6 +10,8 @@ type RegisterRequest struct {
 	Phone       string `json:"phone"`
 	Password    string `json:"password"`
 	DisplayName string `json:"display_name"`
+	// InviteToken is required when SELF_REGISTRATION=invite_only.
+	InviteToken string `json:"invite_token"`
 }
 
 type UpdateProfileRequest struct {

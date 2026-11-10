@@ -11,6 +11,10 @@ import (
 	"github.com/lib/pq"
 )
 
+// MaxTaskAttempts is how many times a task may be claimed before a further
+// timeout marks it failed.
+const MaxTaskAttempts = 3
+
 type Consumer struct {
 	db *sql.DB
 }
@@ -30,12 +34,23 @@ func (c Consumer) Poll(ctx context.Context, limit int) []task.Message {
 	// claimed must not be treated as stuck the instant it starts running,
 	// or it gets reset to pending and picked up a second time concurrently.
 	// started_at IS NULL covers rows written before this column existed.
+	//
+	// Dead-letter (2026-11-10): a task that has already been claimed
+	// MaxTaskAttempts times and is stuck again is marked failed instead of
+	// being re-queued forever. Without this, one file that reliably wedges the
+	// worker would be retried every ten minutes indefinitely, each time
+	// occupying a worker slot and calling the model again.
 	_, recoverErr := c.db.ExecContext(
 		ctx,
 		`UPDATE assistant_requests
-		 SET status = 'pending'
+		 SET status = CASE WHEN attempts >= $1 THEN 'failed' ELSE 'pending' END,
+		     error_message = CASE WHEN attempts >= $1
+		       THEN '任务多次超时未完成，已停止重试（已尝试 ' || attempts || ' 次）'
+		       ELSE error_message END,
+		     completed_at = CASE WHEN attempts >= $1 THEN NOW() ELSE completed_at END
 		 WHERE status = 'running'
 		   AND (started_at IS NULL OR started_at < NOW() - INTERVAL '10 minutes')`,
+		MaxTaskAttempts,
 	)
 	if recoverErr != nil {
 		log.Printf("postgres-queue recover-running failed: %v", recoverErr)
@@ -108,7 +123,7 @@ func (c Consumer) Poll(ctx context.Context, limit int) []task.Message {
 		ctx,
 		`
 		UPDATE assistant_requests
-		SET status = 'running', started_at = NOW()
+		SET status = 'running', started_at = NOW(), attempts = attempts + 1
 		WHERE id::text = ANY($1)
 		`,
 		pq.Array(ids),

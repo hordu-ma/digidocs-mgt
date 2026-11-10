@@ -181,6 +181,24 @@ func (s MembershipService) PreviewInvite(ctx context.Context, token string) (*qu
 	return s.repo.GetInvitePreview(ctx, token)
 }
 
+// ValidateInviteToken reports whether token is an active, unexpired invite.
+// Used to gate invite-only self-registration.
+func (s MembershipService) ValidateInviteToken(ctx context.Context, token string) error {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return fmt.Errorf("%w: invite token is required", ErrForbidden)
+	}
+	invite, err := s.repo.GetInviteByToken(ctx, token)
+	if err != nil {
+		return fmt.Errorf("%w: invalid invite", ErrForbidden)
+	}
+	expires, err := time.Parse(time.RFC3339, invite.ExpiresAt)
+	if invite.Status != "active" || err != nil || time.Now().UTC().After(expires.UTC()) {
+		return fmt.Errorf("%w: invite is not active", ErrForbidden)
+	}
+	return nil
+}
+
 func (s MembershipService) AcceptInvite(ctx context.Context, actorID, token string) (*query.ProjectMemberItem, error) {
 	token = strings.TrimSpace(token)
 	if actorID == "" || token == "" {

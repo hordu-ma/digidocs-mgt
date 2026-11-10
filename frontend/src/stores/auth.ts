@@ -21,6 +21,13 @@ export const useAuthStore = defineStore("auth", () => {
     localStorage.setItem("role", payload.role);
   }
 
+  // Replace only the token, e.g. with the one reissued after a password change
+  // (the old one is revoked server-side).
+  function replaceToken(next: string) {
+    token.value = next;
+    localStorage.setItem("access_token", next);
+  }
+
   function updateProfile(payload: { username: string; displayName: string; role: string }) {
     username.value = payload.username;
     displayName.value = payload.displayName;
@@ -52,5 +59,6 @@ export const useAuthStore = defineStore("auth", () => {
     login,
     updateProfile,
     logout,
+    replaceToken,
   };
 });

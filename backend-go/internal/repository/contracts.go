@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"digidocs-mgt/backend-go/internal/domain/auth"
 	"digidocs-mgt/backend-go/internal/domain/command"
@@ -135,6 +136,12 @@ type UserAuthReader interface {
 	UpdateUserProfile(ctx context.Context, userID string, input auth.ProfileUpdateInput) (*auth.UserProfile, error)
 	GetUserCredentials(ctx context.Context, userID string) (*auth.UserRecord, error)
 	UpdateUserPassword(ctx context.Context, userID string, passwordHash string) error
+}
+
+// SessionStateReader reports what can invalidate an otherwise valid JWT: the
+// account being disabled, or the password changed after the token was issued.
+type SessionStateReader interface {
+	GetSessionState(ctx context.Context, userID string) (status string, passwordChangedAt *time.Time, err error)
 }
 
 // ========== Data Asset ==========

@@ -88,8 +88,8 @@ func TestAssistantRepositoryCompleteRequestUpdatesProjectionSuggestionsAndConver
 	mock.ExpectBegin()
 	mock.ExpectQuery("FROM assistant_requests\\s+WHERE id::text = \\$1\\s+FOR UPDATE").
 		WithArgs("req-1").
-		WillReturnRows(sqlmock.NewRows([]string{"request_type", "related_type", "related_id", "conversation_id", "payload", "created_at"}).
-			AddRow(string(task.TaskTypeDocumentSummarize), "document", "doc-1", "conv-1", `{"version_id":"ver-1","scope":{"document_id":"doc-1"}}`, createdAt))
+		WillReturnRows(sqlmock.NewRows([]string{"request_type", "related_type", "related_id", "conversation_id", "payload", "created_at", "status"}).
+			AddRow(string(task.TaskTypeDocumentSummarize), "document", "doc-1", "conv-1", `{"version_id":"ver-1","scope":{"document_id":"doc-1"}}`, createdAt, "running"))
 	mock.ExpectExec("UPDATE assistant_requests").
 		WithArgs("req-1", "completed", "", sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/lib/pq"
 
@@ -214,7 +215,7 @@ func (r UserAuthRepository) UpdateUserPassword(ctx context.Context, userID strin
 		ctx,
 		`
 		UPDATE users
-		SET password_hash = $2, updated_at = now()
+		SET password_hash = $2, updated_at = now(), password_changed_at = now()
 		WHERE id::text = $1
 		  AND status = 'active'
 		`,
@@ -232,4 +233,21 @@ func (r UserAuthRepository) UpdateUserPassword(ctx context.Context, userID strin
 		return service.ErrNotFound
 	}
 	return nil
+}
+
+func (r UserAuthRepository) GetSessionState(ctx context.Context, userID string) (string, *time.Time, error) {
+	var status string
+	var changedAt sql.NullTime
+	err := r.db.QueryRowContext(ctx, `SELECT status, password_changed_at FROM users WHERE id::text = $1`, userID).Scan(&status, &changedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil, service.ErrNotFound
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	if changedAt.Valid {
+		t := changedAt.Time
+		return status, &t, nil
+	}
+	return status, nil, nil
 }

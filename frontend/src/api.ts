@@ -23,7 +23,14 @@ api.interceptors.response.use(
     (error) => {
         const status = error?.response?.status;
         const url = String(error?.config?.url ?? "");
-        if (status === 401 && !url.includes("/auth/login") && !url.includes("/auth/register")) {
+        // change-password answers 401 for a wrong *current* password; that is
+        // a form error, not an expired session, and must not log the user out.
+        if (
+            status === 401 &&
+            !url.includes("/auth/login") &&
+            !url.includes("/auth/register") &&
+            !url.includes("/auth/change-password")
+        ) {
             const auth = useAuthStore();
             if (auth.token) {
                 const current = router.currentRoute.value;

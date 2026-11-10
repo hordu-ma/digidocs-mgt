@@ -14,9 +14,14 @@ type contextKey string
 
 const claimsKey contextKey = "auth_claims"
 
+// SessionValidator decides whether a verified token's session is still live
+// (account active, password not changed since the token was issued).
+type SessionValidator func(ctx context.Context, claims auth.Claims) bool
+
 // Auth returns a middleware that validates HS256 JWT in the Authorization header
-// and injects the parsed claims into the request context.
-func Auth(tokenService service.TokenService) Middleware {
+// and injects the parsed claims into the request context. Optional validators
+// can reject a signature-valid token whose session has been revoked.
+func Auth(tokenService service.TokenService, validators ...SessionValidator) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
@@ -30,6 +35,12 @@ func Auth(tokenService service.TokenService) Middleware {
 			if err != nil {
 				response.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid or expired token")
 				return
+			}
+			for _, valid := range validators {
+				if !valid(r.Context(), claims) {
+					response.WriteError(w, http.StatusUnauthorized, "session_revoked", "会话已失效（密码已修改或账号已停用），请重新登录")
+					return
+				}
 			}
 
 			ctx := context.WithValue(r.Context(), claimsKey, claims)
@@ -63,8 +74,8 @@ func UserRoleFromContext(ctx context.Context) string {
 }
 
 // RequireAdmin returns a middleware that rejects non-admin users with 403.
-func RequireAdmin(tokenService service.TokenService) Middleware {
-	authMw := Auth(tokenService)
+func RequireAdmin(tokenService service.TokenService, validators ...SessionValidator) Middleware {
+	authMw := Auth(tokenService, validators...)
 	return func(next http.Handler) http.Handler {
 		return authMw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if UserRoleFromContext(r.Context()) != "admin" {

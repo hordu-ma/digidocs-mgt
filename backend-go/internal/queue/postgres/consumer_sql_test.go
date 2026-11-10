@@ -22,7 +22,7 @@ func newQueueMockDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 func TestConsumerPollReturnsMessagesAndMarksRunning(t *testing.T) {
 	db, mock := newQueueMockDB(t)
 	consumer := NewConsumer(db)
-	mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'pending'").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE assistant_requests\\s+SET status = CASE").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectBegin()
 	mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
 		WithArgs(2).
@@ -46,7 +46,7 @@ func TestConsumerPollReturnsMessagesAndMarksRunning(t *testing.T) {
 func TestConsumerPollDefaultsLimitAndHandlesEmptyQueue(t *testing.T) {
 	db, mock := newQueueMockDB(t)
 	consumer := NewConsumer(db)
-	mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'pending'").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("UPDATE assistant_requests\\s+SET status = CASE").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectBegin()
 	mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
 		WithArgs(10).
@@ -64,7 +64,7 @@ func TestConsumerPollDefaultsLimitAndHandlesEmptyQueue(t *testing.T) {
 func TestConsumerPollReturnsNilOnDecodeError(t *testing.T) {
 	db, mock := newQueueMockDB(t)
 	consumer := NewConsumer(db)
-	mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'pending'").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("UPDATE assistant_requests\\s+SET status = CASE").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectBegin()
 	mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
 		WithArgs(1).
@@ -88,14 +88,14 @@ func TestConsumerPollReturnsNilOnTransactionFailures(t *testing.T) {
 		{
 			name: "begin",
 			setup: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'pending'").WillReturnResult(sqlmock.NewResult(0, 0))
+				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = CASE").WillReturnResult(sqlmock.NewResult(0, 0))
 				mock.ExpectBegin().WillReturnError(errors.New("begin failed"))
 			},
 		},
 		{
 			name: "query",
 			setup: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'pending'").WillReturnResult(sqlmock.NewResult(0, 0))
+				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = CASE").WillReturnResult(sqlmock.NewResult(0, 0))
 				mock.ExpectBegin()
 				mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
 					WithArgs(1).
@@ -105,7 +105,7 @@ func TestConsumerPollReturnsNilOnTransactionFailures(t *testing.T) {
 		{
 			name: "mark running",
 			setup: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'pending'").WillReturnResult(sqlmock.NewResult(0, 0))
+				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = CASE").WillReturnResult(sqlmock.NewResult(0, 0))
 				mock.ExpectBegin()
 				mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
 					WithArgs(1).
@@ -119,7 +119,7 @@ func TestConsumerPollReturnsNilOnTransactionFailures(t *testing.T) {
 		{
 			name: "commit",
 			setup: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'pending'").WillReturnResult(sqlmock.NewResult(0, 0))
+				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = CASE").WillReturnResult(sqlmock.NewResult(0, 0))
 				mock.ExpectBegin()
 				mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
 					WithArgs(1).
