@@ -21,6 +21,11 @@ class Settings:
     http_retry_attempts: int = 3
     http_retry_base_delay: float = 0.5
     worker_concurrency: int = 3
+    # 2026-11-10: prompt budget and streaming.
+    max_context_chars: int = 12000
+    max_summary_sections: int = 6
+    stream_answers: bool = True
+    progress_interval: float = 1.0
 
 
 def load_settings() -> Settings:
@@ -54,6 +59,10 @@ def load_settings() -> Settings:
         http_retry_attempts=int(os.getenv("HTTP_RETRY_ATTEMPTS", "3")),
         http_retry_base_delay=float(os.getenv("HTTP_RETRY_BASE_DELAY", "0.5")),
         worker_concurrency=int(os.getenv("WORKER_CONCURRENCY", "3")),
+        max_context_chars=int(os.getenv("MAX_CONTEXT_CHARS", "12000")),
+        max_summary_sections=int(os.getenv("MAX_SUMMARY_SECTIONS", "6")),
+        stream_answers=os.getenv("STREAM_ANSWERS", "true").lower() == "true",
+        progress_interval=float(os.getenv("PROGRESS_INTERVAL", "1.0")),
     )
 
 

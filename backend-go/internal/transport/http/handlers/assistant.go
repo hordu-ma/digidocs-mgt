@@ -327,7 +327,13 @@ func (h AssistantHandler) ConfirmSuggestion(w http.ResponseWriter, r *http.Reque
 		_ = json.NewDecoder(r.Body).Decode(&payload)
 	}
 
-	data, err := h.service.ConfirmSuggestion(
+	confirm := h.service.ConfirmSuggestion
+	// {"execute": true} runs the suggestion's whitelisted flow action as the
+	// confirming user before marking it confirmed.
+	if execute, _ := payload["execute"].(bool); execute {
+		confirm = h.service.ConfirmAndExecuteSuggestion
+	}
+	data, err := confirm(
 		r.Context(),
 		r.PathValue("suggestionID"),
 		middleware.UserIDFromContext(r.Context()),

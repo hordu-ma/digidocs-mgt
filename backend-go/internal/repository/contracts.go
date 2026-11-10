@@ -182,5 +182,8 @@ type AssistantRepository interface {
 	GetDocumentVersionExtractedText(ctx context.Context, documentID, versionID string) (string, error)
 	ListSuggestions(ctx context.Context, filter query.AssistantSuggestionFilter) ([]query.AssistantSuggestionItem, error)
 	ConfirmSuggestion(ctx context.Context, suggestionID string, actorID string, note string) (map[string]any, error)
+	GetSuggestion(ctx context.Context, suggestionID string) (*query.AssistantSuggestionItem, error)
+	UpdateRequestProgress(ctx context.Context, requestID string, partialAnswer string) error
+	GetRequestCreator(ctx context.Context, requestID string) (string, error)
 	DismissSuggestion(ctx context.Context, suggestionID string, actorID string, reason string) (map[string]any, error)
 }

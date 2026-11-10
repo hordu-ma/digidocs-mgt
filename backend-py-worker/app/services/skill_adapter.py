@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import cast
 
 from ..clients.openclaw_client import OpenClawClient
@@ -28,6 +29,7 @@ class WorkerSkillAdapter:
         task: WorkerTask,
         context: ObjectDict,
         scope: ObjectDict | None = None,
+        on_delta: Callable[[str], None] | None = None,
     ) -> ObjectDict:
         normalized_scope = self._normalize_scope(task, context, scope)
         self._validate_scope(task, normalized_scope)
@@ -41,11 +43,14 @@ class WorkerSkillAdapter:
             raise SkillAdapterError(str(exc)) from exc
 
         if definition.name == "answer_with_context":
-            raw_output = self.openclaw_client.ask(
-                question=_string_value(task.payload.get("question")),
-                scope=normalized_scope,
-                context=context,
-            )
+            ask_kwargs: dict[str, object] = {
+                "question": _string_value(task.payload.get("question")),
+                "scope": normalized_scope,
+                "context": context,
+            }
+            if on_delta is not None:
+                ask_kwargs["on_delta"] = on_delta
+            raw_output = self.openclaw_client.ask(**ask_kwargs)  # type: ignore[arg-type]
         elif definition.name == "document_summary":
             raw_output = self.openclaw_client.summarize_document(
                 task.request_id,

@@ -270,9 +270,13 @@ type AssistantSuggestionItem struct {
 	Confidence     *float64 `json:"confidence,omitempty"`
 	RequestID      string   `json:"request_id,omitempty"`
 	GeneratedAt    string   `json:"generated_at"`
+	// SuggestedAction is an optional whitelisted flow action (mark_in_progress,
+	// finalize, archive) the user can run with "确认并执行". Never executed by AI.
+	SuggestedAction string `json:"suggested_action,omitempty"`
 }
 
 type AssistantSuggestionFilter struct {
+	SuggestionID   string
 	RelatedType    string
 	RelatedID      string
 	Status         string
@@ -479,4 +483,29 @@ type AssistantRequestBrief struct {
 	RelatedID   string
 	CreatedBy   string
 	Status      string
+}
+
+// TextSearchFilter drives lexical search over document_text_chunks.
+// DocumentID narrows to one document; ProjectID to one project; Scope keeps
+// non-admin callers inside projects they belong to.
+type TextSearchFilter struct {
+	Query      string
+	ProjectID  string
+	DocumentID string
+	Scope      ActorScope
+	Limit      int
+}
+
+// TextSearchHit is one matching chunk of a document's current version.
+type TextSearchHit struct {
+	DocumentID  string `json:"document_id"`
+	Title       string `json:"title"`
+	ProjectID   string `json:"project_id"`
+	ProjectName string `json:"project_name,omitempty"`
+	VersionID   string `json:"version_id"`
+	VersionNo   int    `json:"version_no"`
+	ChunkNo     int    `json:"chunk_no"`
+	Content     string `json:"content,omitempty"`
+	Snippet     string `json:"snippet"`
+	Score       int    `json:"score"`
 }

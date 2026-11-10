@@ -59,6 +59,20 @@ type AssistantRequestItem = {
 const question = ref("");
 const loading = ref(false);
 const thinking = ref(false);
+// Answer streamed so far for the in-flight request (output.partial_answer).
+const partialAnswer = ref("");
+
+interface Citation {
+  label: string;
+  document_id?: string;
+  title?: string;
+  version_no?: number;
+  snippet?: string;
+}
+function citationsOf(metadata: Record<string, unknown> | undefined): Citation[] {
+  const raw = metadata?.citations;
+  return Array.isArray(raw) ? (raw as Citation[]).filter((c) => c && c.label) : [];
+}
 const conversationsLoading = ref(false);
 const messagesLoading = ref(false);
 const showArchived = ref(false);
@@ -76,11 +90,12 @@ const activeConversationID = ref("");
 const activeRequestID = ref("");
 let pollTimer: number | null = null;
 let pollAttempts = 0;
-const POLL_INTERVAL_MS = 2000;
+// 1 s while a request runs so the streamed partial answer feels live.
+const POLL_INTERVAL_MS = 1000;
 // ~4 minutes: generous enough to cover a slow OpenClaw response (Worker's own
 // upstream timeout defaults to 180s), but bounded so a stuck/lost request
 // does not poll silently forever if the component stays mounted.
-const MAX_POLL_ATTEMPTS = 120;
+const MAX_POLL_ATTEMPTS = 240;
 
 /* ---------- computed ---------- */
 
@@ -355,9 +370,12 @@ async function pollRequest(requestID: string) {
   try {
     const res = await api.get(`/assistant/requests/${requestID}`);
     const data = res.data?.data as AssistantRequestItem;
+    const partial = (data.output as Record<string, unknown> | undefined)?.partial_answer;
+    partialAnswer.value = typeof partial === "string" ? partial : "";
     if (data.status === "completed" || data.status === "failed") {
       stopPolling();
       thinking.value = false;
+      partialAnswer.value = "";
       await fetchConversations();
       if (activeConversationID.value) {
         await fetchMessages(activeConversationID.value);
@@ -625,6 +643,18 @@ onBeforeUnmount(() => {
                   <span :title="item.created_at">{{ relativeTime(item.created_at) }}</span>
                 </div>
                 <div class="assistant-markdown" v-html="renderMarkdown(item.content)"></div>
+                <div v-if="item.role === 'assistant' && citationsOf(item.metadata).length" class="citation-list">
+                  <span class="citation-head">引用来源</span>
+                  <RouterLink
+                    v-for="c in citationsOf(item.metadata)"
+                    :key="c.label"
+                    class="citation-item"
+                    :to="c.document_id ? `/documents/${c.document_id}` : ''"
+                    :title="c.snippet"
+                  >
+                    [{{ c.label }}] {{ c.title || "当前文档" }}<template v-if="c.version_no"> · v{{ c.version_no }}</template>
+                  </RouterLink>
+                </div>
                 <div v-if="item.role === 'assistant'" class="message-extra">
                   <span class="memory-label">
                     <ElIcon><CircleCheck /></ElIcon>
@@ -649,8 +679,9 @@ onBeforeUnmount(() => {
               <div class="message-bubble thinking-bubble">
                 <div class="message-meta">
                   <strong>OpenClaw</strong>
-                  <span>正在思考</span>
+                  <span>{{ partialAnswer ? "正在生成" : "正在思考" }}</span>
                 </div>
+                <div v-if="partialAnswer" class="assistant-markdown" v-html="renderMarkdown(partialAnswer)"></div>
                 <div class="thinking-dots" aria-label="AI 正在思考">
                   <span class="dot"></span>
                   <span class="dot"></span>
@@ -997,6 +1028,32 @@ onBeforeUnmount(() => {
     justify-content: space-between;
   }
 
+}
+
+/* citations under an answer */
+.citation-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.citation-head {
+  color: var(--dd-subtle);
+}
+
+.citation-item {
+  padding: 2px 8px;
+  border: 1px solid var(--dd-line);
+  border-radius: 999px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.citation-item:hover {
+  border-color: #bfd5ed;
 }
 
 /* thinking bubble animation */

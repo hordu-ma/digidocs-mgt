@@ -732,3 +732,38 @@ func newID() string {
 	hexed := hex.EncodeToString(buf)
 	return fmt.Sprintf("%s-%s-%s-%s-%s", hexed[0:8], hexed[8:12], hexed[12:16], hexed[16:20], hexed[20:32])
 }
+
+func (r *AssistantRepository) GetSuggestion(_ context.Context, suggestionID string) (*query.AssistantSuggestionItem, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	item, ok := r.suggestions[suggestionID]
+	if !ok {
+		return nil, service.ErrNotFound
+	}
+	return &item, nil
+}
+
+func (r *AssistantRepository) UpdateRequestProgress(_ context.Context, requestID string, partialAnswer string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	req, ok := r.requests[requestID]
+	if !ok || (req.Status != "running" && req.Status != "pending") {
+		return nil
+	}
+	if req.Output == nil {
+		req.Output = map[string]any{}
+	}
+	req.Output["partial_answer"] = partialAnswer
+	r.requests[requestID] = req
+	return nil
+}
+
+func (r *AssistantRepository) GetRequestCreator(_ context.Context, requestID string) (string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	req, ok := r.requests[requestID]
+	if !ok {
+		return "", service.ErrNotFound
+	}
+	return req.CreatedBy, nil
+}

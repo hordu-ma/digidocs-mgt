@@ -4,6 +4,7 @@ import re
 import signal
 import tempfile
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import FrameType
@@ -18,6 +19,7 @@ from ..services.document_text_extractor import (
     DocumentTextExtractionError,
     extract_text,
 )
+from ..services.context_budget import Passage, passages_from_hits, select_passages
 from ..services.skill_adapter import SkillAdapterError, WorkerSkillAdapter
 from ..tasks.contracts import TaskResult, WorkerTask
 
@@ -156,8 +158,14 @@ class WorkerDispatcher:
             # Inline document text extraction when scoped to a document
             if _string_value(normalized_scope.get("document_id")):
                 self._ensure_document_text(task, context)
-            output, failure = self._run_skill(task, context, normalized_scope)
-            return failure or self._completed(task, output)
+            citations = self._attach_passages(task, context, normalized_scope)
+            output, failure = self._run_skill(
+                task, context, normalized_scope, on_delta=self._progress_reporter(task)
+            )
+            if failure:
+                return failure
+            output["citations"] = citations
+            return self._completed(task, output)
 
         if task.task_type == "document.summarize":
             context = self._build_context(task)
@@ -197,19 +205,73 @@ class WorkerDispatcher:
 
         return self._failed(task, f"unsupported task type: {task.task_type}")
 
+    def _attach_passages(
+        self, task: WorkerTask, context: ObjectDict, scope: ObjectDict
+    ) -> list[ObjectDict]:
+        """Replace raw document text in the prompt with budgeted passages.
+
+        Document scope: rank the document's own chunks against the question.
+        Project scope: ask the backend to search the project's indexed text.
+        Returns citations ([{label, document_id, title, version_no, ...}]) for
+        the answer; the model is told to cite passages as [片段N].
+        """
+        question = _string_value(task.payload.get("question"))
+        budget = settings.max_context_chars
+        document_id = _string_value(scope.get("document_id"))
+        project_id = _string_value(scope.get("project_id"))
+        passages: list[Passage] = []
+        if document_id:
+            text = _string_value(context.pop("document_text", ""))
+            doc_ctx = _as_object_dict(context.get("document_context"))
+            if doc_ctx is not None:
+                text = text or _string_value(doc_ctx.get("extracted_text"))
+                doc_ctx.pop("extracted_text", None)
+                document = _as_object_dict(doc_ctx.get("document")) or {}
+                title = _string_value(document.get("title"))
+                version_no = _current_version_no(doc_ctx)
+            else:
+                title, version_no = "", 0
+            passages = select_passages(
+                text, question, budget, document_id=document_id, title=title, version_no=version_no
+            )
+        elif project_id and question:
+            hits = self.context_client.search_project_text(project_id, question)
+            passages = passages_from_hits(hits, budget)
+        context["passages"] = [p.as_context() for p in passages]
+        if not passages:
+            context["passages_note"] = "未检索到相关正文片段，只能基于元数据回答。"
+        return [p.as_citation() for p in passages]
+
+    def _progress_reporter(self, task: WorkerTask) -> Callable[[str], None]:
+        """Throttled callback that posts the answer streamed so far."""
+        last_sent = 0.0
+
+        def report(text: str) -> None:
+            nonlocal last_sent
+            now = time.monotonic()
+            if now - last_sent < settings.progress_interval:
+                return
+            last_sent = now
+            self.callback_client.submit_progress(task.request_id, text)
+
+        return report
+
     def _run_skill(
         self,
         task: WorkerTask,
         context: ObjectDict,
         scope: ObjectDict | None = None,
+        on_delta: Callable[[str], None] | None = None,
     ) -> tuple[ObjectDict, TaskResult | None]:
         """Run the skill adapter, returning (output, None) on success or
         ({}, failure_result) when the adapter or OpenClaw client errors."""
         try:
             if scope is None:
                 output = self.skill_adapter.run(task, context)
-            else:
+            elif on_delta is None:
                 output = self.skill_adapter.run(task, context, scope)
+            else:
+                output = self.skill_adapter.run(task, context, scope, on_delta=on_delta)
         except (OpenClawClientError, SkillAdapterError) as exc:
             return {}, self._failed(task, str(exc))
         return output, None
@@ -330,6 +392,17 @@ def _string_value(value: object) -> str:
 
 def _as_object_dict(value: object) -> ObjectDict | None:
     return cast(ObjectDict, value) if isinstance(value, dict) else None
+
+
+def _current_version_no(document_context: ObjectDict) -> int:
+    version_id = _string_value(document_context.get("version_id")) or _latest_version_id(document_context)
+    versions = document_context.get("versions")
+    if isinstance(versions, list):
+        for item in versions:
+            if isinstance(item, dict) and item.get("id") == version_id:
+                number = item.get("version_no")
+                return number if isinstance(number, int) else 0
+    return 0
 
 
 def _latest_version_id(document_context: ObjectDict | None) -> str:

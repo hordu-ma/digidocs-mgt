@@ -49,6 +49,10 @@ type Config struct {
 	SMTPUsername      string
 	SMTPPassword      string
 	SMTPFrom          string
+
+	// AutoSummarizeOnUpload chains an AI summary after upload-time text
+	// extraction succeeds (2026-11-10, default on).
+	AutoSummarizeOnUpload bool
 }
 
 func Load() Config {
@@ -85,6 +89,7 @@ func Load() Config {
 		SMTPUsername:               getEnv("SMTP_USERNAME", ""),
 		SMTPPassword:               getEnv("SMTP_PASSWORD", ""),
 		SMTPFrom:                   getEnv("SMTP_FROM", ""),
+		AutoSummarizeOnUpload:      getEnv("AUTO_SUMMARIZE_ON_UPLOAD", "true") == "true",
 	}
 
 	if cfg.AppEnv == "production" {

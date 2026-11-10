@@ -30,6 +30,29 @@ class BackendContextClient:
     def get_project_context(self, project_id: str) -> ObjectDict:
         return self._fetch(f"/api/v1/internal/assistant-context/projects/{project_id}")
 
+    def search_project_text(
+        self, project_id: str, query: str, document_id: str = "", limit: int = 8
+    ) -> list[ObjectDict]:
+        """Retrieval for assistant.ask over the project's current-version text.
+        Returns [] on any failure: the answer then relies on metadata only."""
+        params = {"q": query, "limit": str(limit)}
+        if document_id:
+            params["document_id"] = document_id
+        url = f"{self.base_url}/api/v1/internal/assistant-context/projects/{project_id}/search?{urlencode(params)}"
+        req = urllib.request.Request(url, method="GET")
+        req.add_header("Authorization", f"Bearer {self.token}")
+        req.add_header("Accept", "application/json")
+        try:
+            _, _, raw = fetch(req, timeout=10, label="project-text-search")
+            parsed = cast(object, json.loads(raw))
+        except Exception as exc:
+            logger.warning("project text search failed project=%s: %s", project_id, exc)
+            return []
+        data = parsed.get("data") if isinstance(parsed, dict) else None
+        if not isinstance(data, list):
+            return []
+        return [cast(ObjectDict, item) for item in data if isinstance(item, dict)]
+
     def get_handover_context(self, handover_id: str) -> ObjectDict:
         return self._fetch(f"/api/v1/internal/assistant-context/handovers/{handover_id}")
 

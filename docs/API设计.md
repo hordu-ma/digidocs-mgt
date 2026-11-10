@@ -1291,6 +1291,12 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 }
 ```
 
+2026-11-10 起的输出字段：
+
+- 运行中（`status=running`）时 `output.partial_answer` 为模型已生成的部分回答，Worker 约每秒回传一次。前端以 1 秒间隔轮询并实时渲染，完成后以 `output.answer` 为准。
+- `output.citations`：回答所依据的正文片段，`[{label, document_id, title, version_no, chunk_no, snippet}]`。回答正文用 `[片段N]` 标注来源，会话消息的 `metadata.citations` 同步保存。
+- 正文片段来源：文档范围从该文档正文中按问题选取；课题范围调用 9.5.5 的内部检索。总长度受 Worker `MAX_CONTEXT_CHARS`（默认 12000 字）约束，不再把整篇正文塞进提示词。
+
 ### 9.1.2 查询问答历史列表
 
 `GET /api/v1/assistant/requests`
@@ -1358,6 +1364,9 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 说明：
 
 - `skill_name` 为可选字段；若未传，Worker 会按 `document.summarize` 的白名单选取默认 skill。
+- 2026-11-10：未传 `version_id` 时摘要写入 Worker 实际读取的最新版本。输出新增 `summary_basis`：`full_text`（全文）、`map_reduce`（长文分段提炼后汇总）、`map_reduce_sampled`（超长文均匀抽样分段）、`metadata_only`（无正文）。
+- 自动摘要：上传新版本后正文抽取成功，若后端 `AUTO_SUMMARIZE_ON_UPLOAD=true`（默认），会以上传人身份自动排队一次摘要；摘要完成后上传人收到站内通知。
+- 摘要建议可带可选字段 `suggested_action`，取值仅限 `mark_in_progress`、`finalize`、`archive`，其余值由 Worker 和后端双重丢弃。
 
 ### 9.3 生成交接摘要
 
@@ -1493,6 +1502,20 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 - 使用 Worker shared token 鉴权；
 - 返回版本原始文件流，供正文抽取器处理。
 
+### 9.5.5 课题正文检索（2026-11-10）
+
+`GET /api/v1/internal/assistant-context/projects/{project_id}/search?q=&document_id=&limit=8`
+
+- 仅供 Worker 使用，Worker shared token 鉴权；提问人对该课题的查看权限已在 `POST /assistant/ask` 入队时校验。
+- 在 `document_text_chunks` 中检索该课题文档**当前版本**的正文片段，按命中的查询词数量排序。查询词规则：英文与数字按单词，中文按两字一组，去掉「什么」「如何」等提问用语。
+- 响应：`[{document_id, title, project_id, project_name, version_id, version_no, chunk_no, content, snippet, score}]`。
+
+### 9.5.6 增量回答回传（2026-11-10）
+
+`POST /api/v1/internal/worker-progress`
+
+请求体 `{"request_id": "uuid", "partial_answer": "已生成的部分回答"}`。只更新状态为 `running` 的请求，请求完成后的迟到回传会被忽略。Worker 单次尝试、3 秒超时，失败不影响最终结果。
+
 ### 9.6 确认建议
 
 `POST /api/v1/assistant/suggestions/{suggestion_id}/confirm`
@@ -1501,7 +1524,8 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 
 ```json
 {
-  "note": "采纳该建议"
+  "note": "采纳该建议",
+  "execute": false
 }
 ```
 
@@ -1513,10 +1537,13 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
     "id": "uuid",
     "status": "confirmed",
     "confirmed_by": "uuid",
-    "note": "采纳该建议"
+    "note": "采纳该建议",
+    "executed_action": "finalize"
   }
 }
 ```
+
+确认并执行（2026-11-10）：`execute=true` 且建议带 `suggested_action` 时，后端先以**确认人身份**执行该流转动作，成功后再把建议标为已确认，响应带 `executed_action`。流转动作照常经过权限与状态机校验；执行失败时返回对应错误（403 / 409），建议保持 `pending`。建议不是 `pending`、没有可执行动作或不属于文档时返回 400。AI 本身从不执行任何动作。
 
 ### 9.7 忽略建议
 

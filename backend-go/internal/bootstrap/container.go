@@ -41,6 +41,7 @@ type Container struct {
 	AuditService          service.AuditService
 	MembershipService     service.MembershipService
 	NotificationService   service.NotificationService
+	SearchService         service.SearchService
 }
 
 // buildNotificationChannels returns the external channels enabled by config.
@@ -100,6 +101,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 		auditService := service.NewAuditService(pgrepo.NewAuditRepository(postgresDB))
 		notificationService := service.NewNotificationService(pgrepo.NewNotificationRepository(postgresDB), cfg.PublicBaseURL, buildNotificationChannels(cfg)...)
 		log.Printf("[bootstrap] notification channels: %v", notificationService.Channels())
+		flowService := service.NewFlowService(pgrepo.NewFlowRepository(postgresDB), actionRepo, permissionService).WithNotifications(notificationService)
 		return Container{
 			DB:            postgresDB,
 			QueueConsumer: pgqueue.NewConsumer(postgresDB),
@@ -108,13 +110,17 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				pgrepo.NewUserQueryRepository(postgresDB),
 				pgrepo.NewProjectRepository(postgresDB),
 			),
-			AdminService:          service.NewAdminService(pgrepo.NewAdminRepository(postgresDB)),
-			AssistantService:      service.NewAssistantService(noopqueue.NewPublisher(), pgrepo.NewAssistantRepository(postgresDB), docRepo, versionRepo, permissionService).WithNotifications(notificationService),
+			AdminService: service.NewAdminService(pgrepo.NewAdminRepository(postgresDB)),
+			AssistantService: service.NewAssistantService(noopqueue.NewPublisher(), pgrepo.NewAssistantRepository(postgresDB), docRepo, versionRepo, permissionService).
+				WithNotifications(notificationService).
+				WithFlowExecutor(flowService).
+				WithAutoSummarize(cfg.AutoSummarizeOnUpload),
 			DocumentService:       service.NewDocumentService(docRepo, docRepo, storageProvider, versionWorkflow, permissionService),
 			AuditQueryService:     service.NewAuditQueryService(pgrepo.NewAuditRepository(postgresDB)).WithPermissions(permissionService),
 			DashboardQueryService: service.NewDashboardQueryService(pgrepo.NewDashboardRepository(postgresDB)),
 			VersionService:        service.NewVersionService(storageProvider, versionWorkflow, versionRepo, permissionService),
-			FlowService:           service.NewFlowService(pgrepo.NewFlowRepository(postgresDB), actionRepo, permissionService).WithNotifications(notificationService),
+			FlowService:           flowService,
+			SearchService:         service.NewSearchService(pgrepo.NewTextSearchRepository(postgresDB)),
 			HandoverService:       service.NewHandoverService(pgrepo.NewHandoverRepository(postgresDB), actionRepo, permissionService).WithNotifications(notificationService),
 			DataAssetService:      service.NewDataAssetService(dataAssetRepo, dataAssetRepo, storageProvider, permissionService),
 			CodeRepositoryService: service.NewCodeRepositoryService(codeRepo, codeRepo, permissionService, cfg.CodeRepoRoot, storageProvider),

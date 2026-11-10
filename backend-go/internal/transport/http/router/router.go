@@ -36,7 +36,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 		container.FlowService,
 		container.HandoverService,
 		container.DashboardQueryService,
-	)
+	).WithSearch(container.SearchService)
 	teamSpaceHandler := handlers.NewTeamSpaceHandler(container.QueryService)
 	userHandler := handlers.NewUserHandler(container.QueryService)
 	projectHandler := handlers.NewProjectHandler(container.QueryService)
@@ -81,6 +81,8 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	// Worker callback uses its own shared-secret token, not user JWT.
 	mux.HandleFunc("POST "+cfg.APIV1Prefix+"/internal/worker-results", internalWorkerHandler.ReceiveResult)
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/poll-tasks", internalWorkerHandler.PollTasks)
+	mux.HandleFunc("POST "+cfg.APIV1Prefix+"/internal/worker-progress", internalWorkerHandler.ReceiveProgress)
+	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/assistant-context/projects/{projectID}/search", internalAssistantContextHandler.SearchProjectText)
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/assistant-context/projects/{projectID}", internalAssistantContextHandler.GetProjectContext)
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/assistant-context/documents/{documentID}", internalAssistantContextHandler.GetDocumentContext)
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/internal/assistant-context/handovers/{handoverID}", internalAssistantContextHandler.GetHandoverContext)

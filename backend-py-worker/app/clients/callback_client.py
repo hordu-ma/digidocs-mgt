@@ -64,5 +64,20 @@ class CallbackClient:
         return {"request_id": result.request_id, "status": result.status}
 
 
+    def submit_progress(self, request_id: str, partial_answer: str) -> None:
+        """Best effort: store the answer streamed so far. One attempt with a
+        short timeout and no exception, because a lost progress update only
+        delays what the user sees; the final result is posted separately."""
+        url = f"{self.base_url}/api/v1/internal/worker-progress"
+        payload = json.dumps({"request_id": request_id, "partial_answer": partial_answer}).encode()
+        req = urllib.request.Request(url, data=payload, method="POST")
+        req.add_header("Authorization", f"Bearer {self.token}")
+        req.add_header("Content-Type", "application/json")
+        try:
+            fetch(req, timeout=3, label="worker-progress", attempts=1)
+        except Exception as exc:
+            logger.debug("progress update dropped request_id=%s: %s", request_id, exc)
+
+
 def _as_object_dict(value: object) -> ObjectDict | None:
     return cast(ObjectDict, value) if isinstance(value, dict) else None

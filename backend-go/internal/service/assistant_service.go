@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"digidocs-mgt/backend-go/internal/domain/query"
@@ -27,6 +28,22 @@ type AssistantService struct {
 	versions    repository.VersionReader
 	permissions PermissionService
 	notify      NotificationService
+	flows       FlowActionExecutor
+	// autoSummarize queues a summary once text extraction of an upload succeeds.
+	autoSummarize bool
+}
+
+func (s AssistantService) WithAutoSummarize(enabled bool) AssistantService {
+	s.autoSummarize = enabled
+	return s
+}
+
+// ReceiveProgress stores a partially streamed answer for a running request.
+func (s AssistantService) ReceiveProgress(ctx context.Context, requestID string, partialAnswer string) error {
+	if strings.TrimSpace(requestID) == "" {
+		return fmt.Errorf("%w: request_id is required", ErrValidation)
+	}
+	return s.repo.UpdateRequestProgress(ctx, requestID, partialAnswer)
 }
 
 func (s AssistantService) WithNotifications(n NotificationService) AssistantService {
@@ -180,7 +197,34 @@ func (s AssistantService) ReceiveResult(ctx context.Context, result task.Result)
 		return err
 	}
 	s.notify.OnAssistantResult(ctx, result)
+	s.maybeAutoSummarize(ctx, result)
 	return nil
+}
+
+// maybeAutoSummarize chains document.summarize after a successful upload-time
+// extraction, on behalf of the uploader. The summary task reuses the text just
+// extracted (cached per version), so this costs one model call, not a second
+// extraction. Failures are logged: the upload itself already succeeded.
+func (s AssistantService) maybeAutoSummarize(ctx context.Context, result task.Result) {
+	if !s.autoSummarize || result.Status != "completed" || strings.TrimSpace(stringValue(result.Output["extracted_text"])) == "" {
+		return
+	}
+	req, err := s.repo.GetAssistantRequest(ctx, result.RequestID)
+	if err != nil || req.RequestType != string(task.TaskTypeDocumentExtractText) || req.RelatedType != "document" || req.RelatedID == "" {
+		return
+	}
+	creator, err := s.repo.GetRequestCreator(ctx, result.RequestID)
+	if err != nil {
+		log.Printf("[assistant] auto-summary skipped request=%s: %v", result.RequestID, err)
+		return
+	}
+	payload := map[string]any{"auto": true}
+	if versionID := stringValue(result.Output["version_id"]); versionID != "" {
+		payload["version_id"] = versionID
+	}
+	if _, err := s.QueueTask(ctx, task.TaskTypeDocumentSummarize, "document", req.RelatedID, payload, creator); err != nil {
+		log.Printf("[assistant] auto-summary queue failed document=%s: %v", req.RelatedID, err)
+	}
 }
 
 // SummarizeDocument is the permission-checked entry point handlers must use to

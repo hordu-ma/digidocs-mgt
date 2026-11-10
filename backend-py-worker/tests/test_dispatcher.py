@@ -22,7 +22,7 @@ def test_handle_assistant_ask_task(monkeypatch: MonkeyPatch) -> None:
         lambda project_id: {"available": True, "scope": {"project_id": project_id}},
     )
 
-    def fake_run(task: WorkerTask, context: ObjectDict, scope: ObjectDict | None = None) -> ObjectDict:
+    def fake_run(task: WorkerTask, context: ObjectDict, scope: ObjectDict | None = None, on_delta: object = None) -> ObjectDict:
         captured["task"] = task
         captured["scope"] = scope or {}
         captured["context"] = context
@@ -258,7 +258,7 @@ def test_assistant_ask_inline_extraction_updates_context(monkeypatch: MonkeyPatc
         ),
     )
 
-    def fake_run(task: WorkerTask, context: ObjectDict, scope: ObjectDict | None = None) -> ObjectDict:
+    def fake_run(task: WorkerTask, context: ObjectDict, scope: ObjectDict | None = None, on_delta: object = None) -> ObjectDict:
         captured["context"] = context
         return {"answer": "ok"}
 
@@ -275,8 +275,14 @@ def test_assistant_ask_inline_extraction_updates_context(monkeypatch: MonkeyPatc
     context = cast(ObjectDict, captured["context"])
     doc_context = cast(ObjectDict, context["document_context"])
     assert result.status == "completed"
-    assert context["document_text"] == "内联正文"
-    assert doc_context["extracted_text"] == "内联正文"
+    # Raw text is replaced by budgeted, labelled passages (2026-11-10), and is
+    # not duplicated inside document_context.
+    assert "document_text" not in context
+    assert "extracted_text" not in doc_context
+    passages = cast(list[ObjectDict], context["passages"])
+    assert passages[0]["content"] == "内联正文" and passages[0]["label"] == "片段1"
+    citations = cast(list[ObjectDict], result.output["citations"])
+    assert citations[0]["label"] == "片段1"
 
 
 # ── run_forever / poll_once / _process_batch ───────────────────

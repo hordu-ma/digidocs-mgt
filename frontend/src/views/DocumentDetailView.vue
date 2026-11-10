@@ -11,7 +11,7 @@ import {
   Upload,
   UserFilled,
 } from "@element-plus/icons-vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import type { UploadRawFile } from "element-plus";
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -463,6 +463,29 @@ async function updateSuggestionStatus(id: string, action: "confirm" | "dismiss")
   }
 }
 
+// AI suggestions may propose one whitelisted flow action. Executing it runs
+// the action as the current user (normal permission and state checks apply);
+// if it fails, the suggestion stays pending.
+async function executeSuggestion(id: string, action: string) {
+  const label = flowActionLabel[action] ?? action;
+  try {
+    await ElMessageBox.confirm(`确认采纳这条建议，并以你的身份执行「${label}」？`, "确认并执行", {
+      confirmButtonText: `确认并${label}`,
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+  } catch {
+    return;
+  }
+  try {
+    await api.post(`/assistant/suggestions/${id}/confirm`, { execute: true, note: "前端确认并执行" });
+    ElMessage.success(`已执行「${label}」`);
+    await loadData();
+  } catch (err) {
+    ElMessage.error(extractError(err, `执行「${label}」失败，建议保持待确认`));
+  }
+}
+
 function goToHandovers() {
   void router.push("/handovers");
 }
@@ -715,8 +738,16 @@ onBeforeUnmount(() => {
                 </div>
                 <div class="summary-text">{{ item.content }}</div>
                 <div v-if="item.status === 'pending'" class="suggestion-actions">
+                  <ElButton
+                    v-if="item.suggested_action"
+                    size="small"
+                    type="primary"
+                    @click="executeSuggestion(item.id, item.suggested_action)"
+                  >
+                    确认并{{ flowActionLabel[item.suggested_action] ?? item.suggested_action }}
+                  </ElButton>
                   <ElButton size="small" type="success" @click="updateSuggestionStatus(item.id, 'confirm')">
-                    确认
+                    {{ item.suggested_action ? "仅确认" : "确认" }}
                   </ElButton>
                   <ElButton size="small" @click="updateSuggestionStatus(item.id, 'dismiss')">
                     忽略

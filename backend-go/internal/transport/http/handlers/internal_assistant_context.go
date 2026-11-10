@@ -25,6 +25,41 @@ type InternalAssistantContextHandler struct {
 	flows     service.FlowService
 	handovers service.HandoverService
 	dashboard service.DashboardQueryService
+	search    service.SearchService
+}
+
+// WithSearch enables the retrieval endpoint used by assistant.ask.
+func (h InternalAssistantContextHandler) WithSearch(search service.SearchService) InternalAssistantContextHandler {
+	h.search = search
+	return h
+}
+
+// SearchProjectText  GET /internal/assistant-context/projects/{projectID}/search?q=&document_id=&limit=
+// Retrieval for assistant.ask: the most relevant chunks of the project's (or
+// one document's) current-version text. Pinned to the path project; the user
+// was already authorized for that scope when the question was queued.
+func (h InternalAssistantContextHandler) SearchProjectText(w http.ResponseWriter, r *http.Request) {
+	if !workerAuthorized(r, h.cfg) {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid worker callback token")
+		return
+	}
+	projectID := r.PathValue("projectID")
+	if projectID == "" {
+		response.WriteError(w, http.StatusBadRequest, "bad_request", "project_id is required")
+		return
+	}
+	hits, err := h.search.SearchChunks(r.Context(), query.TextSearchFilter{
+		Query:      r.URL.Query().Get("q"),
+		ProjectID:  projectID,
+		DocumentID: r.URL.Query().Get("document_id"),
+		Scope:      workerScope,
+		Limit:      parseIntOrDefault(r.URL.Query().Get("limit"), 8),
+	})
+	if err != nil {
+		writeServiceError(w, err, "project not found", "failed to search project text")
+		return
+	}
+	response.WriteData(w, http.StatusOK, hits)
 }
 
 func NewInternalAssistantContextHandler(

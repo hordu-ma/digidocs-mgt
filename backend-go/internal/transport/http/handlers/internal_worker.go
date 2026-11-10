@@ -56,6 +56,29 @@ func (h InternalWorkerHandler) ReceiveResult(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+// ReceiveProgress  POST /internal/worker-progress {request_id, partial_answer}
+// Stores the answer streamed so far so the chat can render it while the model
+// is still generating. Ignored once the request has completed.
+func (h InternalWorkerHandler) ReceiveProgress(w http.ResponseWriter, r *http.Request) {
+	if !workerAuthorized(r, h.cfg) {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid worker callback token")
+		return
+	}
+	var body struct {
+		RequestID     string `json:"request_id"`
+		PartialAnswer string `json:"partial_answer"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid request body")
+		return
+	}
+	if err := h.assistant.ReceiveProgress(r.Context(), body.RequestID, body.PartialAnswer); err != nil {
+		writeServiceError(w, err, "assistant request not found", "failed to store progress")
+		return
+	}
+	response.WriteData(w, http.StatusOK, map[string]bool{"accepted": true})
+}
+
 // PollTasks returns up to 10 pending task messages from the queue.
 func (h InternalWorkerHandler) PollTasks(w http.ResponseWriter, r *http.Request) {
 	if !workerAuthorized(r, h.cfg) {

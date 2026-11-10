@@ -421,7 +421,8 @@ func (r AssistantRepository) CompleteAssistantRequest(
 				source_scope,
 				confidence,
 				request_id,
-				generated_at
+				generated_at,
+				action_payload
 			)
 			VALUES (
 				$1::uuid,
@@ -434,7 +435,8 @@ func (r AssistantRepository) CompleteAssistantRequest(
 				NULLIF($8, ''),
 				$9,
 				$10,
-				$11
+				$11,
+				CASE WHEN $12 = '' THEN NULL ELSE jsonb_build_object('action', $12::text) END
 			)
 			`,
 			item.ID,
@@ -448,6 +450,7 @@ func (r AssistantRepository) CompleteAssistantRequest(
 			confidence,
 			item.RequestID,
 			parseRFC3339(item.GeneratedAt),
+			item.SuggestedAction,
 		)
 		if err != nil {
 			return err
@@ -478,6 +481,8 @@ func (r AssistantRepository) CompleteAssistantRequest(
 						"source_scope":           extractScope(payload, result.Output),
 						"memory_sources":         extractMemorySources(payload),
 						"processing_duration_ms": completedAt.Sub(createdAt).Milliseconds(),
+						// Passages the answer was grounded on, cited as [片段N].
+						"citations": result.Output["citations"],
 					},
 					CreatedAt: completedAt,
 				},
@@ -498,6 +503,18 @@ func updateAssistantProjection(
 ) error {
 	if result.Status != "completed" {
 		return nil
+	}
+
+	// Index extracted text for retrieval. Both extraction and summarize may
+	// carry it; the version the worker actually read is in output.version_id.
+	if text := stringValue(result.Output["extracted_text"]); text != "" {
+		versionID := stringValue(result.Output["version_id"])
+		if versionID == "" {
+			versionID = stringValue(request.Payload["version_id"])
+		}
+		if err := storeDocumentTextChunks(ctx, tx, versionID, text); err != nil {
+			return err
+		}
 	}
 
 	switch request.RequestType {
@@ -522,7 +539,12 @@ func updateAssistantProjection(
 		)
 		return err
 	case string(task.TaskTypeDocumentSummarize):
+		// A summary requested without an explicit version targets the latest
+		// one; the worker reports which version it summarized.
 		versionID := stringValue(request.Payload["version_id"])
+		if versionID == "" {
+			versionID = stringValue(result.Output["version_id"])
+		}
 		if versionID == "" {
 			return nil
 		}
@@ -577,13 +599,15 @@ func (r AssistantRepository) ListSuggestions(
 			COALESCE(source_scope, ''),
 			confidence,
 			COALESCE(request_id, ''),
-			TO_CHAR(generated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+			TO_CHAR(generated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+			COALESCE(action_payload->>'action', '')
 		FROM assistant_suggestions
 		WHERE ($1 = '' OR related_type = $1)
 		  AND ($2 = '' OR related_id::text = $2)
 		  AND ($3 = '' OR status::text = $3)
 		  AND ($4 = '' OR suggestion_type::text = $4)
 		  AND `+projectScopeSQL(assistantRelatedProjectSQL("related_type", "related_id"), "$5", "$6")+`
+		  AND ($7 = '' OR id::text = $7)
 		ORDER BY generated_at DESC
 		`,
 		filter.RelatedType,
@@ -592,6 +616,7 @@ func (r AssistantRepository) ListSuggestions(
 		filter.SuggestionType,
 		isAdmin,
 		actorID,
+		filter.SuggestionID,
 	)
 	if err != nil {
 		return nil, err
@@ -614,6 +639,7 @@ func (r AssistantRepository) ListSuggestions(
 			&confidence,
 			&item.RequestID,
 			&item.GeneratedAt,
+			&item.SuggestedAction,
 		); err != nil {
 			return nil, err
 		}
@@ -1004,6 +1030,11 @@ func buildSuggestionItems(
 			if confidence, ok := floatValue(m["confidence"]); ok {
 				item.Confidence = &confidence
 			}
+			// Only document-scoped suggestions may carry an action, and only one
+			// from the whitelist; anything else the model invents is dropped.
+			if req.RelatedType == "document" {
+				item.SuggestedAction = service.NormalizeSuggestedAction(stringValue(m["suggested_action"]))
+			}
 			items = append(items, item)
 		}
 	}
@@ -1276,4 +1307,37 @@ func fallbackString(value string, fallback string) string {
 func stringValue(value any) string {
 	raw, _ := value.(string)
 	return raw
+}
+
+// GetSuggestion reads one suggestion regardless of scope; callers authorize
+// first (EnsureViewAssistantSuggestion).
+func (r AssistantRepository) GetSuggestion(ctx context.Context, suggestionID string) (*query.AssistantSuggestionItem, error) {
+	items, err := r.ListSuggestions(ctx, query.AssistantSuggestionFilter{Scope: query.ActorScope{IsAdmin: true}, SuggestionID: suggestionID})
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return nil, service.ErrNotFound
+	}
+	return &items[0], nil
+}
+
+// UpdateRequestProgress stores the answer streamed so far. It only touches a
+// running request, so a late progress post can never overwrite a final answer.
+func (r AssistantRepository) UpdateRequestProgress(ctx context.Context, requestID string, partialAnswer string) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE assistant_requests
+		SET output = COALESCE(output, '{}'::jsonb) || jsonb_build_object('partial_answer', $2::text)
+		WHERE id::text = $1 AND status = 'running'
+	`, requestID, partialAnswer)
+	return err
+}
+
+func (r AssistantRepository) GetRequestCreator(ctx context.Context, requestID string) (string, error) {
+	var createdBy string
+	err := r.db.QueryRowContext(ctx, `SELECT COALESCE(created_by::text, '') FROM assistant_requests WHERE id::text = $1`, requestID).Scan(&createdBy)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", service.ErrNotFound
+	}
+	return createdBy, err
 }

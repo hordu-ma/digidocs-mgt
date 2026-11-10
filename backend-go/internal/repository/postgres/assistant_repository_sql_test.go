@@ -100,7 +100,7 @@ func TestAssistantRepositoryCompleteRequestUpdatesProjectionSuggestionsAndConver
 		WithArgs("ver-1", "文档摘要").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("INSERT INTO assistant_suggestions").
-		WithArgs(sqlmock.AnyArg(), "document", "doc-1", "document_summary", "pending", "文档摘要", "文档摘要", sqlmock.AnyArg(), nil, "req-1", sqlmock.AnyArg()).
+		WithArgs(sqlmock.AnyArg(), "document", "doc-1", "document_summary", "pending", "文档摘要", "文档摘要", sqlmock.AnyArg(), nil, "req-1", sqlmock.AnyArg(), "").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("INSERT INTO assistant_conversation_messages").
 		WithArgs(sqlmock.AnyArg(), "conv-1", "assistant", "这是回答", "req-1", sqlmock.AnyArg(), "", sqlmock.AnyArg()).
