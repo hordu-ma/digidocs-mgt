@@ -77,6 +77,13 @@ func TestPostgresIntegrationTextChunksSearchProgressAndActions(t *testing.T) {
 	if out, _ := search.SearchChunks(ctx, query.TextSearchFilter{Query: "奖励函数", Scope: query.ActorScope{ActorID: outsider}}); len(out) != 0 {
 		t.Fatal("non-member must not see project text")
 	}
+	docs, err := search.SearchDocuments(ctx, query.TextSearchFilter{Query: "PPO 奖励函数", Scope: query.ActorScope{ActorID: integrationUserID}})
+	if err != nil || len(docs) != 1 || docs[0].DocumentID != docID || docs[0].MatchedChunks < 1 || !strings.Contains(docs[0].Snippet, "奖励") {
+		t.Fatalf("document search should return one row per document: %#v %v", docs, err)
+	}
+	if out, _ := search.SearchDocuments(ctx, query.TextSearchFilter{Query: "奖励函数", Scope: query.ActorScope{ActorID: outsider}}); len(out) != 0 {
+		t.Fatal("non-member must not find documents by content")
+	}
 
 	// A new version replaces the index; an old version's late extraction is ignored.
 	v2 := newVersion()
@@ -136,5 +143,66 @@ func TestPostgresIntegrationTextChunksSearchProgressAndActions(t *testing.T) {
 	var summary string
 	if err := database.QueryRowContext(ctx, `SELECT COALESCE(summary_text,'') FROM document_versions WHERE id=$1`, v2).Scan(&summary); err != nil || summary != "摘要" {
 		t.Fatalf("summary without payload version should land on output version: %q %v", summary, err)
+	}
+}
+
+func TestPostgresIntegrationDocumentListFilters(t *testing.T) {
+	ctx := context.Background()
+	database := openIntegrationDB(t)
+	seedIntegrationBaseRows(t, ctx, database)
+	const member = "00000000-0000-0000-0000-000000000701"
+	exec := func(q string, args ...any) {
+		t.Helper()
+		if _, err := database.ExecContext(ctx, q, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`INSERT INTO users(id,username,password_hash,display_name,role,status) VALUES($1,'m','h','成员','member','active')`, member)
+	exec(`INSERT INTO project_members(project_id,user_id,project_role) VALUES($1,$2,'contributor')`, integrationProjectID, member)
+	documents := pgrepo.NewDocumentRepository(database)
+	newDoc := func(title, owner string) string {
+		t.Helper()
+		d, err := documents.CreateDocument(ctx, command.DocumentCreateInput{TeamSpaceID: integrationTeamSpaceID, ProjectID: integrationProjectID, Title: title, CurrentOwnerID: owner, ActorID: owner})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return d["id"].(string)
+	}
+	newDoc("b 报告", integrationUserID)
+	mine := newDoc("a 方案", member)
+	old := newDoc("100% 完成", member)
+	gone := newDoc("已删除", member)
+	exec(`UPDATE documents SET updated_at = NOW() - INTERVAL '20 days' WHERE id=$1`, old)
+	exec(`UPDATE documents SET is_deleted = true WHERE id=$1`, gone)
+
+	list := func(f query.DocumentListFilter) ([]query.DocumentListItem, int) {
+		t.Helper()
+		items, total, err := documents.ListDocuments(ctx, f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return items, total
+	}
+	if items, total := list(query.DocumentListFilter{ActorID: member, Sort: "title_asc", PageSize: 2}); total != 3 || len(items) != 2 || items[0].Title != "100% 完成" || items[1].ID != mine {
+		t.Fatalf("title sort + paging: total=%d %#v", total, items)
+	}
+	if _, total := list(query.DocumentListFilter{ActorID: member, OwnerID: member}); total != 2 {
+		t.Fatalf("mine: %d", total)
+	}
+	if _, total := list(query.DocumentListFilter{ActorID: member, UpdatedWithinDays: 7}); total != 2 {
+		t.Fatalf("recent: %d", total)
+	}
+	if items, total := list(query.DocumentListFilter{ActorID: member, Keyword: "%"}); total != 1 || items[0].ID != old {
+		t.Fatalf("keyword %% must be literal: total=%d", total)
+	}
+	if _, total := list(query.DocumentListFilter{ActorID: member, DeletedOnly: true}); total != 0 {
+		t.Fatal("a contributor must not see the recycle bin")
+	}
+	if items, total := list(query.DocumentListFilter{ActorID: integrationUserID, DeletedOnly: true}); total != 1 || items[0].ID != gone || !items[0].IsDeleted {
+		t.Fatalf("project owner sees the recycle bin: total=%d", total)
+	}
+	counts, err := documents.CountDocumentsByProject(ctx, query.DocumentListFilter{ActorID: member, ProjectID: "ignored-for-counts"})
+	if err != nil || len(counts) != 1 || counts[0].Count != 3 {
+		t.Fatalf("project counts: %#v %v", counts, err)
 	}
 }

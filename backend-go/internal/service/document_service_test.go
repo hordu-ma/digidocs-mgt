@@ -288,3 +288,7 @@ func TestDocumentService_RestoreDocument_MissingDocumentID(t *testing.T) {
 		t.Errorf("err = %v, want ErrValidation", err)
 	}
 }
+
+func (m *mockDocumentReader) CountDocumentsByProject(context.Context, query.DocumentListFilter) ([]query.ProjectDocumentCount, error) {
+	return nil, nil
+}

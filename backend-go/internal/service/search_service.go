@@ -10,6 +10,7 @@ import (
 // TextSearchReader is implemented by the postgres text search repository.
 type TextSearchReader interface {
 	SearchChunks(ctx context.Context, filter query.TextSearchFilter) ([]query.TextSearchHit, error)
+	SearchDocuments(ctx context.Context, filter query.TextSearchFilter) ([]query.TextSearchHit, error)
 }
 
 // SearchService serves lexical search over extracted document text, for the
@@ -28,4 +29,13 @@ func (s SearchService) SearchChunks(ctx context.Context, filter query.TextSearch
 		return []query.TextSearchHit{}, nil
 	}
 	return s.reader.SearchChunks(ctx, filter)
+}
+
+// SearchDocuments is the user-facing search; the scope must come from the
+// authenticated caller (handlers use scopeFrom).
+func (s SearchService) SearchDocuments(ctx context.Context, filter query.TextSearchFilter) ([]query.TextSearchHit, error) {
+	if s.reader == nil || strings.TrimSpace(filter.Query) == "" {
+		return []query.TextSearchHit{}, nil
+	}
+	return s.reader.SearchDocuments(ctx, filter)
 }

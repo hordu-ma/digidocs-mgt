@@ -496,10 +496,17 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 - `folder_id`
 - `owner_id`
 - `status`
-- `keyword`
+- `keyword`（标题模糊匹配，`%`、`_` 按字面处理）
 - `include_archived`
+- `sort`（2026-11-10）：`updated_desc`（默认）、`updated_asc`、`title_asc`、`owner_asc`
+- `mine=true`：等同 `owner_id=<调用者>`
+- `updated_within_days`：只看最近 N 天更新的文档
+- `deleted_only=true`：回收站，只返回已删除文档，且仅限调用者为 owner/manager 的课题（`admin` 不限）
+- `with_counts=true`：在 `meta.project_counts` 返回按课题的计数（同样的筛选条件，但不含 `project_id`），供左侧课题栏使用
 - `page`
-- `page_size`
+- `page_size`（上限 200）
+
+说明：此前前端一次取 200 条后在浏览器里筛选与排序，超过 200 条的文档会被漏掉，课题计数也只统计已加载部分。现在所有筛选、排序、计数都在服务端完成，前端按页加载。
 
 响应体：
 
@@ -517,16 +524,30 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
         "display_name": "张三"
       },
       "current_version_no": 3,
-      "updated_at": "2026-04-03T10:00:00Z"
+      "updated_at": "2026-04-03T10:00:00Z",
+      "project_id": "uuid",
+      "is_archived": false,
+      "is_deleted": false
     }
   ],
   "meta": {
     "page": 1,
     "page_size": 20,
-    "total": 128
+    "total": 128,
+    "project_counts": [
+      { "project_id": "uuid", "project_name": "课题A", "count": 42 }
+    ]
   }
 }
 ```
+
+### 4.2.1 全文检索（2026-11-10）
+
+`GET /api/v1/search?q=&project_id=&limit=20`
+
+在调用者所属课题的文档**当前版本正文**中检索，每篇文档返回一条，代表片段为命中查询词最多的一段。查询词规则与 AI 检索相同（中文两字一组、英文按单词），正文来自 `document_text_chunks`，尚未抽取正文的文档搜不到。
+
+响应：`[{document_id, title, project_id, project_name, version_id, version_no, chunk_no, snippet, score, matched_chunks}]`，按命中词数、命中片段数、更新时间排序，`limit` 上限 50。
 
 ### 4.3 文档详情
 

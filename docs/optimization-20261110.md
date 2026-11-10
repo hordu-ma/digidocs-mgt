@@ -14,7 +14,7 @@
 | M2 | 待办收件箱与通知：站内「待我处理」、通知表、邮件/Webhook 推送 | 已完成并部署 |
 | M3 | 交接候选自动归集；风险规则扩充；转交状态命名拆分 | 已完成并部署 |
 | M4 | AI：正文截断与分块、自动摘要、流式输出、结构化输出、建议可执行、向量检索 | 已完成并部署（向量检索因网关无嵌入接口改为词面检索，见下） |
-| M5 | 全文检索与服务端分页筛选 | 待开始 |
+| M5 | 全文检索与服务端分页筛选 | 已完成并部署 |
 | M6 | 体验收口：权限可解释、时间与空值统一、版本折叠、命名统一、登录页品牌 | 待开始 |
 | M7 | 工程与运维：任务死信与幂等、/metrics、Office 转 PDF 预览、孤儿对象对账、低危安全项 | 待开始 |
 | 并行 | TLS、演示默认口令、群晖凭据轮换、main 分支保护 | 需负责人在仓库外执行，见文末 |
@@ -193,6 +193,41 @@
 - 回滚镜像标签：`digidocs-mgt-{backend-go,backend-py-worker,frontend}:before-opt-m4`；部署前数据库备份：`/home/pgx/ops/digidocs-reviews/rollback-20261110-m4/db.sql.gz`。
 - 迁移 014 新增一张表和一个可空列，旧代码不读取，回滚应用时可保留。彻底撤销：`DROP TABLE document_text_chunks; ALTER TABLE assistant_suggestions DROP COLUMN action_payload; DELETE FROM schema_migrations WHERE version = 14;`。
 - Worker 与后端必须同批回滚：旧后端没有 `/internal/worker-progress` 和检索接口，新 Worker 对此降级处理（进度丢弃、检索返回空），不会失败，但旧 Worker 配新后端同样可用。
+
+## M5 全文检索与服务端分页
+
+### 问题
+
+- 文档页一次拉 200 条再在浏览器里筛选与排序，「我负责的」「待接收」等筛选漏掉第 200 条以后的文档，左侧课题计数也只统计已加载部分。
+- 搜索只匹配标题；正文已在 M4 入库但用户用不上。
+- 行菜单根据 `is_archived` 决定显示「恢复」还是「移出工作台」，但列表接口从不返回 `is_archived`，于是永远显示「移出工作台」，点了实际是**软删除**，文案与行为不符。
+- 删除的文档界面上无处恢复，用户手册却写着可以通过「显示已归档」恢复。
+- 命令面板（Ctrl+K）直接显示英文状态枚举。
+
+### 设计决定
+
+- 筛选、排序、计数全部下沉到服务端，排序用白名单映射到 SQL，平局按 id 保证翻页稳定；列表与计数共用一个 WHERE 构造函数。
+- 关键词按字面匹配，转义 `%` 与 `_`。
+- 回收站是一个筛选条件而非新页面，只对课题 owner/manager 与管理员返回数据，与「恢复」的权限一致。
+- 全文检索复用 M4 的分块表与分词规则，每篇文档只返回最相关的一段。
+- 行菜单改为明确的「删除文档」（二次确认）与「恢复文档」。
+
+### 改动
+
+- 后端：`ListDocuments` 重写（`sort`、`mine`、`updated_within_days`、`deleted_only`、`with_counts`、转义、返回 `is_archived`/`is_deleted`/`project_id`）；`CountDocumentsByProject`；`SearchDocuments` 与 `GET /search`。
+- 前端：文档页按页加载、筛选变化回到第一页并丢弃过期响应、课题栏用服务端计数、正文命中区、回收站、删除确认与恢复、分页；命令面板加正文检索与中文状态。
+- 文档：API 设计 4.2、4.2.1；用户使用说明文档列表、文档详情与快速导航。
+
+### 验证
+
+- 真实 PostgreSQL `TestPostgresIntegrationDocumentListFilters`：标题排序加分页、我负责的、近 7 天、`%` 按字面匹配、普通成员看不到回收站、课题负责人能看到并带 `is_deleted`、课题计数忽略 `project_id`。
+- `SearchDocuments` 一篇文档只返回一行且带摘录，非成员检索为空。
+- `make verify` 与隔离栈 `make smoke-e2e` 通过；无头浏览器在桌面和手机宽度下核对文档页与「我负责的」筛选，课题栏计数随筛选变化，无页面脚本错误。
+- 2026-11-10 16:10 部署 `backend-go`、`frontend`，均 healthy，无数据库迁移；未鉴权访问 `/search` 返回 401。
+
+### 部署与回滚记录
+
+- 回滚镜像标签：`digidocs-mgt-{backend-go,frontend}:before-opt-m5`；部署前数据库备份：`/home/pgx/ops/digidocs-reviews/rollback-20261110-m5/db.sql.gz`。无 schema 变更。
 
 ## 需负责人在仓库外执行的事项
 

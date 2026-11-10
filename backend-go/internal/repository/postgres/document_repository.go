@@ -4,11 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/service"
+	"digidocs-mgt/backend-go/internal/textsearch"
 )
 
 type DocumentRepository struct {
@@ -19,6 +21,64 @@ func NewDocumentRepository(db DBTX) DocumentRepository {
 	return DocumentRepository{db: db}
 }
 
+// documentSortSQL whitelists the list orderings; anything else falls back to
+// most recently updated. Ties break on id so pagination is stable.
+var documentSortSQL = map[string]string{
+	"updated_desc": "d.updated_at DESC, d.id",
+	"updated_asc":  "d.updated_at ASC, d.id",
+	"title_asc":    "d.title ASC, d.id",
+	"owner_asc":    "u.display_name ASC, d.updated_at DESC, d.id",
+}
+
+// documentListWhere builds the shared WHERE clause of the list and its counts.
+// It returns the clause and its bind arguments ($1..$n). skipProject leaves the
+// project filter out, for the per-project counts shown in the side rail.
+func documentListWhere(filter query.DocumentListFilter, skipProject bool) (string, []any) {
+	isAdmin := filter.ActorRole == "admin"
+	projectID := filter.ProjectID
+	if skipProject {
+		projectID = ""
+	}
+	keyword := ""
+	if k := strings.TrimSpace(filter.Keyword); k != "" {
+		keyword = textsearch.LikePatterns([]string{k})[0]
+	}
+	args := []any{
+		filter.TeamSpaceID, projectID, filter.FolderID, filter.OwnerID, filter.Status,
+		keyword, filter.IncludeArchived, filter.ActorID, isAdmin, filter.UpdatedWithinDays, filter.DeletedOnly,
+	}
+	where := `
+		WHERE ($1 = '' OR d.team_space_id::text = $1)
+		  AND ($2 = '' OR d.project_id::text = $2)
+		  AND ($3 = '' OR d.folder_id::text = $3)
+		  AND ($4 = '' OR d.current_owner_id::text = $4)
+		  AND ($5 = '' OR d.current_status::text = $5)
+		  AND ($6 = '' OR d.title ILIKE $6)
+		  AND ($7 = true OR $11 = true OR d.is_archived = false)
+		  AND ($10::int <= 0 OR d.updated_at >= NOW() - make_interval(days => $10::int))
+		  AND d.is_deleted = $11
+		  AND (
+			$9 = true
+			OR (
+				-- 回收站只对课题 owner/manager 可见；其余列表对课题成员可见。
+				$11 = false AND EXISTS (
+					SELECT 1 FROM projects sp
+					LEFT JOIN project_members spm ON spm.project_id = sp.id AND spm.user_id::text = $8
+					WHERE sp.id = d.project_id AND (sp.owner_id::text = $8 OR spm.id IS NOT NULL)
+				)
+			)
+			OR (
+				$11 = true AND EXISTS (
+					SELECT 1 FROM projects sp
+					LEFT JOIN project_members spm ON spm.project_id = sp.id AND spm.user_id::text = $8
+					 AND spm.project_role IN ('owner', 'manager')
+					WHERE sp.id = d.project_id AND (sp.owner_id::text = $8 OR spm.id IS NOT NULL)
+				)
+			)
+		  )`
+	return where, args
+}
+
 func (r DocumentRepository) ListDocuments(
 	ctx context.Context,
 	filter query.DocumentListFilter,
@@ -27,13 +87,15 @@ func (r DocumentRepository) ListDocuments(
 	if page <= 0 {
 		page = 1
 	}
-
 	pageSize := filter.PageSize
 	if pageSize <= 0 {
 		pageSize = 20
 	}
-
-	isAdmin := filter.ActorRole == "admin"
+	orderBy, ok := documentSortSQL[filter.Sort]
+	if !ok {
+		orderBy = documentSortSQL["updated_desc"]
+	}
+	where, args := documentListWhere(filter, false)
 
 	rows, err := r.db.QueryContext(
 		ctx,
@@ -47,36 +109,20 @@ func (r DocumentRepository) ListDocuments(
 			u.id::text,
 			u.display_name,
 			dv.version_no,
-			TO_CHAR(d.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+			TO_CHAR(d.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+			d.is_archived,
+			d.is_deleted,
+			d.project_id::text
 		FROM documents d
 		LEFT JOIN projects p ON p.id = d.project_id
 		LEFT JOIN folders f ON f.id = d.folder_id
 		LEFT JOIN users u ON u.id = d.current_owner_id
 		LEFT JOIN document_versions dv ON dv.id = d.current_version_id
-		LEFT JOIN project_members pm ON pm.project_id = d.project_id AND pm.user_id::text = $8
-		WHERE ($1 = '' OR d.team_space_id::text = $1)
-		  AND ($2 = '' OR d.project_id::text = $2)
-		  AND ($3 = '' OR d.folder_id::text = $3)
-		  AND ($4 = '' OR d.current_owner_id::text = $4)
-		  AND ($5 = '' OR d.current_status::text = $5)
-		  AND ($6 = '' OR d.title ILIKE '%' || $6 || '%')
-		  AND ($7 = true OR d.is_archived = false)
-		  AND ($9 = true OR p.owner_id::text = $8 OR pm.id IS NOT NULL)
-		  AND d.is_deleted = false
-		ORDER BY d.updated_at DESC
-		LIMIT $10 OFFSET $11
+		`+where+`
+		ORDER BY `+orderBy+`
+		LIMIT $12 OFFSET $13
 		`,
-		filter.TeamSpaceID,
-		filter.ProjectID,
-		filter.FolderID,
-		filter.OwnerID,
-		filter.Status,
-		filter.Keyword,
-		filter.IncludeArchived,
-		filter.ActorID,
-		isAdmin,
-		pageSize,
-		(page-1)*pageSize,
+		append(args, pageSize, (page-1)*pageSize)...,
 	)
 	if err != nil {
 		return nil, 0, err
@@ -100,6 +146,9 @@ func (r DocumentRepository) ListDocuments(
 			&owner.DisplayName,
 			&versionNo,
 			&updatedAt,
+			&item.IsArchived,
+			&item.IsDeleted,
+			&item.ProjectID,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -109,43 +158,44 @@ func (r DocumentRepository) ListDocuments(
 		item.UpdatedAt = updatedAt
 		items = append(items, item)
 	}
-
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
 	}
 
 	var total int
-	if err := r.db.QueryRowContext(
-		ctx,
-		`
-		SELECT COUNT(1)
-		FROM documents d
-		LEFT JOIN projects p ON p.id = d.project_id
-		LEFT JOIN project_members pm ON pm.project_id = d.project_id AND pm.user_id::text = $8
-		WHERE ($1 = '' OR d.team_space_id::text = $1)
-		  AND ($2 = '' OR d.project_id::text = $2)
-		  AND ($3 = '' OR d.folder_id::text = $3)
-		  AND ($4 = '' OR d.current_owner_id::text = $4)
-		  AND ($5 = '' OR d.current_status::text = $5)
-		  AND ($6 = '' OR d.title ILIKE '%' || $6 || '%')
-		  AND ($7 = true OR d.is_archived = false)
-		  AND ($9 = true OR p.owner_id::text = $8 OR pm.id IS NOT NULL)
-		  AND d.is_deleted = false
-		`,
-		filter.TeamSpaceID,
-		filter.ProjectID,
-		filter.FolderID,
-		filter.OwnerID,
-		filter.Status,
-		filter.Keyword,
-		filter.IncludeArchived,
-		filter.ActorID,
-		isAdmin,
-	).Scan(&total); err != nil {
+	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(1) FROM documents d LEFT JOIN users u ON u.id = d.current_owner_id `+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
-
 	return items, total, nil
+}
+
+// CountDocumentsByProject returns, for the same filters minus the project,
+// how many documents each visible project has — the counts of the side rail,
+// which must not depend on which page of the list is loaded.
+func (r DocumentRepository) CountDocumentsByProject(ctx context.Context, filter query.DocumentListFilter) ([]query.ProjectDocumentCount, error) {
+	where, args := documentListWhere(filter, true)
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT d.project_id::text, COALESCE(p.name, ''), COUNT(1)::int
+		FROM documents d
+		LEFT JOIN projects p ON p.id = d.project_id
+		LEFT JOIN users u ON u.id = d.current_owner_id
+		`+where+`
+		GROUP BY d.project_id, p.name
+		ORDER BY p.name
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]query.ProjectDocumentCount, 0)
+	for rows.Next() {
+		var c query.ProjectDocumentCount
+		if err := rows.Scan(&c.ProjectID, &c.ProjectName, &c.Count); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
 }
 
 func (r DocumentRepository) GetDocument(ctx context.Context, documentID string) (*query.DocumentDetail, error) {

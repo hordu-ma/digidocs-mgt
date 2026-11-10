@@ -8,9 +8,9 @@ import {
   RefreshLeft,
   Search,
 } from "@element-plus/icons-vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import type { UploadRawFile } from "element-plus";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
@@ -52,30 +52,98 @@ const folderOptions = ref<FolderOption[]>([]);
 const referenceLoading = ref(false);
 const collapsedGroups = ref<Set<string>>(new Set());
 const allProjects = ref<{ id: string; name: string }[]>([]);
-const selectedProjectName = ref("");
+// Server-side paging (2026-11-10): the list used to load the first 200 rows
+// and filter/sort them in the browser, so filters silently missed anything
+// beyond row 200 and the rail counts only covered the loaded page.
+const selectedProjectId = ref("");
+const page = ref(1);
+const PAGE_SIZE = 30;
+const projectCounts = ref<{ project_id: string; project_name: string; count: number }[]>([]);
+const listLoading = ref(false);
+
+interface ContentHit {
+  document_id: string;
+  title: string;
+  project_name?: string;
+  version_no: number;
+  snippet: string;
+  matched_chunks?: number;
+}
+const contentHits = ref<ContentHit[]>([]);
+const searchedKeyword = ref("");
 
 
 
-// 后端分页上限是 200（backend-go/internal/transport/http/handlers/documents.go
-// 的 maxPageSize），请求更大的 page_size 也只会被静默截到 200——之前这里传
-// 500，会让人误以为拿到的就是全部数据，实际上超过 200 篇的部分被悄悄丢弃且
-// 界面没有任何提示。改成如实请求 200，并用 isTruncated 在超限时给出提示。
-const MAX_PAGE_SIZE = 200;
-
-async function fetchDocuments() {
-  const res = await api.get("/documents", {
-    params: {
-      page: 1,
-      page_size: MAX_PAGE_SIZE,
-      keyword: keyword.value,
-      include_archived: showArchived.value || undefined,
-    },
-  });
-  rows.value = res.data?.data ?? [];
-  total.value = res.data?.meta?.total ?? 0;
+function quickFilterParams(): Record<string, string | number | undefined> {
+  switch (quickFilter.value) {
+    case "mine":
+      return { mine: "true" };
+    case "pending_handover":
+    case "in_progress":
+      return { status: quickFilter.value };
+    case "recent":
+      return { updated_within_days: 7 };
+    case "deleted":
+      return { deleted_only: "true" };
+    default:
+      return {};
+  }
 }
 
-const isTruncated = computed(() => total.value > rows.value.length);
+let fetchSeq = 0;
+async function fetchDocuments() {
+  const seq = ++fetchSeq;
+  listLoading.value = true;
+  try {
+    const res = await api.get("/documents", {
+      params: {
+        page: page.value,
+        page_size: PAGE_SIZE,
+        keyword: keyword.value || undefined,
+        include_archived: showArchived.value || undefined,
+        sort: sortBy.value,
+        project_id: selectedProjectId.value || undefined,
+        with_counts: "true",
+        ...quickFilterParams(),
+      },
+    });
+    if (seq !== fetchSeq) return; // a newer filter change superseded this request
+    rows.value = res.data?.data ?? [];
+    total.value = res.data?.meta?.total ?? 0;
+    projectCounts.value = res.data?.meta?.project_counts ?? [];
+  } catch (err) {
+    if (seq === fetchSeq) ElMessage.error(extractError(err, "文档列表加载失败"));
+  } finally {
+    if (seq === fetchSeq) listLoading.value = false;
+  }
+}
+
+// Full-text hits: documents whose current-version text mentions the keyword.
+async function fetchContentHits() {
+  const q = keyword.value.trim();
+  searchedKeyword.value = q;
+  if (!q) {
+    contentHits.value = [];
+    return;
+  }
+  try {
+    const res = await api.get("/search", {
+      params: { q, project_id: selectedProjectId.value || undefined, limit: 10 },
+    });
+    contentHits.value = res.data?.data ?? [];
+  } catch {
+    contentHits.value = [];
+  }
+}
+
+function refetchFromFirstPage() {
+  page.value = 1;
+  void fetchDocuments();
+}
+
+watch([quickFilter, sortBy, selectedProjectId, showArchived], refetchFromFirstPage);
+
+const railTotal = computed(() => projectCounts.value.reduce((sum, c) => sum + c.count, 0));
 
 function parseDateValue(value?: string) {
   return value ? new Date(value).getTime() : 0;
@@ -99,7 +167,8 @@ const quickFilters = [
   { key: "mine", label: "我负责的" },
   { key: "pending_handover", label: "待接收" },
   { key: "in_progress", label: "处理中" },
-  { key: "recent", label: "最近更新" },
+  { key: "recent", label: "近 7 天更新" },
+  { key: "deleted", label: "回收站" },
 ];
 
 type DocumentGroup = {
@@ -107,48 +176,10 @@ type DocumentGroup = {
   documents: any[];
 };
 
-const processedRows = computed(() => {
-  let list = [...rows.value];
-  switch (quickFilter.value) {
-    case "mine":
-      list = list.filter((doc) => doc.current_owner?.id === auth.userId);
-      break;
-    case "pending_handover":
-      list = list.filter((doc) => doc.current_status === "pending_handover");
-      break;
-    case "in_progress":
-      list = list.filter((doc) => doc.current_status === "in_progress");
-      break;
-    case "recent":
-      list = list.filter((doc) => isRecent(doc));
-      break;
-  }
-
-  list.sort((a, b) => {
-    switch (sortBy.value) {
-      case "updated_asc":
-        return parseDateValue(a.updated_at) - parseDateValue(b.updated_at);
-      case "title_asc":
-        return `${a.title || ""}`.localeCompare(`${b.title || ""}`, "zh-Hans");
-      case "owner_asc":
-        return `${a.current_owner?.display_name || ""}`.localeCompare(
-          `${b.current_owner?.display_name || ""}`,
-          "zh-Hans",
-        );
-      default:
-        return parseDateValue(b.updated_at) - parseDateValue(a.updated_at);
-    }
-  });
-
-  return list;
-});
+const processedRows = computed(() => rows.value);
 
 const groupedDocuments = computed<DocumentGroup[]>(() => {
   const groups = new Map<string, any[]>();
-  // Seed with all projects the user has access to
-  for (const p of allProjects.value) {
-    if (!groups.has(p.name)) groups.set(p.name, []);
-  }
   for (const doc of processedRows.value) {
     const key = doc.project_name || "未分类";
     if (!groups.has(key)) groups.set(key, []);
@@ -159,14 +190,7 @@ const groupedDocuments = computed<DocumentGroup[]>(() => {
     .map(([name, docs]) => ({ projectName: name, documents: docs }));
 });
 
-const displayedGroupedDocuments = computed(() => {
-  if (!selectedProjectName.value) {
-    return groupedDocuments.value;
-  }
-  return groupedDocuments.value.filter(
-    (group) => group.projectName === selectedProjectName.value,
-  );
-});
+const displayedGroupedDocuments = groupedDocuments;
 
 const visibleDocumentTotal = computed(() =>
   displayedGroupedDocuments.value.reduce((sum, group) => sum + group.documents.length, 0),
@@ -181,7 +205,8 @@ function toggleGroup(name: string) {
 }
 
 function handleSearch() {
-  fetchDocuments();
+  refetchFromFirstPage();
+  void fetchContentHits();
 }
 
 function goDetail(row: any) {
@@ -192,18 +217,35 @@ function ownerInitial(row: any) {
   return (row.current_owner?.display_name || "责").slice(0, 1);
 }
 
-async function toggleArchiveState(row: any) {
+// Row menu: delete is a soft delete that only project owners/managers can undo
+// from the 回收站 filter. The menu used to say "移出工作台" and decide on
+// is_archived (never returned by the list), so it always soft-deleted.
+async function deleteRow(row: any) {
   try {
-    if (row.is_archived) {
-      await api.post(`/documents/${row.id}/restore`);
-      ElMessage.success("文档已恢复");
-    } else {
-      await api.post(`/documents/${row.id}/delete`, { reason: "前端工作台快捷移出" });
-      ElMessage.success("文档已移出当前工作台");
-    }
+    await ElMessageBox.confirm(
+      `删除《${row.title}》？删除后课题负责人可在「回收站」中恢复。`,
+      "删除文档",
+      { confirmButtonText: "删除", cancelButtonText: "取消", type: "warning" },
+    );
+  } catch {
+    return;
+  }
+  try {
+    await api.post(`/documents/${row.id}/delete`, { reason: "文档列表删除" });
+    ElMessage.success("文档已删除，可在回收站恢复");
     await fetchDocuments();
   } catch (err) {
-    ElMessage.error(extractError(err, "操作失败"));
+    ElMessage.error(extractError(err, "删除失败"));
+  }
+}
+
+async function restoreRow(row: any) {
+  try {
+    await api.post(`/documents/${row.id}/restore`);
+    ElMessage.success("文档已恢复");
+    await fetchDocuments();
+  } catch (err) {
+    ElMessage.error(extractError(err, "恢复失败"));
   }
 }
 
@@ -401,36 +443,27 @@ onMounted(async () => {
           </div>
           <button
             class="project-filter"
-            :class="{ active: selectedProjectName === '' }"
+            :class="{ active: selectedProjectId === '' }"
             type="button"
-            @click="selectedProjectName = ''"
+            @click="selectedProjectId = ''"
           >
-            <span>全部文档</span>
-            <strong>{{ total }}</strong>
+            <span>全部课题</span>
+            <strong>{{ railTotal }}</strong>
           </button>
           <button
-            v-for="group in groupedDocuments"
-            :key="group.projectName"
+            v-for="c in projectCounts"
+            :key="c.project_id"
             class="project-filter"
-            :class="{ active: selectedProjectName === group.projectName }"
+            :class="{ active: selectedProjectId === c.project_id }"
             type="button"
-            @click="selectedProjectName = group.projectName"
+            @click="selectedProjectId = c.project_id"
           >
-            <span>{{ group.projectName }}</span>
-            <strong>{{ group.documents.length }}</strong>
+            <span>{{ c.project_name || "未分类" }}</span>
+            <strong>{{ c.count }}</strong>
           </button>
         </aside>
 
         <section class="page-card asset-panel">
-          <ElAlert
-            v-if="isTruncated"
-            type="warning"
-            show-icon
-            :closable="false"
-            class="truncation-alert"
-            title="仅显示前 200 篇文档"
-            :description="`该范围内共有 ${total} 篇文档，超过单次加载上限，已省略其余 ${total - rows.length} 篇。请用关键词搜索或在左侧按课题筛选缩小范围以查看全部。`"
-          />
           <div class="control-bar asset-control-bar">
             <div class="segmented-filters">
               <button
@@ -454,7 +487,7 @@ onMounted(async () => {
           <div class="toolbar">
             <ElInput
               v-model="keyword"
-              placeholder="搜索文档标题"
+              placeholder="搜索标题或正文，回车检索"
               clearable
               @keyup.enter="handleSearch"
               @clear="handleSearch"
@@ -464,21 +497,36 @@ onMounted(async () => {
               </template>
             </ElInput>
             <label class="archived-toggle">
-              <ElSwitch
-                v-model="showArchived"
-                size="small"
-                @change="fetchDocuments"
-              />
+              <ElSwitch v-model="showArchived" size="small" />
               <span>显示已归档</span>
             </label>
             <span class="doc-count">
-              当前显示 {{ visibleDocumentTotal }} 篇文档，共 {{ groupedDocuments.length }} 个课题
+              共 {{ total }} 篇，第 {{ page }} 页显示 {{ rows.length }} 篇
             </span>
           </div>
 
-          <div v-if="displayedGroupedDocuments.length === 0" class="empty-state">
-            <p class="empty-title">暂无文档资产</p>
-            <p class="empty-hint">新建文档后会按课题自动归入资产库</p>
+          <div v-if="searchedKeyword && contentHits.length" class="content-hits">
+            <div class="content-hits-head">正文中提到「{{ searchedKeyword }}」的文档</div>
+            <button
+              v-for="hit in contentHits"
+              :key="hit.document_id"
+              type="button"
+              class="content-hit"
+              @click="router.push(`/documents/${hit.document_id}`)"
+            >
+              <strong>{{ hit.title }}</strong>
+              <span class="content-hit-meta">
+                {{ hit.project_name }} · v{{ hit.version_no }}<template v-if="hit.matched_chunks"> · {{ hit.matched_chunks }} 处相关</template>
+              </span>
+              <span class="content-hit-snippet">{{ hit.snippet }}</span>
+            </button>
+          </div>
+
+          <div v-if="!listLoading && displayedGroupedDocuments.length === 0" class="empty-state">
+            <p class="empty-title">{{ quickFilter === "deleted" ? "回收站为空" : "暂无符合条件的文档" }}</p>
+            <p class="empty-hint">
+              {{ quickFilter === "deleted" ? "只有课题负责人和协管人能看到并恢复已删除的文档" : "调整筛选条件，或新建文档后会按课题自动归入资产库" }}
+            </p>
           </div>
 
           <div v-else class="project-groups">
@@ -552,9 +600,13 @@ onMounted(async () => {
                             <ElIcon><CopyDocument /></ElIcon>
                             复制标题
                           </ElDropdownItem>
-                          <ElDropdownItem @click="toggleArchiveState(row)">
+                          <ElDropdownItem v-if="row.is_deleted" @click="restoreRow(row)">
                             <ElIcon><RefreshLeft /></ElIcon>
-                            {{ row.is_archived ? "恢复文档" : "移出工作台" }}
+                            恢复文档
+                          </ElDropdownItem>
+                          <ElDropdownItem v-else @click="deleteRow(row)">
+                            <ElIcon><RefreshLeft /></ElIcon>
+                            删除文档
                           </ElDropdownItem>
                         </ElDropdownMenu>
                       </template>
@@ -564,6 +616,15 @@ onMounted(async () => {
               </div>
             </div>
           </div>
+          <ElPagination
+            v-if="total > PAGE_SIZE"
+            v-model:current-page="page"
+            class="list-pagination"
+            layout="prev, pager, next, total"
+            :page-size="PAGE_SIZE"
+            :total="total"
+            @current-change="fetchDocuments"
+          />
         </section>
       </div>
 
@@ -639,8 +700,41 @@ onMounted(async () => {
   margin-bottom: 14px;
 }
 
-.truncation-alert {
-  margin-bottom: 14px;
+.list-pagination {
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.content-hits {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #bfd5ed;
+  border-radius: 8px;
+  background: #f6f9fd;
+}
+
+.content-hits-head {
+  font-weight: 600;
+}
+
+.content-hit {
+  display: grid;
+  gap: 2px;
+  padding: 8px 0;
+  border: 0;
+  border-top: 1px solid var(--dd-line);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.content-hit-meta,
+.content-hit-snippet {
+  color: var(--dd-subtle);
+  font-size: 13px;
 }
 
 .sort-select {

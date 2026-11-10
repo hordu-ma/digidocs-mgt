@@ -47,6 +47,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	codeRepositoryHandler := handlers.NewCodeRepositoryHandler(container.CodeRepositoryService, cfg.APIV1Prefix)
 	membershipHandler := handlers.NewMembershipHandler(container.MembershipService)
 	notificationHandler := handlers.NewNotificationHandler(container.NotificationService)
+	searchHandler := handlers.NewSearchHandler(container.SearchService)
 
 	authMw := middleware.Auth(container.TokenService)
 	protect := func(h http.HandlerFunc) http.Handler {
@@ -95,6 +96,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/logout", protect(authHandler.Logout))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/users", protect(userHandler.List))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/inbox", protect(notificationHandler.Inbox))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/search", protect(searchHandler.Search))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/notifications", protect(notificationHandler.List))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/notifications/unread-count", protect(notificationHandler.UnreadCount))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/notifications/read-all", protect(notificationHandler.MarkAllRead))

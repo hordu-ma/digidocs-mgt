@@ -44,6 +44,10 @@ func (s DocumentService) ListDocuments(ctx context.Context, filter query.Documen
 	return s.reader.ListDocuments(ctx, filter)
 }
 
+func (s DocumentService) CountDocumentsByProject(ctx context.Context, filter query.DocumentListFilter) ([]query.ProjectDocumentCount, error) {
+	return s.reader.CountDocumentsByProject(ctx, filter)
+}
+
 func (s DocumentService) GetDocument(ctx context.Context, documentID string, actorID string, actorRole string) (*query.DocumentDetail, error) {
 	if err := s.permissions.EnsureViewDocument(ctx, actorID, actorRole, documentID); err != nil {
 		return nil, err

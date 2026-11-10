@@ -15,6 +15,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import api from "@/api";
+import { documentStatusClass, documentStatusLabel } from "@/utils/labels";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -129,16 +130,18 @@ watch(keyword, (value) => {
 async function searchDocuments(value: string) {
   loading.value = true;
   try {
-    const [documentRes] = await Promise.all([
-      api.get("/documents", {
-        params: {
-          keyword: value,
-          page: 1,
-          page_size: 8,
-        },
-      }),
+    // Title matches first, then documents whose text mentions the keyword.
+    const [documentRes, contentRes] = await Promise.allSettled([
+      api.get("/documents", { params: { keyword: value, page: 1, page_size: 8 } }),
+      api.get("/search", { params: { q: value, limit: 6 } }),
     ]);
-    documents.value = documentRes.data?.data ?? [];
+    if (value !== keyword.value.trim()) return; // stale response
+    const byTitle: any[] = documentRes.status === "fulfilled" ? documentRes.value.data?.data ?? [] : [];
+    const seen = new Set(byTitle.map((d) => d.id));
+    const byContent: any[] = (contentRes.status === "fulfilled" ? contentRes.value.data?.data ?? [] : [])
+      .filter((hit: any) => !seen.has(hit.document_id))
+      .map((hit: any) => ({ id: hit.document_id, title: hit.title, project_name: hit.project_name, snippet: hit.snippet }));
+    documents.value = [...byTitle, ...byContent];
   } finally {
     loading.value = false;
   }
@@ -227,7 +230,7 @@ onBeforeUnmount(() => {
 
         <div v-if="!keyword.trim()" class="command-empty">
           <ElIcon><Operation /></ElIcon>
-          <span>输入文档标题关键词后，这里会显示直达结果。</span>
+          <span>输入关键词，按标题和正文查找文档。</span>
         </div>
 
         <div v-else-if="loading" class="command-empty">
@@ -250,14 +253,16 @@ onBeforeUnmount(() => {
           >
             <div class="command-result-copy">
               <strong>{{ item.title }}</strong>
-              <small>
+              <small v-if="item.snippet">{{ item.project_name || "未分类课题" }} · 正文：{{ item.snippet }}</small>
+              <small v-else>
                 {{ item.project_name || "未分类课题" }} ·
                 {{ item.current_owner?.display_name || "未分配责任人" }}
               </small>
             </div>
-            <span class="status-pill" :class="`status-${item.current_status?.replaceAll('_', '-')}`">
-              {{ item.current_status }}
+            <span v-if="item.current_status" class="status-pill" :class="documentStatusClass[item.current_status]">
+              {{ documentStatusLabel[item.current_status] ?? item.current_status }}
             </span>
+            <span v-else class="status-pill">正文匹配</span>
           </button>
         </div>
       </div>

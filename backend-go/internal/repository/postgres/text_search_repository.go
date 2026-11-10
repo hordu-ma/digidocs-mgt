@@ -103,3 +103,57 @@ func (r TextSearchRepository) SearchChunks(ctx context.Context, filter query.Tex
 	}
 	return hits, rows.Err()
 }
+
+// SearchDocuments is the user-facing full-text search: one row per document,
+// represented by its best-matching chunk, with how many chunks matched.
+func (r TextSearchRepository) SearchDocuments(ctx context.Context, filter query.TextSearchFilter) ([]query.TextSearchHit, error) {
+	terms := textsearch.Terms(filter.Query)
+	if len(terms) == 0 {
+		return []query.TextSearchHit{}, nil
+	}
+	limit := filter.Limit
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	isAdmin, actorID := scopeArgs(filter.Scope)
+	rows, err := r.db.QueryContext(ctx, `
+		WITH hits AS (
+			SELECT d.id AS document_id, d.title, d.project_id, COALESCE(p.name, '') AS project_name,
+				v.id AS version_id, v.version_no, c.chunk_no, c.content, d.updated_at,
+				(SELECT COUNT(*) FROM unnest($1::text[]) AS pat WHERE c.content ILIKE pat)::int AS score
+			FROM document_text_chunks c
+			JOIN documents d ON d.id = c.document_id AND d.current_version_id = c.version_id
+			JOIN document_versions v ON v.id = c.version_id
+			LEFT JOIN projects p ON p.id = d.project_id
+			WHERE d.is_deleted = false
+			  AND c.content ILIKE ANY($1::text[])
+			  AND ($2 = '' OR d.project_id::text = $2)
+			  AND `+projectScopeSQL("d.project_id", "$3", "$4")+`
+		),
+		best AS (
+			SELECT DISTINCT ON (document_id) *, COUNT(*) OVER (PARTITION BY document_id) AS matched
+			FROM hits
+			ORDER BY document_id, score DESC, chunk_no ASC
+		)
+		SELECT document_id::text, title, project_id::text, project_name, version_id::text,
+			version_no, chunk_no, content, score, matched::int
+		FROM best
+		ORDER BY score DESC, matched DESC, updated_at DESC
+		LIMIT $5
+	`, pq.Array(textsearch.LikePatterns(terms)), filter.ProjectID, isAdmin, actorID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	hits := make([]query.TextSearchHit, 0, limit)
+	for rows.Next() {
+		var h query.TextSearchHit
+		var content string
+		if err := rows.Scan(&h.DocumentID, &h.Title, &h.ProjectID, &h.ProjectName, &h.VersionID, &h.VersionNo, &h.ChunkNo, &content, &h.Score, &h.MatchedChunks); err != nil {
+			return nil, err
+		}
+		h.Snippet = textsearch.Snippet(content, terms, 120)
+		hits = append(hits, h)
+	}
+	return hits, rows.Err()
+}

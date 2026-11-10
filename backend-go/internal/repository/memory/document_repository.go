@@ -97,3 +97,9 @@ func (r DocumentRepository) DeleteDocument(_ context.Context, _ command.Document
 func (r DocumentRepository) RestoreDocument(_ context.Context, _ string, _ string) error {
 	return nil
 }
+
+func (r DocumentRepository) CountDocumentsByProject(ctx context.Context, filter query.DocumentListFilter) ([]query.ProjectDocumentCount, error) {
+	_ = ctx
+	_ = filter
+	return []query.ProjectDocumentCount{}, nil
+}

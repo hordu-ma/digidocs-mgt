@@ -122,23 +122,35 @@ func (h DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 		Status:          r.URL.Query().Get("status"),
 		Keyword:         r.URL.Query().Get("keyword"),
 		IncludeArchived: r.URL.Query().Get("include_archived") == "true",
+		Sort:            r.URL.Query().Get("sort"),
+		DeletedOnly:     r.URL.Query().Get("deleted_only") == "true",
 		Page:            parseIntOrDefault(r.URL.Query().Get("page"), 1),
 		PageSize:        parsePageSize(r.URL.Query().Get("page_size")),
 		ActorID:         middleware.UserIDFromContext(r.Context()),
 		ActorRole:       middleware.UserRoleFromContext(r.Context()),
 	}
 
+	filter.UpdatedWithinDays = parseIntOrDefault(r.URL.Query().Get("updated_within_days"), 0)
+	// mine=true is shorthand for owner_id=<caller>.
+	if r.URL.Query().Get("mine") == "true" {
+		filter.OwnerID = filter.ActorID
+	}
 	items, total, err := h.service.ListDocuments(r.Context(), filter)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list documents")
 		return
 	}
-
-	response.WriteWithMeta(w, http.StatusOK, items, query.PaginationMeta{
-		Page:     filter.Page,
-		PageSize: filter.PageSize,
-		Total:    total,
-	})
+	meta := map[string]any{"page": filter.Page, "page_size": filter.PageSize, "total": total}
+	// with_counts=true adds per-project totals for the side rail.
+	if r.URL.Query().Get("with_counts") == "true" {
+		counts, err := h.service.CountDocumentsByProject(r.Context(), filter)
+		if err != nil {
+			response.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to count documents")
+			return
+		}
+		meta["project_counts"] = counts
+	}
+	response.WriteWithMeta(w, http.StatusOK, items, meta)
 }
 
 func (h DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {

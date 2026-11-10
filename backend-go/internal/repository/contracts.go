@@ -117,6 +117,7 @@ type PermissionReader interface {
 
 type DocumentReader interface {
 	ListDocuments(ctx context.Context, filter query.DocumentListFilter) ([]query.DocumentListItem, int, error)
+	CountDocumentsByProject(ctx context.Context, filter query.DocumentListFilter) ([]query.ProjectDocumentCount, error)
 	GetDocument(ctx context.Context, documentID string) (*query.DocumentDetail, error)
 }
 

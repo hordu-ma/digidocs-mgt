@@ -171,6 +171,16 @@ type DocumentListItem struct {
 	CurrentOwner     *UserSummary `json:"current_owner,omitempty"`
 	CurrentVersionNo *int         `json:"current_version_no,omitempty"`
 	UpdatedAt        *string      `json:"updated_at,omitempty"`
+	ProjectID        string       `json:"project_id,omitempty"`
+	IsArchived       bool         `json:"is_archived"`
+	IsDeleted        bool         `json:"is_deleted"`
+}
+
+// ProjectDocumentCount is one entry of the document list's per-project counts.
+type ProjectDocumentCount struct {
+	ProjectID   string `json:"project_id"`
+	ProjectName string `json:"project_name"`
+	Count       int    `json:"count"`
 }
 
 type DocumentDetail struct {
@@ -192,8 +202,13 @@ type DocumentListFilter struct {
 	Status          string
 	Keyword         string
 	IncludeArchived bool
-	Page            int
-	PageSize        int
+	// 2026-11-10: server-side sorting/filters previously done in the browser.
+	Sort              string // updated_desc | updated_asc | title_asc | owner_asc
+	UpdatedWithinDays int
+	// DeletedOnly lists the recycle bin (project owners/managers and admins only).
+	DeletedOnly bool
+	Page        int
+	PageSize    int
 	// ActorID/ActorRole scope the result to projects the actor can see.
 	// Non-admin actors only see documents in projects they own or are a
 	// member of; admin actors see everything. Set by the handler from the
@@ -508,4 +523,6 @@ type TextSearchHit struct {
 	Content     string `json:"content,omitempty"`
 	Snippet     string `json:"snippet"`
 	Score       int    `json:"score"`
+	// MatchedChunks is set by document-level search: how many passages matched.
+	MatchedChunks int `json:"matched_chunks,omitempty"`
 }

@@ -20,11 +20,11 @@ func TestDocumentRepository_ListAndGet(t *testing.T) {
 	ver := 3
 	updatedAt := "2026-05-01T00:00:00Z"
 	mock.ExpectQuery("FROM documents d\\s+LEFT JOIN projects").
-		WithArgs("ts-1", "p-1", "", "", "", "report", false, "", false, 5, 5).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "project_name", "folder_path", "status", "owner_id", "owner_name", "version_no", "updated_at"}).
-			AddRow("doc-1", "Report", "Project", "/docs", "in_progress", "u-1", "张三", ver, updatedAt))
+		WithArgs("ts-1", "p-1", "", "", "", "%report%", false, "", false, 0, false, 5, 5).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "project_name", "folder_path", "status", "owner_id", "owner_name", "version_no", "updated_at", "archived", "deleted", "project_id"}).
+			AddRow("doc-1", "Report", "Project", "/docs", "in_progress", "u-1", "张三", ver, updatedAt, false, false, "p-1"))
 	mock.ExpectQuery("SELECT COUNT\\(1\\)\\s+FROM documents d").
-		WithArgs("ts-1", "p-1", "", "", "", "report", false, "", false).
+		WithArgs("ts-1", "p-1", "", "", "", "%report%", false, "", false, 0, false).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(8))
 	items, total, err := repo.ListDocuments(ctx, query.DocumentListFilter{
 		TeamSpaceID: "ts-1", ProjectID: "p-1", Keyword: "report", Page: 2, PageSize: 5,
