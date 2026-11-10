@@ -544,3 +544,15 @@ type TextSearchHit struct {
 	// MatchedChunks is set by document-level search: how many passages matched.
 	MatchedChunks int `json:"matched_chunks,omitempty"`
 }
+
+// DocumentText is the readable text of a document's current version, rebuilt
+// from document_text_chunks. Available is false until extraction has run.
+type DocumentText struct {
+	DocumentID string `json:"document_id"`
+	VersionID  string `json:"version_id,omitempty"`
+	VersionNo  int    `json:"version_no,omitempty"`
+	Text       string `json:"text"`
+	Chunks     int    `json:"-"`
+	Available  bool   `json:"available"`
+	Truncated  bool   `json:"truncated"`
+}

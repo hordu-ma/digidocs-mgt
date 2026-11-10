@@ -195,3 +195,15 @@ def test_stream_midway_failure_is_error(monkeypatch) -> None:
     monkeypatch.setattr("urllib.request.urlopen", lambda r, timeout: _Broken(b""))
     with pytest.raises(OpenClawClientError):
         OpenClawClient().ask("q", {}, {}, on_delta=lambda _: None)
+
+
+def test_check_gateway(monkeypatch) -> None:
+    monkeypatch.setattr("urllib.request.urlopen", lambda r, timeout: _Resp(b"{}"))
+    assert OpenClawClient().check_gateway()[0] is True
+
+    def boom(r, timeout):
+        raise urllib.error.URLError("timed out")
+
+    monkeypatch.setattr("urllib.request.urlopen", boom)
+    ok, detail = OpenClawClient().check_gateway()
+    assert ok is False and "timed out" in detail

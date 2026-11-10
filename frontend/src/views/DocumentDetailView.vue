@@ -486,6 +486,26 @@ async function executeSuggestion(id: string, action: string) {
   }
 }
 
+// In-browser reading of the extracted text: the preview for Office files,
+// which browsers cannot render inline. Opening it is audited server-side.
+const textVisible = ref(false);
+const textLoading = ref(false);
+const documentText = ref<{ available: boolean; text: string; version_no?: number; truncated: boolean } | null>(null);
+
+async function openDocumentText() {
+  textVisible.value = true;
+  textLoading.value = true;
+  try {
+    const res = await api.get(`/documents/${documentID}/text`);
+    documentText.value = res.data?.data ?? null;
+  } catch (err) {
+    documentText.value = null;
+    ElMessage.error(extractError(err, "正文加载失败"));
+  } finally {
+    textLoading.value = false;
+  }
+}
+
 function goToHandovers() {
   void router.push("/handovers");
 }
@@ -552,6 +572,7 @@ onBeforeUnmount(() => {
               <ElButton disabled>{{ act.label }}</ElButton>
             </span>
           </ElTooltip>
+          <ElButton :disabled="!doc.current_version_id" @click="openDocumentText">在线查看正文</ElButton>
           <ElButton @click="openEdit">
             <ElIcon><EditPen /></ElIcon>
             档案编辑
@@ -845,11 +866,41 @@ onBeforeUnmount(() => {
       </template>
     </ElDialog>
 
+    <ElDrawer v-model="textVisible" title="正文" size="min(96vw, 760px)" append-to-body>
+      <div v-loading="textLoading" class="text-drawer">
+        <template v-if="documentText?.available">
+          <p class="text-drawer-meta">
+            当前版本 v{{ documentText.version_no }} 的抽取正文，仅含文字，不保留排版、图片与公式。
+            <template v-if="documentText.truncated">正文过长，只显示前一部分，完整内容请下载原文件。</template>
+          </p>
+          <pre class="text-drawer-body">{{ documentText.text }}</pre>
+        </template>
+        <div v-else-if="!textLoading" class="empty-state compact">
+          <p class="empty-title">暂无可查看的正文</p>
+          <p class="empty-hint">上传后系统会自动抽取正文，通常几十秒内完成；扫描件或不支持的格式请下载原文件查看。</p>
+        </div>
+      </div>
+    </ElDrawer>
+
     <DocumentTransferDialog v-model="showTransferDialog" v-model:form="transferForm" :selectable-users="selectableUsers" :transfer-loading="transferLoading" @submit="submitTransfer" />
   </AppLayout>
 </template>
 
 <style scoped>
+.text-drawer-meta {
+  margin: 0 0 12px;
+  color: var(--dd-subtle);
+  font-size: 13px;
+}
+
+.text-drawer-body {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+  line-height: 1.8;
+}
+
 .disabled-action-wrap {
   display: inline-flex;
   cursor: not-allowed;

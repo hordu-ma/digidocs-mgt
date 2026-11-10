@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AuthShell from "@/components/AuthShell.vue";
+import { loadRegistrationMode, registrationMode } from "@/utils/registration";
 import { ElMessage } from "element-plus";
 import { reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -45,6 +46,8 @@ async function submit() {
     loading.value = false;
   }
 }
+
+void loadRegistrationMode();
 </script>
 
 <template>
@@ -65,10 +68,14 @@ async function submit() {
           登录
         </ElButton>
       </ElForm>
-      <div class="auth-switch">
+      <div v-if="registrationMode === 'open'" class="auth-switch">
         没有账号？
         <RouterLink to="/register">去注册</RouterLink>
       </div>
+      <div v-else-if="registrationMode === 'invite_only'" class="auth-switch">
+        新成员请使用课题负责人发来的邀请链接注册
+      </div>
+      <div v-else class="auth-switch">没有账号？请联系管理员开通</div>
     </ElCard>
   </AuthShell>
 </template>

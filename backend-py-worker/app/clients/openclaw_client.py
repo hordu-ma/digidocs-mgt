@@ -43,6 +43,20 @@ class OpenClawClient:
         # later calls do not pay for a guaranteed 400.
         self._json_mode: bool = True
 
+    def check_gateway(self) -> tuple[bool, str]:
+        """Probe GET /v1/models once. `openclaw status` being healthy does not
+        mean the OpenAI-compatible HTTP endpoint is enabled or reachable from
+        this container (see docs/部署准备与运行说明.md), so check the real thing."""
+        request = urllib.request.Request(f"{self.base_url}/v1/models", method="GET")
+        if self.api_key and self.api_key != "replace-me":
+            request.add_header("Authorization", f"Bearer {self.api_key}")
+        try:
+            with urllib.request.urlopen(request, timeout=5) as resp:
+                status = int(getattr(resp, "status", 200) or 200)
+                return status < 300, f"HTTP {status}"
+        except Exception as exc:  # noqa: BLE001 - any failure means unusable
+            return False, str(exc)
+
     def ask(
         self,
         question: str,

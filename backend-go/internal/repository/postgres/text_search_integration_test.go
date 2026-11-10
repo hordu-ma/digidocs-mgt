@@ -85,6 +85,11 @@ func TestPostgresIntegrationTextChunksSearchProgressAndActions(t *testing.T) {
 		t.Fatal("non-member must not find documents by content")
 	}
 
+	full, err := search.DocumentText(ctx, docID)
+	if err != nil || !full.Available || full.Text != strings.TrimSpace(long) || full.VersionID != v1 {
+		t.Fatalf("reassembled text must equal the extracted text exactly (len got %d want %d) err=%v", len([]rune(full.Text)), len([]rune(strings.TrimSpace(long))), err)
+	}
+
 	// A new version replaces the index; an old version's late extraction is ignored.
 	v2 := newVersion()
 	extract(v2, "第二版只讨论数据集划分。")

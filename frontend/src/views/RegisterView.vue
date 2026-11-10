@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AuthShell from "@/components/AuthShell.vue";
+import { inviteTokenFromRedirect } from "@/utils/registration";
 import { ElMessage } from "element-plus";
 import { reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -56,6 +57,8 @@ async function submit() {
       phone: form.phone.trim(),
       password: form.password,
       display_name: form.displayName.trim(),
+      // Required when registration is invite-only; harmless otherwise.
+      invite_token: inviteTokenFromRedirect(route.query.redirect) || undefined,
     });
     const data = res.data?.data;
     auth.login({

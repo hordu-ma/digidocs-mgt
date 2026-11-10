@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { loadRegistrationMode, registrationMode } from "@/utils/registration";
 import { ElMessage } from "element-plus";
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -71,6 +72,8 @@ async function accept() {
     joining.value = false;
   }
 }
+
+void loadRegistrationMode();
 </script>
 
 <template>
@@ -95,7 +98,7 @@ async function accept() {
           <ElButton type="primary" style="width: 100%; margin-bottom: 10px" @click="router.push(loginPath)">
             去登录
           </ElButton>
-          <ElButton style="width: 100%" @click="router.push(registerPath)">去注册</ElButton>
+          <ElButton v-if="registrationMode !== 'closed'" style="width: 100%" @click="router.push(registerPath)">去注册</ElButton>
         </template>
       </template>
       <template v-else>

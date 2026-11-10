@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 	"database/sql"
 	"errors"
 
@@ -156,4 +157,48 @@ func (r TextSearchRepository) SearchDocuments(ctx context.Context, filter query.
 		hits = append(hits, h)
 	}
 	return hits, rows.Err()
+}
+
+// GetDocumentText reassembles the current version's extracted text from its
+// chunks, dropping each chunk's overlap with the previous one.
+func (r TextSearchRepository) GetDocumentText(ctx context.Context, documentID string) (*query.DocumentText, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT v.id::text, v.version_no, c.chunk_no, c.content
+		FROM documents d
+		JOIN document_text_chunks c ON c.document_id = d.id AND c.version_id = d.current_version_id
+		JOIN document_versions v ON v.id = c.version_id
+		WHERE d.id::text = $1 AND d.is_deleted = false
+		ORDER BY c.chunk_no
+	`, documentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := &query.DocumentText{DocumentID: documentID}
+	var b strings.Builder
+	for rows.Next() {
+		var chunkNo int
+		var content string
+		if err := rows.Scan(&out.VersionID, &out.VersionNo, &chunkNo, &content); err != nil {
+			return nil, err
+		}
+		runes := []rune(content)
+		if chunkNo > 0 {
+			overlap := textsearch.ChunkSize - textsearch.ChunkStep
+			if len(runes) > overlap {
+				runes = runes[overlap:]
+			} else {
+				runes = nil
+			}
+		}
+		b.WriteString(string(runes))
+		out.Chunks++
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out.Text = b.String()
+	out.Available = out.Chunks > 0
+	out.Truncated = out.Chunks >= textsearch.MaxChunks
+	return out, nil
 }

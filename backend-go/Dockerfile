@@ -9,7 +9,8 @@ RUN go build -mod=vendor -o /out/digidocs-go-api ./cmd/api
 # Synology NAS this container is already configured to trust, reusing the
 # same internal/storage/synology client instead of a bespoke curl-based
 # reimplementation of DSM auth in the backup script.
-RUN go build -mod=vendor -o /out/digidocs-backup-sync ./cmd/backup-sync
+RUN go build -mod=vendor -o /out/digidocs-backup-sync ./cmd/backup-sync \
+    && go build -mod=vendor -o /out/digidocs-storage-audit ./cmd/storage-audit
 
 FROM debian:bookworm-slim
 
@@ -23,6 +24,7 @@ RUN apt-get update \
 
 COPY --from=build /out/digidocs-go-api /usr/local/bin/digidocs-go-api
 COPY --from=build /out/digidocs-backup-sync /usr/local/bin/digidocs-backup-sync
+COPY --from=build /out/digidocs-storage-audit /usr/local/bin/digidocs-storage-audit
 COPY --from=build /app/migrations ./migrations
 
 EXPOSE 8080

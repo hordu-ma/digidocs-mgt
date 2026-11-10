@@ -1,6 +1,7 @@
 package router
 
 import (
+	"digidocs-mgt/backend-go/internal/metrics"
 	"net/http"
 	"time"
 
@@ -51,7 +52,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	codeRepositoryHandler := handlers.NewCodeRepositoryHandler(container.CodeRepositoryService, cfg.APIV1Prefix)
 	membershipHandler := handlers.NewMembershipHandler(container.MembershipService)
 	notificationHandler := handlers.NewNotificationHandler(container.NotificationService)
-	searchHandler := handlers.NewSearchHandler(container.SearchService)
+	searchHandler := handlers.NewSearchHandler(container.SearchService, container.DocumentService, container.AuditService)
 
 	authMw := middleware.Auth(container.TokenService, container.AuthService.SessionValid)
 	protect := func(h http.HandlerFunc) http.Handler {
@@ -64,6 +65,8 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 
 	// --- Public routes (no JWT required) ---
 	mux.HandleFunc("GET /healthz", systemHandler.Healthz)
+	metricsRegistry := metrics.NewRegistry()
+	mux.Handle("GET /metrics", metricsRegistry.Handler(container.DB, cfg.MetricsToken))
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/system/info", systemHandler.Info)
 	loginLimiter := middleware.NewRateLimiter(cfg.LoginRateLimitPerMin, time.Minute)
 	registerLimiter := middleware.NewRateLimiter(cfg.RegisterRateLimitPerMin, time.Minute)
@@ -101,6 +104,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.Handle("GET "+cfg.APIV1Prefix+"/users", protect(userHandler.List))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/inbox", protect(notificationHandler.Inbox))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/search", protect(searchHandler.Search))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/documents/{documentID}/text", protect(searchHandler.DocumentText))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/notifications", protect(notificationHandler.List))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/notifications/unread-count", protect(notificationHandler.UnreadCount))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/notifications/read-all", protect(notificationHandler.MarkAllRead))
@@ -200,5 +204,8 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 		middleware.JSONContentType,
 		middleware.LimitBody,
 		middleware.AccessLog,
+		// Innermost: it must see the request the mux annotates with r.Pattern
+		// (outer middlewares replace the request via WithContext).
+		metricsRegistry.Middleware,
 	)
 }

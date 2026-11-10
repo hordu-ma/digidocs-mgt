@@ -70,6 +70,15 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 
 ### 2.1.1 自助注册
 
+注册模式（2026-11-10）：由后端 `SELF_REGISTRATION` 决定，`GET /api/v1/system/info` 的 `self_registration` 字段公开当前模式，供登录页决定是否显示注册入口。
+
+| 模式 | 行为 |
+| --- | --- |
+| `open`（默认） | 任何人可注册 |
+| `invite_only` | 请求体必须带有效、未过期的课题邀请令牌 `invite_token`，否则 `403 invite_required`；从邀请链接进入注册页时前端会自动带上 |
+| `closed` | 一律 `403 registration_closed`，由管理员后台开通账号 |
+
+
 `POST /api/v1/auth/register`（公开路由，独立注册限流，默认 5 次/分钟/IP，`REGISTER_RATE_LIMIT_PER_MIN` 可配）
 
 完全开放注册，不做短信/邮箱验证码；注册即激活，角色由服务端强制写为 `member`。请求体不接受 `role`。
@@ -193,16 +202,18 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 
 ```json
 {
-  "data": { "success": true }
+  "data": { "success": true, "access_token": "新令牌" }
 }
 ```
+
+2026-11-10 起：改密成功后，签发时间早于改密时间的所有令牌（包括本次请求所用的）都会失效，响应返回一个新令牌供当前会话继续使用，其他设备在约 30 秒内被要求重新登录。
 
 校验规则：
 
 - `current_password` 必填，且必须与当前密码一致，否则返回 `401 unauthorized`（`message` 为「当前密码不正确」）；仅凭有效 JWT 不足以改密，避免令牌泄露后账号被直接锁死；
 - `new_password` 长度 8–72 字符，且不得与当前密码相同，否则返回 `400 validation_error`。
 
-已知限制：本系统签发的是无状态 JWT，没有吊销名单，因此**改密不会使已签发的令牌失效**，旧令牌仍可用至自然过期（2 小时）。前端「修改密码」面板已明确提示这一点。若要做到改密即登出，需要引入 token 版本号或黑名单，属于后续项。
+会话失效规则（2026-11-10，迁移 015）：鉴权中间件在验签和过期检查之后，再检查账号仍为 `active`，且令牌签发时间不早于 `users.password_changed_at`。不满足时返回 `401 session_revoked`。账号状态按用户缓存 30 秒；查库失败时放行，因为令牌本身已通过验签，这一步是纵深防御。没有 `exp` 的令牌一律拒绝。
 
 ### 2.5 退出登录
 
@@ -540,6 +551,14 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
   }
 }
 ```
+
+### 4.2.2 在线查看正文（2026-11-10）
+
+`GET /api/v1/documents/{document_id}/text`
+
+返回当前版本的抽取正文，用分块拼回原文（去掉相邻块的重叠部分），作为 Office 文件的在线预览，因为浏览器无法直接渲染 docx/xlsx/pptx。权限同查看文档详情。有正文时写入一条 `preview` 审计（`extra_data.mode=text`），写入失败返回 `500 audit_failed`。
+
+响应：`{document_id, version_id, version_no, text, available, truncated}`。正文尚未抽取时 `available=false`；超过分块上限（约 28 万字）时 `truncated=true`。
 
 ### 4.2.1 全文检索（2026-11-10）
 
@@ -1188,6 +1207,13 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 | 通过邀请链接入组 | 课题 owner/manager | 否 |
 
 外发通道由部署配置开启，见部署说明「通知外发」。普通问答不发通知，提问人本就在会话页等待。
+
+## 8.7 运行指标（2026-11-10）
+
+`GET /metrics`（不在 `/api/v1` 下），Prometheus 文本格式。必须配置 `METRICS_TOKEN` 并以 `Authorization: Bearer <METRICS_TOKEN>` 访问；未配置时返回 404。
+
+- `digidocs_http_requests_total{route,status}` 与 `digidocs_http_request_duration_seconds_sum{route,status}`：`route` 是路由模板（如 `GET /api/v1/documents/{documentID}`），不是实际路径，序列数量有上限。
+- 抓取时从数据库采样的业务指标：AI 任务按状态计数、最早一个排队任务的等待秒数、近 24 小时模型 token 用量、文档按状态计数、未完成交接、未读通知、正文分块数。
 
 ## 9. OpenClaw 接口
 

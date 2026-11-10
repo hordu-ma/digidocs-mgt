@@ -60,6 +60,18 @@ class WorkerDispatcher:
         print(
             f"worker={settings.worker_name} mode={settings.worker_mode} openclaw={settings.openclaw_base_url}"
         )
+        ok, detail = self.openclaw_client.check_gateway()
+        if ok:
+            logger.info("openclaw gateway reachable: %s", detail)
+        else:
+            # Loud but not fatal: text extraction does not need the gateway,
+            # and the gateway may come up later. AI tasks will fail with a
+            # clear error until it does.
+            logger.error(
+                "OpenClaw gateway NOT reachable at %s/v1/models (%s); AI tasks will fail until it is",
+                settings.openclaw_base_url,
+                detail,
+            )
 
     def _handle_stop_signal(self, signum: int, _frame: FrameType | None) -> None:
         logger.info("received signal %s, will stop after the in-flight batch", signum)

@@ -57,6 +57,9 @@ type Config struct {
 	// SelfRegistration controls POST /auth/register: open (default),
 	// invite_only (a valid invite token is required) or closed.
 	SelfRegistration string
+
+	// MetricsToken enables GET /metrics (Bearer auth); empty disables it.
+	MetricsToken string
 }
 
 func Load() Config {
@@ -95,6 +98,7 @@ func Load() Config {
 		SMTPFrom:                   getEnv("SMTP_FROM", ""),
 		AutoSummarizeOnUpload:      getEnv("AUTO_SUMMARIZE_ON_UPLOAD", "true") == "true",
 		SelfRegistration:           getEnv("SELF_REGISTRATION", "open"),
+		MetricsToken:               getEnv("METRICS_TOKEN", ""),
 	}
 
 	if cfg.AppEnv == "production" {
