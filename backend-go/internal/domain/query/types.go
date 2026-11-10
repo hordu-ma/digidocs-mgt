@@ -409,3 +409,68 @@ type HandoverDataLine struct {
 	Selected    bool   `json:"selected"`
 	Note        string `json:"note,omitempty"`
 }
+
+// NotificationItem is one in-app notification (migration 013).
+type NotificationItem struct {
+	ID          string `json:"id"`
+	EventType   string `json:"event_type"`
+	Title       string `json:"title"`
+	Body        string `json:"body,omitempty"`
+	Link        string `json:"link,omitempty"`
+	RelatedType string `json:"related_type,omitempty"`
+	RelatedID   string `json:"related_id,omitempty"`
+	ActorName   string `json:"actor_name,omitempty"`
+	Read        bool   `json:"read"`
+	CreatedAt   string `json:"created_at"`
+}
+
+// InboxItem is one "waiting for me" task, computed live from business tables.
+// Kind values: accept_transfer, confirm_handover, complete_handover,
+// fill_handover_items, review_suggestion, stale_document.
+type InboxItem struct {
+	Kind        string `json:"kind"`
+	Title       string `json:"title"`
+	Detail      string `json:"detail,omitempty"`
+	Link        string `json:"link"`
+	RelatedType string `json:"related_type"`
+	RelatedID   string `json:"related_id"`
+	ProjectName string `json:"project_name,omitempty"`
+	Since       string `json:"since,omitempty"`
+}
+
+// UserContact is what external channels need to address a recipient.
+type UserContact struct {
+	ID          string
+	DisplayName string
+	Email       string
+}
+
+// DocumentBrief / HandoverBrief carry just enough context to word a notification.
+type DocumentBrief struct {
+	ID          string
+	Title       string
+	ProjectID   string
+	ProjectName string
+	OwnerID     string
+}
+
+type HandoverBrief struct {
+	ID             string
+	ProjectID      string
+	ProjectName    string
+	TargetUserID   string
+	TargetName     string
+	ReceiverUserID string
+	ReceiverName   string
+	GeneratedBy    string
+	ManagerIDs     []string
+}
+
+type AssistantRequestBrief struct {
+	ID          string
+	RequestType string
+	RelatedType string
+	RelatedID   string
+	CreatedBy   string
+	Status      string
+}

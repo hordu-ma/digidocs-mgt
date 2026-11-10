@@ -19,6 +19,12 @@ type HandoverService struct {
 	reader      repository.HandoverReader
 	writer      repository.ActionWriter
 	permissions PermissionService
+	notify      NotificationService
+}
+
+func (s HandoverService) WithNotifications(n NotificationService) HandoverService {
+	s.notify = n
+	return s
 }
 
 func NewHandoverService(reader repository.HandoverReader, writer repository.ActionWriter, permissions ...PermissionService) HandoverService {
@@ -42,7 +48,14 @@ func (s HandoverService) Create(ctx context.Context, input command.HandoverCreat
 	if err := s.permissions.EnsureCreateHandover(ctx, input.ActorID, input.ActorRole, input.ProjectID); err != nil {
 		return nil, err
 	}
-	return s.writer.CreateHandover(ctx, input)
+	result, err := s.writer.CreateHandover(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	if id, _ := result["id"].(string); id != "" {
+		s.notify.OnHandoverCreated(ctx, id, input.ActorID)
+	}
+	return result, nil
 }
 
 func (s HandoverService) UpdateItems(ctx context.Context, input command.HandoverItemUpdateInput) (map[string]any, error) {
@@ -71,7 +84,12 @@ func (s HandoverService) ApplyAction(ctx context.Context, input command.Handover
 	if err := s.permissions.EnsureApplyHandover(ctx, input.ActorID, input.ActorRole, input.HandoverID, input.Action); err != nil {
 		return nil, err
 	}
-	return s.writer.ApplyHandover(ctx, input)
+	result, err := s.writer.ApplyHandover(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	s.notify.OnHandoverAction(ctx, input)
+	return result, nil
 }
 
 func (s HandoverService) List(ctx context.Context, scope query.ActorScope) ([]query.HandoverItem, error) {

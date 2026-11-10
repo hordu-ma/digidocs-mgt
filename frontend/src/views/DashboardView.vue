@@ -12,6 +12,7 @@ import { useRouter } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
+import { formatDateTime } from "@/utils/format";
 
 const router = useRouter();
 
@@ -41,6 +42,39 @@ interface AuditSummary {
 // Download activity is a secondary panel: if the summary call fails the rest
 // of the dashboard must still render, so it is loaded independently.
 const auditSummary = ref<AuditSummary | null>(null);
+
+interface InboxItem {
+  kind: string;
+  title: string;
+  detail?: string;
+  link: string;
+  related_id: string;
+  project_name?: string;
+  since?: string;
+}
+const inbox = ref<InboxItem[]>([]);
+const inboxLoaded = ref(false);
+const INBOX_PREVIEW = 6;
+const inboxExpanded = ref(false);
+const visibleInbox = computed(() =>
+  inboxExpanded.value ? inbox.value : inbox.value.slice(0, INBOX_PREVIEW),
+);
+const inboxKindLabel: Record<string, string> = {
+  accept_transfer: "待接收",
+  confirm_handover: "待确认交接",
+  complete_handover: "待完成交接",
+  fill_handover_items: "待补清单",
+  review_suggestion: "待确认建议",
+  stale_document: "长期未更新",
+};
+const inboxKindTone: Record<string, string> = {
+  accept_transfer: "status-pending-handover",
+  confirm_handover: "status-pending-handover",
+  complete_handover: "status-in-progress",
+  fill_handover_items: "status-draft",
+  review_suggestion: "status-finalized",
+  stale_document: "status-risk",
+};
 
 const statusLabel: Record<string, string> = {
   draft: "草稿",
@@ -127,13 +161,7 @@ const statusEntries = computed(() =>
 );
 
 function formatTime(value?: string) {
-  if (!value) return "-";
-  return new Date(value).toLocaleString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTime(value);
 }
 
 onMounted(async () => {
@@ -145,6 +173,17 @@ onMounted(async () => {
   overview.value = overviewRes.data?.data ?? overview.value;
   recentFlows.value = flowsRes.data?.data ?? [];
   riskDocs.value = riskRes.data?.data ?? [];
+});
+
+onMounted(async () => {
+  try {
+    const res = await api.get("/inbox");
+    inbox.value = res.data?.data ?? [];
+  } catch {
+    inbox.value = [];
+  } finally {
+    inboxLoaded.value = true;
+  }
 });
 
 onMounted(async () => {
@@ -171,6 +210,42 @@ function openDocument(id?: string) {
           <p>优先呈现需要负责人关注的文档状态、近期流转和交接风险。</p>
         </div>
       </div>
+
+      <section v-if="inboxLoaded" class="page-card inbox-panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="section-title">我的待办</h2>
+            <p class="section-note">需要你本人处理的事项，处理完成后会自动消失</p>
+          </div>
+          <span class="status-pill" :class="inbox.length ? 'status-pending-handover' : ''">{{ inbox.length }}</span>
+        </div>
+        <div v-if="inbox.length === 0" class="empty-state compact">
+          <p class="empty-title">暂无待办</p>
+          <p class="empty-hint">有人把文档转交给你、或交接需要你确认时，会出现在这里</p>
+        </div>
+        <button
+          v-for="item in visibleInbox"
+          :key="`${item.kind}-${item.related_id}`"
+          type="button"
+          class="inbox-item"
+          @click="router.push(item.link)"
+        >
+          <span class="status-pill" :class="inboxKindTone[item.kind]">{{ inboxKindLabel[item.kind] ?? item.kind }}</span>
+          <span class="inbox-title">{{ item.title }}</span>
+          <span class="inbox-detail">
+            {{ item.detail }}<template v-if="item.project_name"> · {{ item.project_name }}</template>
+          </span>
+          <span class="inbox-since">{{ formatDateTime(item.since, "") }}</span>
+        </button>
+        <ElButton
+          v-if="inbox.length > INBOX_PREVIEW"
+          link
+          type="primary"
+          @click="inboxExpanded = !inboxExpanded"
+        >
+          {{ inboxExpanded ? "收起" : `展开全部 ${inbox.length} 项` }}
+        </ElButton>
+      </section>
 
       <section class="command-strip page-card">
         <div class="command-copy">
@@ -312,6 +387,63 @@ function openDocument(id?: string) {
 </template>
 
 <style scoped>
+.inbox-panel {
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.inbox-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "tag title since"
+    "tag detail since";
+  gap: 2px 12px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--dd-line);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.inbox-item .status-pill {
+  grid-area: tag;
+}
+
+.inbox-title {
+  grid-area: title;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-detail {
+  grid-area: detail;
+  color: var(--dd-subtle);
+  font-size: 13px;
+}
+
+.inbox-since {
+  grid-area: since;
+  color: var(--dd-subtle);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .inbox-item {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "tag title"
+      "detail detail"
+      "since since";
+  }
+}
+
 .risk-item,
 .download-item {
   width: 100%;

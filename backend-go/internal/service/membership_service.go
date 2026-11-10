@@ -29,8 +29,14 @@ type MembershipRepo interface {
 }
 
 type MembershipService struct {
-	repo MembershipRepo
-	perm PermissionService
+	repo   MembershipRepo
+	perm   PermissionService
+	notify NotificationService
+}
+
+func (s MembershipService) WithNotifications(n NotificationService) MembershipService {
+	s.notify = n
+	return s
 }
 
 func NewMembershipService(repo MembershipRepo, perm PermissionService) MembershipService {
@@ -73,6 +79,7 @@ func (s MembershipService) AddMember(ctx context.Context, actorID, actorRole, pr
 	if err != nil {
 		return nil, err
 	}
+	s.notify.OnMemberJoined(ctx, projectID, strings.TrimSpace(userID), actorID, false)
 	return item, nil
 }
 
@@ -200,5 +207,10 @@ func (s MembershipService) AcceptInvite(ctx context.Context, actorID, token stri
 	if !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
-	return s.repo.AddProjectMember(ctx, invite.ProjectID, actorID, invite.ProjectRole)
+	item, err := s.repo.AddProjectMember(ctx, invite.ProjectID, actorID, invite.ProjectRole)
+	if err != nil {
+		return nil, err
+	}
+	s.notify.OnMemberJoined(ctx, invite.ProjectID, actorID, actorID, true)
+	return item, nil
 }

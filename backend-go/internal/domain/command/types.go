@@ -182,3 +182,17 @@ type AuditEventInput struct {
 	Extra              map[string]any
 	DedupWindowSeconds int
 }
+
+// NotificationInput is one notification fanned out to Recipients.
+type NotificationInput struct {
+	Recipients  []string
+	EventType   string
+	Title       string
+	Body        string
+	Link        string
+	RelatedType string
+	RelatedID   string
+	ActorID     string
+	// External marks events important enough for email / webhook delivery.
+	External bool
+}

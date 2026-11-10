@@ -11,7 +11,8 @@ import {
   FolderOpened,
   UserFilled,
 } from "@element-plus/icons-vue";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 
 import AppLayout from "@/components/AppLayout.vue";
 import api from "@/api";
@@ -477,9 +478,21 @@ async function applyAction(action: "confirm" | "complete" | "cancel") {
   }
 }
 
+const route = useRoute();
+
+// Notifications and the inbox link to /handovers?id=<id>; open that handover's
+// detail directly so the user lands on the action they were asked to take.
+async function openFromQuery() {
+  const id = typeof route.query.id === "string" ? route.query.id : "";
+  if (id) await openDetail(id);
+}
+
 onMounted(async () => {
   await Promise.all([fetchHandovers(), fetchReferenceData()]);
+  await openFromQuery();
 });
+
+watch(() => route.query.id, () => void openFromQuery());
 </script>
 
 <template>

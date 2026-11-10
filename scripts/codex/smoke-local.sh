@@ -333,6 +333,17 @@ if [[ "$backend_ready" == "1" ]]; then
       require_or_skip "GET /audit-events -> $ae_status (expected 200)"
     fi
 
+    # GET /inbox + /notifications/unread-count (2026-11-10)
+    for notify_path in inbox notifications/unread-count notifications; do
+      nt_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+        -H "$auth_header" "$backend_url/api/v1/$notify_path" 2>/dev/null)
+      if [[ "$nt_status" == "200" ]]; then
+        echo "[OK] GET /$notify_path -> $nt_status"
+      else
+        require_or_skip "GET /$notify_path -> $nt_status (expected 200)"
+      fi
+    done
+
     # GET /audit-events/summary
     as_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
       -H "$auth_header" "$backend_url/api/v1/audit-events/summary" 2>/dev/null)

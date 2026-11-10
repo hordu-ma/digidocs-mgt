@@ -26,6 +26,12 @@ type AssistantService struct {
 	documents   repository.DocumentReader
 	versions    repository.VersionReader
 	permissions PermissionService
+	notify      NotificationService
+}
+
+func (s AssistantService) WithNotifications(n NotificationService) AssistantService {
+	s.notify = n
+	return s
 }
 
 func NewAssistantService(
@@ -170,7 +176,11 @@ func (s AssistantService) QueueTask(
 }
 
 func (s AssistantService) ReceiveResult(ctx context.Context, result task.Result) error {
-	return s.repo.CompleteAssistantRequest(ctx, result)
+	if err := s.repo.CompleteAssistantRequest(ctx, result); err != nil {
+		return err
+	}
+	s.notify.OnAssistantResult(ctx, result)
+	return nil
 }
 
 // SummarizeDocument is the permission-checked entry point handlers must use to

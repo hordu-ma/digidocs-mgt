@@ -38,6 +38,17 @@ type Config struct {
 	// the frontend nginx. Raising it trusts one more entry of client-supplied
 	// data, so it must match the real proxy chain — see middleware.clientIP.
 	TrustedProxyDepth int
+
+	// Notifications (2026-11-10). In-app notifications are always on; the
+	// external channels below are optional and off when left empty.
+	PublicBaseURL     string // e.g. https://docs.example.org, used for links in external messages
+	NotifyWebhookURL  string // group robot URL (contains its key; never log it)
+	NotifyWebhookKind string // wecom | dingtalk | generic
+	SMTPHost          string
+	SMTPPort          int
+	SMTPUsername      string
+	SMTPPassword      string
+	SMTPFrom          string
 }
 
 func Load() Config {
@@ -66,6 +77,14 @@ func Load() Config {
 		LoginRateLimitPerMin:       getEnvInt("LOGIN_RATE_LIMIT_PER_MIN", 10),
 		TrustedProxyDepth:          getEnvInt("TRUSTED_PROXY_DEPTH", 1),
 		RegisterRateLimitPerMin:    getEnvInt("REGISTER_RATE_LIMIT_PER_MIN", 5),
+		PublicBaseURL:              getEnv("PUBLIC_BASE_URL", ""),
+		NotifyWebhookURL:           getEnv("NOTIFY_WEBHOOK_URL", ""),
+		NotifyWebhookKind:          getEnv("NOTIFY_WEBHOOK_KIND", "generic"),
+		SMTPHost:                   getEnv("SMTP_HOST", ""),
+		SMTPPort:                   getEnvInt("SMTP_PORT", 587),
+		SMTPUsername:               getEnv("SMTP_USERNAME", ""),
+		SMTPPassword:               getEnv("SMTP_PASSWORD", ""),
+		SMTPFrom:                   getEnv("SMTP_FROM", ""),
 	}
 
 	if cfg.AppEnv == "production" {

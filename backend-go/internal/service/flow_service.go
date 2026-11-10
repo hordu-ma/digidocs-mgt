@@ -22,6 +22,14 @@ type FlowService struct {
 	reader      repository.FlowReader
 	writer      repository.ActionWriter
 	permissions PermissionService
+	notify      NotificationService
+}
+
+// WithNotifications returns a copy that notifies the other party after a
+// successful transfer / accept.
+func (s FlowService) WithNotifications(n NotificationService) FlowService {
+	s.notify = n
+	return s
 }
 
 func NewFlowService(reader repository.FlowReader, writer repository.ActionWriter, permissions ...PermissionService) FlowService {
@@ -51,7 +59,12 @@ func (s FlowService) ApplyAction(ctx context.Context, input command.FlowActionIn
 	if err := s.permissions.EnsureFlowDocument(ctx, input.ActorID, input.ActorRole, input.DocumentID, input.Action); err != nil {
 		return nil, err
 	}
-	return s.writer.CreateFlowRecord(ctx, input)
+	result, err := s.writer.CreateFlowRecord(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	s.notify.OnFlowAction(ctx, input)
+	return result, nil
 }
 
 func (s FlowService) ListFlows(ctx context.Context, documentID string, actorID string, actorRole string) ([]query.FlowItem, error) {

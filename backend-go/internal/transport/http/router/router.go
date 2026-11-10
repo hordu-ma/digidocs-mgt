@@ -46,6 +46,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	dataAssetHandler := handlers.NewDataAssetHandler(container.DataAssetService, container.AuditService)
 	codeRepositoryHandler := handlers.NewCodeRepositoryHandler(container.CodeRepositoryService, cfg.APIV1Prefix)
 	membershipHandler := handlers.NewMembershipHandler(container.MembershipService)
+	notificationHandler := handlers.NewNotificationHandler(container.NotificationService)
 
 	authMw := middleware.Auth(container.TokenService)
 	protect := func(h http.HandlerFunc) http.Handler {
@@ -91,6 +92,11 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/change-password", protect(authHandler.ChangePassword))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/auth/logout", protect(authHandler.Logout))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/users", protect(userHandler.List))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/inbox", protect(notificationHandler.Inbox))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/notifications", protect(notificationHandler.List))
+	mux.Handle("GET "+cfg.APIV1Prefix+"/notifications/unread-count", protect(notificationHandler.UnreadCount))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/notifications/read-all", protect(notificationHandler.MarkAllRead))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/notifications/{notificationID}/read", protect(notificationHandler.MarkRead))
 	mux.Handle("POST "+cfg.APIV1Prefix+"/assistant/conversations", protect(assistantHandler.CreateConversation))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/assistant/conversations", protect(assistantHandler.ListConversations))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/assistant/conversations/{conversationID}", protect(assistantHandler.GetConversation))

@@ -18,6 +18,7 @@ import { useRoute, useRouter } from "vue-router";
 
 import GlobalCommandDialog from "@/components/GlobalCommandDialog.vue";
 import NoProjectMembership from "@/components/NoProjectMembership.vue";
+import NotificationBell from "@/components/NotificationBell.vue";
 import { useAuthStore } from "@/stores/auth";
 import api from "@/api";
 
@@ -332,6 +333,7 @@ onBeforeUnmount(() => {
             <span v-if="!isMobile" class="app-kbd">Ctrl K</span>
           </button>
 
+          <NotificationBell />
           <ElDropdown trigger="click" @command="handleUserCommand">
             <button class="user-menu" type="button">
               <span class="user-avatar">{{ auth.displayName.slice(0, 1) || "用" }}</span>

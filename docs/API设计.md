@@ -1085,6 +1085,51 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 
 ---
 
+## 8.6 待办与通知（2026-11-10）
+
+### 8.6.1 我的待办
+
+`GET /api/v1/inbox`
+
+按调用者实时计算，不落库。每一类都对应调用者确实有权执行的动作，处理完成后自动消失。
+
+| `kind` | 条件 | 跳转 |
+| --- | --- | --- |
+| `accept_transfer` | 文档转交给我（责任人是我且状态为 `pending_handover`） | `/documents/{id}` |
+| `confirm_handover` | 我是接收人且交接单状态为 `generated` | `/handovers?id={id}` |
+| `complete_handover` | 我管理的课题中，交接单状态为 `pending_confirm` | `/handovers?id={id}` |
+| `fill_handover_items` | 我管理的课题中，`generated` 状态且未勾选任何文档或数据 | `/handovers?id={id}` |
+| `review_suggestion` | 我负责的文档上有待确认的 AI 建议 | `/documents/{id}` |
+| `stale_document` | 我负责的在办文档超过 30 天未更新 | `/documents/{id}` |
+
+响应：`data` 为 `[{kind, title, detail, link, related_type, related_id, project_name, since}]`，最多 100 条；`meta` 为 `{total, counts: {kind: n}}`。
+
+### 8.6.2 通知
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/notifications?unread_only=true&page=&page_size=` | 本人通知列表，`meta` 含 `pagination` 与 `unread` |
+| GET | `/notifications/unread-count` | 未读数 `{unread}`，顶栏每 60 秒轮询 |
+| POST | `/notifications/{id}/read` | 标记单条已读；不是本人的通知返回 404 |
+| POST | `/notifications/read-all` | 全部标为已读，返回 `{updated}` |
+
+通知项字段：`id`、`event_type`、`title`、`body`、`link`、`related_type`、`related_id`、`actor_name`、`read`、`created_at`。
+
+触发规则：
+
+| 事件 | 收件人 | 外发 |
+| --- | --- | --- |
+| 转交文档 | 接收人 | 是 |
+| 接收转交 | 原转交人 | 否 |
+| 创建交接单 | 接收人（外发）、被交接人 | 接收人是 |
+| 接收人确认交接 | 课题 owner/manager 与发起人 | 是 |
+| 完成 / 取消交接 | 被交接人、接收人 | 否 |
+| 文档 / 交接 AI 摘要完成或失败 | 发起人 | 否 |
+| 负责人添加成员 | 被添加人 | 否 |
+| 通过邀请链接入组 | 课题 owner/manager | 否 |
+
+外发通道由部署配置开启，见部署说明「通知外发」。普通问答不发通知，提问人本就在会话页等待。
+
 ## 9. OpenClaw 接口
 
 当前实现说明：

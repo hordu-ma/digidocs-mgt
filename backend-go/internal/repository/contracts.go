@@ -56,6 +56,25 @@ type AuditWriter interface {
 	RecordAuditEvent(ctx context.Context, event command.AuditEventInput) error
 }
 
+// NotificationRepository stores in-app notifications and resolves the context
+// needed to word them. ListInbox computes "waiting for me" tasks live from the
+// business tables; nothing about the inbox is stored.
+type NotificationRepository interface {
+	CreateNotifications(ctx context.Context, input command.NotificationInput) error
+	ListNotifications(ctx context.Context, userID string, unreadOnly bool, page int, pageSize int) ([]query.NotificationItem, int, error)
+	CountUnread(ctx context.Context, userID string) (int, error)
+	MarkRead(ctx context.Context, userID string, notificationID string) error
+	MarkAllRead(ctx context.Context, userID string) (int, error)
+	ListInbox(ctx context.Context, userID string, isAdmin bool) ([]query.InboxItem, error)
+
+	GetUserContacts(ctx context.Context, userIDs []string) ([]query.UserContact, error)
+	GetDocumentBrief(ctx context.Context, documentID string) (*query.DocumentBrief, error)
+	GetHandoverBrief(ctx context.Context, handoverID string) (*query.HandoverBrief, error)
+	GetLastTransferSender(ctx context.Context, documentID string) (string, error)
+	GetAssistantRequestBrief(ctx context.Context, requestID string) (*query.AssistantRequestBrief, error)
+	GetProjectManagers(ctx context.Context, projectID string) ([]string, string, error)
+}
+
 type DashboardReader interface {
 	GetOverview(ctx context.Context, projectID string, scope query.ActorScope) (query.DashboardOverview, error)
 	ListRecentFlows(ctx context.Context, projectID string, scope query.ActorScope) ([]query.RecentFlowItem, error)

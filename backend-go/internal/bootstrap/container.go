@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"database/sql"
+	"digidocs-mgt/backend-go/internal/notify"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -39,6 +40,21 @@ type Container struct {
 	TokenService          service.TokenService
 	AuditService          service.AuditService
 	MembershipService     service.MembershipService
+	NotificationService   service.NotificationService
+}
+
+// buildNotificationChannels returns the external channels enabled by config.
+func buildNotificationChannels(cfg config.Config) []notify.Channel {
+	channels := make([]notify.Channel, 0, 2)
+	if cfg.NotifyWebhookURL != "" {
+		channels = append(channels, notify.WebhookChannel{URL: cfg.NotifyWebhookURL, Kind: cfg.NotifyWebhookKind})
+	}
+	if cfg.SMTPHost != "" && cfg.SMTPFrom != "" {
+		channels = append(channels, notify.SMTPChannel{
+			Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUsername, Password: cfg.SMTPPassword, From: cfg.SMTPFrom,
+		})
+	}
+	return channels
 }
 
 func BuildContainer(cfg config.Config) (Container, error) {
@@ -82,6 +98,8 @@ func BuildContainer(cfg config.Config) (Container, error) {
 		dataAssetRepo := pgrepo.NewDataAssetRepository(postgresDB)
 		codeRepo := pgrepo.NewCodeRepositoryRepository(postgresDB)
 		auditService := service.NewAuditService(pgrepo.NewAuditRepository(postgresDB))
+		notificationService := service.NewNotificationService(pgrepo.NewNotificationRepository(postgresDB), cfg.PublicBaseURL, buildNotificationChannels(cfg)...)
+		log.Printf("[bootstrap] notification channels: %v", notificationService.Channels())
 		return Container{
 			DB:            postgresDB,
 			QueueConsumer: pgqueue.NewConsumer(postgresDB),
@@ -91,19 +109,20 @@ func BuildContainer(cfg config.Config) (Container, error) {
 				pgrepo.NewProjectRepository(postgresDB),
 			),
 			AdminService:          service.NewAdminService(pgrepo.NewAdminRepository(postgresDB)),
-			AssistantService:      service.NewAssistantService(noopqueue.NewPublisher(), pgrepo.NewAssistantRepository(postgresDB), docRepo, versionRepo, permissionService),
+			AssistantService:      service.NewAssistantService(noopqueue.NewPublisher(), pgrepo.NewAssistantRepository(postgresDB), docRepo, versionRepo, permissionService).WithNotifications(notificationService),
 			DocumentService:       service.NewDocumentService(docRepo, docRepo, storageProvider, versionWorkflow, permissionService),
 			AuditQueryService:     service.NewAuditQueryService(pgrepo.NewAuditRepository(postgresDB)),
 			DashboardQueryService: service.NewDashboardQueryService(pgrepo.NewDashboardRepository(postgresDB)),
 			VersionService:        service.NewVersionService(storageProvider, versionWorkflow, versionRepo, permissionService),
-			FlowService:           service.NewFlowService(pgrepo.NewFlowRepository(postgresDB), actionRepo, permissionService),
-			HandoverService:       service.NewHandoverService(pgrepo.NewHandoverRepository(postgresDB), actionRepo, permissionService),
+			FlowService:           service.NewFlowService(pgrepo.NewFlowRepository(postgresDB), actionRepo, permissionService).WithNotifications(notificationService),
+			HandoverService:       service.NewHandoverService(pgrepo.NewHandoverRepository(postgresDB), actionRepo, permissionService).WithNotifications(notificationService),
 			DataAssetService:      service.NewDataAssetService(dataAssetRepo, dataAssetRepo, storageProvider, permissionService),
 			CodeRepositoryService: service.NewCodeRepositoryService(codeRepo, codeRepo, permissionService, cfg.CodeRepoRoot, storageProvider),
 			AuthService:           authService,
 			TokenService:          tokenService,
 			AuditService:          auditService,
-			MembershipService:     service.NewMembershipService(pgrepo.NewMembershipRepository(postgresDB), permissionService),
+			MembershipService:     service.NewMembershipService(pgrepo.NewMembershipRepository(postgresDB), permissionService).WithNotifications(notificationService),
+			NotificationService:   notificationService,
 		}, nil
 	default:
 		actionRepo := memory.NewActionRepository()
@@ -134,6 +153,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			TokenService:          tokenService,
 			AuditService:          auditService,
 			MembershipService:     service.NewMembershipService(memory.NewMembershipRepository(), permissionService),
+			NotificationService:   service.NewNotificationService(memory.NewNotificationRepository(), ""),
 		}, nil
 	}
 }
