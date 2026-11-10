@@ -83,7 +83,7 @@ const workbenchActions = [
     path: "/handovers",
   },
   {
-    label: "进入 OpenClaw",
+    label: "进入 DocsAgent",
     caption: "在受控范围内提问与整理",
     icon: ChatDotRound,
     path: "/assistant",
@@ -124,7 +124,7 @@ const routeMeta = computed(() => {
   }
   if (path.startsWith("/assistant")) {
     return {
-      title: "OpenClaw 助手",
+      title: "DocsAgent 助手",
       caption: "基于受控上下文生成建议",
     };
   }
@@ -898,9 +898,6 @@ onBeforeUnmount(() => {
     white-space: nowrap;
     font-size: 16px;
   }
-
-  .topbar-caption,
-  .topbar-breadcrumbs,
 
   .topbar-tools {
     gap: 8px;

@@ -55,7 +55,7 @@ void loadRegistrationMode();
     <ElCard class="login-card">
       <div class="login-title">课题组文档资产平台</div>
       <div class="login-subtitle">
-        成员协作、交接沉淀、负责人总览、OpenClaw 助手
+        成员协作、交接沉淀、负责人总览、DocsAgent 助手
       </div>
       <ElForm label-position="top" @submit.prevent="submit">
         <ElFormItem label="账号（用户名 / 手机号 / 邮箱）">

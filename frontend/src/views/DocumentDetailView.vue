@@ -757,7 +757,7 @@ onBeforeUnmount(() => {
                 <span class="dot"></span>
                 <span class="dot"></span>
               </div>
-              <span>OpenClaw 正在分析当前版本</span>
+              <span>DocsAgent 正在分析当前版本</span>
             </div>
             <div v-if="suggestions.length === 0" class="empty-state compact">
               <p class="empty-title">暂无 AI 建议</p>

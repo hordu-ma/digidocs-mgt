@@ -77,7 +77,7 @@ const quickActions = computed(() => {
       icon: User,
     },
     {
-      title: "OpenClaw 助手",
+      title: "DocsAgent 助手",
       caption: "进入可信问答工作区",
       route: "/assistant",
       icon: ChatDotRound,

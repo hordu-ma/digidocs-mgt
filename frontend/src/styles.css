@@ -436,6 +436,22 @@ textarea {
   --el-button-active-border-color: var(--dd-primary-strong);
 }
 
+/* Plain primary buttons: the rule above has the same specificity as Element
+   Plus's .is-plain variant and came later, so plain buttons got the solid dark
+   background with dark text and looked empty (assistant 新会话, code page 复制
+   Remote). Restore the light plain look explicitly. */
+.el-button.el-button--primary.is-plain {
+  --el-button-text-color: var(--dd-primary);
+  --el-button-bg-color: var(--dd-primary-soft);
+  --el-button-border-color: #c8ddf2;
+  --el-button-hover-text-color: #fff;
+  --el-button-hover-bg-color: var(--dd-primary);
+  --el-button-hover-border-color: var(--dd-primary);
+  --el-button-active-text-color: #fff;
+  --el-button-active-bg-color: var(--dd-primary-strong);
+  --el-button-active-border-color: var(--dd-primary-strong);
+}
+
 .el-table {
   --el-table-header-bg-color: #f8fafc;
   --el-table-header-text-color: var(--dd-ink-2);

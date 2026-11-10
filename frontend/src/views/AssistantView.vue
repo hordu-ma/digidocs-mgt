@@ -6,8 +6,11 @@ import {
   ChatDotRound,
   CircleCheck,
   Document,
+  Expand,
+  Fold,
   FolderOpened,
   Message,
+  Plus,
   Position,
   RefreshLeft,
   TakeawayBox,
@@ -19,6 +22,28 @@ import { formatDate } from "@/utils/format";
 import { extractError } from "@/utils/error";
 import AppLayout from "@/components/AppLayout.vue";
 import type { DocumentListItem, ProjectOption } from "@/types";
+
+/* ---------- collapsible conversation panel ---------- */
+
+// Remembered per browser; storage may be unavailable (private mode), so every
+// access is guarded and the page works without it.
+const SIDEBAR_KEY = "dd.assistant.sidebarCollapsed";
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+const sidebarCollapsed = ref(readCollapsed());
+function setSidebarCollapsed(value: boolean) {
+  sidebarCollapsed.value = value;
+  try {
+    localStorage.setItem(SIDEBAR_KEY, value ? "1" : "0");
+  } catch {
+    // ignore
+  }
+}
 
 /* ---------- types ---------- */
 
@@ -93,7 +118,7 @@ let pollTimer: number | null = null;
 let pollAttempts = 0;
 // 1 s while a request runs so the streamed partial answer feels live.
 const POLL_INTERVAL_MS = 1000;
-// ~4 minutes: generous enough to cover a slow OpenClaw response (Worker's own
+// ~4 minutes: generous enough to cover a slow model response (Worker's own
 // upstream timeout defaults to 180s), but bounded so a stuck/lost request
 // does not poll silently forever if the component stays mounted.
 const MAX_POLL_ATTEMPTS = 240;
@@ -491,17 +516,42 @@ onBeforeUnmount(() => {
 
 <template>
   <AppLayout>
-    <div class="page-shell assistant-layout">
-      <aside class="assistant-sidebar page-card">
+    <div class="page-shell assistant-layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+      <aside v-if="sidebarCollapsed" class="assistant-sidebar assistant-rail page-card" aria-label="会话（已折叠）">
+        <ElTooltip content="展开会话列表" placement="right">
+          <ElButton circle @click="setSidebarCollapsed(false)">
+            <ElIcon><Expand /></ElIcon>
+          </ElButton>
+        </ElTooltip>
+        <ElTooltip v-if="!showArchived" content="新会话" placement="right">
+          <ElButton circle type="primary" @click="startNewConversation">
+            <ElIcon><Plus /></ElIcon>
+          </ElButton>
+        </ElTooltip>
+        <ElTooltip :content="showArchived ? '返回会话' : '查看归档'" placement="right">
+          <ElButton circle @click="toggleShowArchived">
+            <ElIcon><component :is="showArchived ? RefreshLeft : Box" /></ElIcon>
+          </ElButton>
+        </ElTooltip>
+        <span class="rail-count">{{ visibleConversations.length }}</span>
+      </aside>
+      <aside v-else class="assistant-sidebar page-card">
         <div class="assistant-panel-head">
           <div>
             <h2 class="section-title">{{ showArchived ? "已归档会话" : "会话" }}</h2>
             <p class="section-note">按项目或文档范围筛选问答上下文</p>
           </div>
-          <ElButton link :type="showArchived ? 'warning' : 'default'" @click="toggleShowArchived">
-            <ElIcon><component :is="showArchived ? RefreshLeft : Box" /></ElIcon>
-            {{ showArchived ? "返回" : "归档" }}
-          </ElButton>
+          <div class="panel-head-actions">
+            <ElButton link :type="showArchived ? 'warning' : 'default'" @click="toggleShowArchived">
+              <ElIcon><component :is="showArchived ? RefreshLeft : Box" /></ElIcon>
+              {{ showArchived ? "返回" : "归档" }}
+            </ElButton>
+            <ElTooltip content="折叠会话列表" placement="bottom">
+              <ElButton link aria-label="折叠会话列表" @click="setSidebarCollapsed(true)">
+                <ElIcon><Fold /></ElIcon>
+              </ElButton>
+            </ElTooltip>
+          </div>
         </div>
 
         <div class="scope-filters">
@@ -570,7 +620,7 @@ onBeforeUnmount(() => {
                   <ElIcon>
                     <component :is="item.scope_type === 'document' ? Document : FolderOpened" />
                   </ElIcon>
-                  {{ formatScopeDisplay(item) }}
+                  <span class="scope-chip-text">{{ formatScopeDisplay(item) }}</span>
                 </span>
                 <span class="conversation-time" :title="item.last_message_at || item.created_at">
                   {{ relativeTime(item.last_message_at || item.created_at) }}
@@ -604,7 +654,7 @@ onBeforeUnmount(() => {
       <main class="assistant-workspace page-card">
         <header class="chat-header">
           <div>
-            <h1>{{ activeConversation?.title || "OpenClaw 助手" }}</h1>
+            <h1>{{ activeConversation?.title || "DocsAgent 助手" }}</h1>
             <p>
               {{ selectedProjectID || selectedDocumentID ? "当前回答限定在已选择范围内" : "先选择项目或文档范围，再发起提问" }}
             </p>
@@ -640,7 +690,7 @@ onBeforeUnmount(() => {
               </div>
               <div class="message-bubble">
                 <div class="message-meta">
-                  <strong>{{ item.role === "assistant" ? "OpenClaw" : "用户" }}</strong>
+                  <strong>{{ item.role === "assistant" ? "DocsAgent" : "用户" }}</strong>
                   <span :title="item.created_at">{{ relativeTime(item.created_at) }}</span>
                 </div>
                 <div class="assistant-markdown" v-html="renderMarkdown(item.content)"></div>
@@ -667,7 +717,7 @@ onBeforeUnmount(() => {
                       <div>模型：{{ item.metadata?.model || "-" }}</div>
                       <div>处理耗时：{{ item.metadata?.processing_duration_ms ? `${item.metadata.processing_duration_ms}ms` : "-" }}</div>
                       <div>Request ID：{{ item.request_id || "-" }}</div>
-                      <div>OpenClaw ID：{{ item.metadata?.upstream_request_id || "-" }}</div>
+                      <div>模型响应 ID：{{ item.metadata?.upstream_request_id || "-" }}</div>
                     </div>
                   </details>
                 </div>
@@ -679,7 +729,7 @@ onBeforeUnmount(() => {
               </div>
               <div class="message-bubble thinking-bubble">
                 <div class="message-meta">
-                  <strong>OpenClaw</strong>
+                  <strong>DocsAgent</strong>
                   <span>{{ partialAnswer ? "正在生成" : "正在思考" }}</span>
                 </div>
                 <div v-if="partialAnswer" class="assistant-markdown" v-html="renderMarkdown(partialAnswer)"></div>
@@ -767,7 +817,9 @@ onBeforeUnmount(() => {
 }
 
 .chat-header {
-  padding-bottom: 16px;
+  /* The workspace card has no padding of its own (the message list scrolls
+     edge to edge), so the header needs its own inset. */
+  padding: 16px 20px;
   border-bottom: 1px solid var(--dd-line-soft);
 }
 
@@ -861,14 +913,52 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+/* The scope chip shrinks and truncates so the time always stays on the same
+   line, right-aligned. A dangling selector used to merge .conversation-time
+   into .assistant-workspace, making every card nearly a screen tall with the
+   time floating in the middle. */
+.conversation-meta .scope-chip {
+  flex: 0 1 auto;
+  min-width: 0;
+}
 
+.scope-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
+.conversation-time {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--dd-subtle);
+  font-size: 12px;
+  white-space: nowrap;
+}
 
+/* Collapsible conversation panel, mirroring the main sidebar. */
+.assistant-layout.sidebar-collapsed {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
 
+.assistant-rail {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 10px;
+  padding: 14px 0;
+}
 
+.assistant-rail .rail-count {
+  color: var(--dd-subtle);
+  font-size: 12px;
+}
 
-.conversation-time,
-
+.panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 
 .assistant-workspace {
   grid-template-rows: auto minmax(420px, 1fr) auto;
@@ -1016,6 +1106,17 @@ onBeforeUnmount(() => {
 
   .conversation-list {
     max-height: 320px;
+  }
+
+  .assistant-layout.sidebar-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant-rail {
+    grid-auto-flow: column;
+    justify-content: start;
+    align-items: center;
+    padding: 10px 14px;
   }
 }
 

@@ -34,7 +34,7 @@ function submit() { if (!props.thinking && !props.loading) emit("submit"); }
               type="textarea"
               :disabled="thinking"
               resize="none"
-              :placeholder="thinking ? 'OpenClaw 正在处理上一条问题…' : '输入需要整理、核对或追问的问题'"
+              :placeholder="thinking ? 'DocsAgent 正在处理上一条问题…' : '输入需要整理、核对或追问的问题'"
               @keyup.ctrl.enter="submit"
             />
             <ElButton
