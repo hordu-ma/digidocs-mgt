@@ -111,7 +111,7 @@
 - 当前已补 Assistant 问答历史列表与筛选接口，前端助手页可直接回看历史请求并查看模型、OpenClaw 响应 ID 与耗时。
 - 当前限制：图片 / 扫描 PDF 的 OCR 依赖 Worker 主机安装 `tesseract`；若未安装，AI 摘要仍会退化为结构化业务上下文摘要。
 - 2026-11-10：正文按版本分块入库（`document_text_chunks`），问答先检索后回答并带 `[片段N]` 引用；问答流式生成；长文分段摘要；上传后自动摘要；结构化输出使用 `json_object`。
-- 已知限制：网关 `/v1/embeddings` 不可用，检索为词面匹配；网关每次调用注入约 2.5 万提示 token，需在网关侧处理。详见 [优化记录](docs/optimization-20261110.md)。
+- 2026-11-10 起 Worker 直连本机 llama.cpp 上的 Qwen（经 `digidocs-llm-bridge` 的 `172.29.0.1:11501`），不再经过个人 OpenClaw 智能体：提示 token 从约 2.5 万降至百级，文档正文不再发往外部云模型。检索仍为词面匹配，向量检索待引入嵌入模型。详见 [优化记录](docs/optimization-20261110.md)。
 
 ## 开发命令约定
 

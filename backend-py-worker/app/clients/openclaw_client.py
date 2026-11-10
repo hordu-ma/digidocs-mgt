@@ -102,7 +102,7 @@ class OpenClawClient:
         payload: ObjectDict,
         context: ObjectDict,
     ) -> ObjectDict:
-        context, basis = self._fit_document_text(context)
+        context, basis, map_usage = self._fit_document_text(context)
         raw = self._structured_chat(
             system_prompt=(
                 "你是 DigiDocs 文档助手。"
@@ -133,9 +133,10 @@ class OpenClawClient:
             "summary_text": _string_value(raw.get("summary_text")),
             "suggestions": suggestions,
             "summary_basis": basis,
+            "usage": _sum_usage(map_usage, _as_object_dict(raw.get("_usage")) or {}),
         }
 
-    def _fit_document_text(self, context: ObjectDict) -> tuple[ObjectDict, str]:
+    def _fit_document_text(self, context: ObjectDict) -> tuple[ObjectDict, str, ObjectDict]:
         """Shrink context["document_text"] to the prompt budget.
 
         Returns the (copied) context and the basis of the summary:
@@ -152,24 +153,26 @@ class OpenClawClient:
             doc_ctx.pop("extracted_text", None)
             context["document_context"] = doc_ctx
         if not text:
-            return context, "metadata_only"
+            return context, "metadata_only", {}
         budget = settings.max_context_chars
         if len(text) <= budget:
-            return context, "full_text"
+            return context, "full_text", {}
         sections, sampled = split_for_summary(
             text, budget, max(1, settings.max_summary_sections)
         )
         notes: list[str] = []
+        usage: ObjectDict = {}
         for index, section in enumerate(sections, start=1):
             result = self._chat(
                 system_prompt="你是科研文档摘要助手，只输出中文要点，不要编造。",
                 user_prompt=f"以下是一份长文档的第 {index}/{len(sections)} 部分。请用不超过 200 字列出本部分要点。\n\n{section}",
             )
             notes.append(f"【第 {index} 部分要点】{result.content}")
+            usage = _sum_usage(usage, result.usage)
         header = f"（原文约 {len(text)} 字，分 {len(sections)} 段提炼"
         header += "，因篇幅过长为均匀抽样，未覆盖全部段落）" if sampled else "）"
         context["document_text"] = header + "\n" + "\n".join(notes)
-        return context, "map_reduce_sampled" if sampled else "map_reduce"
+        return context, "map_reduce_sampled" if sampled else "map_reduce", usage
 
     def summarize_handover(
         self,
@@ -201,6 +204,7 @@ class OpenClawClient:
             "task_type": "handover.summarize",
             "summary_text": _string_value(raw.get("summary_text")),
             "suggestions": suggestions,
+            "usage": _as_object_dict(raw.get("_usage")) or {},
         }
 
     def generate_suggestion(
@@ -231,6 +235,7 @@ class OpenClawClient:
                 raw.get("suggestions"),
                 default_type="structure_recommendation",
             ),
+            "usage": _as_object_dict(raw.get("_usage")) or {},
         }
 
     def _structured_chat(self, system_prompt: str, user_prompt: str) -> ObjectDict:
@@ -244,7 +249,9 @@ class OpenClawClient:
         result = self._chat_json_mode(system_prompt, user_prompt)
         content = result.content.strip()
         try:
-            return _parse_json_content(content)
+            parsed = _parse_json_content(content)
+            parsed["_usage"] = result.usage
+            return parsed
         except json.JSONDecodeError:
             logger.warning("structured output not JSON, attempting one repair round")
         repaired = self._chat(
@@ -252,7 +259,9 @@ class OpenClawClient:
             user_prompt="把下面的内容整理成同样字段的合法 JSON 对象：\n" + content[:6000],
         )
         try:
-            return _parse_json_content(repaired.content)
+            parsed = _parse_json_content(repaired.content)
+            parsed["_usage"] = _sum_usage(result.usage, repaired.usage)
+            return parsed
         except json.JSONDecodeError as exc:
             raise OpenClawClientError(f"OpenClaw 返回了非 JSON 结构化结果: {exc}") from exc
 
@@ -286,6 +295,10 @@ class OpenClawClient:
         payload: ObjectDict = {
             "model": self.model,
             "stream": True,
+            # OpenAI-style servers (llama.cpp included) only report token usage
+            # for a stream when asked; without it AI usage metrics miss every
+            # streamed answer.
+            "stream_options": {"include_usage": True},
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -448,6 +461,18 @@ def _extract_message_content(payload: ObjectDict) -> str:
                     parts.append(text.strip())
         return "\n".join(parts).strip()
     return ""
+
+
+def _sum_usage(*usages: ObjectDict) -> ObjectDict:
+    """Add up the integer token counters of several calls (map-reduce, repair)."""
+    total: ObjectDict = {}
+    for usage in usages:
+        for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+            value = usage.get(key)
+            if isinstance(value, int):
+                current = total.get(key, 0)
+                total[key] = (current if isinstance(current, int) else 0) + value
+    return total
 
 
 def _parse_extra_body(raw: str) -> ObjectDict:

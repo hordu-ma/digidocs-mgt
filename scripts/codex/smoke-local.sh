@@ -240,25 +240,6 @@ if [[ "$backend_ready" == "1" ]]; then
     -d '{"identifier":"admin","password":"admin123"}' 2>/dev/null || true)
   token=$(echo "$login_resp" | extract_json_string access_token)
 
-  smoke_stamp=$(date +%s)
-  smoke_phone="139$(printf '%08d' $((smoke_stamp % 100000000)))"
-  register_resp=$(smoke_curl -sS --max-time 8 -X POST "$backend_url/api/v1/auth/register" \
-    -H 'Content-Type: application/json' \
-    -d "{\"email\":\"smoke-reg-${smoke_stamp}@digidocs.test\",\"phone\":\"${smoke_phone}\",\"password\":\"SmokeReg1\",\"display_name\":\"Smoke注册\"}" 2>/dev/null || true)
-  register_token=$(echo "$register_resp" | extract_json_string access_token)
-  if [[ -n "$register_token" ]]; then
-    echo "[OK] auth/register returned token"
-    me_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
-      -H "Authorization: Bearer $register_token" "$backend_url/api/v1/auth/me" 2>/dev/null)
-    if [[ "$me_status" == "200" ]]; then
-      echo "[OK] registered user can access /auth/me -> $me_status"
-    else
-      require_or_skip "registered user GET /auth/me -> $me_status (expected 200)"
-    fi
-  else
-    require_or_skip "auth/register did not return a token"
-  fi
-
   if [[ -n "$token" ]]; then
     echo "[OK] auth/login returned token"
     auth_header="Authorization: Bearer $token"
@@ -274,6 +255,46 @@ if [[ "$backend_ready" == "1" ]]; then
         -H "$auth_header" -H 'Content-Type: application/json' -d '{}' 2>/dev/null || true)
     fi
     invite_token=$(echo "$invite_resp" | extract_json_string token)
+
+    # Registration follows SELF_REGISTRATION (2026-11-10): register with the
+    # invite token, as a new member would; in invite_only mode also assert that
+    # registering without one is refused. closed mode skips registration.
+    registration_mode=$(smoke_curl -sS --max-time 5 "$backend_url/api/v1/system/info" 2>/dev/null | extract_json_string self_registration)
+    registration_mode="${registration_mode:-open}"
+    echo "[INFO] self_registration=$registration_mode"
+    smoke_stamp=$(date +%s)
+    smoke_phone="139$(printf '%08d' $((smoke_stamp % 100000000)))"
+    register_token=""
+    if [[ "$registration_mode" == "invite_only" ]]; then
+      denied_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 8 -X POST "$backend_url/api/v1/auth/register" \
+        -H 'Content-Type: application/json' \
+        -d "{\"email\":\"smoke-noinvite-${smoke_stamp}@digidocs.test\",\"password\":\"SmokeReg1\",\"display_name\":\"Smoke无邀请\"}" 2>/dev/null)
+      if [[ "$denied_status" == "403" ]]; then
+        echo "[OK] invite_only rejects registration without invite -> 403"
+      else
+        require_or_skip "invite_only registration without invite -> $denied_status (expected 403)"
+      fi
+    fi
+    if [[ "$registration_mode" != "closed" ]]; then
+      register_resp=$(smoke_curl -sS --max-time 8 -X POST "$backend_url/api/v1/auth/register" \
+        -H 'Content-Type: application/json' \
+        -d "{\"email\":\"smoke-reg-${smoke_stamp}@digidocs.test\",\"phone\":\"${smoke_phone}\",\"password\":\"SmokeReg1\",\"display_name\":\"Smoke注册\",\"invite_token\":\"${invite_token}\"}" 2>/dev/null || true)
+      register_token=$(echo "$register_resp" | extract_json_string access_token)
+      if [[ -n "$register_token" ]]; then
+        echo "[OK] auth/register returned token"
+        me_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+          -H "Authorization: Bearer $register_token" "$backend_url/api/v1/auth/me" 2>/dev/null)
+        if [[ "$me_status" == "200" ]]; then
+          echo "[OK] registered user can access /auth/me -> $me_status"
+        else
+          require_or_skip "registered user GET /auth/me -> $me_status (expected 200)"
+        fi
+      else
+        require_or_skip "auth/register did not return a token"
+      fi
+    else
+      echo "[SKIP] self_registration=closed, registration not exercised"
+    fi
     if [[ -n "$invite_token" ]]; then
       echo "[OK] project invite created"
       preview_status=$(smoke_curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \

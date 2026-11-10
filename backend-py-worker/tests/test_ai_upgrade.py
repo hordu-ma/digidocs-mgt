@@ -45,7 +45,8 @@ def test_stream_reports_growing_text(monkeypatch) -> None:
     seen: list[str] = []
 
     def fake_urlopen(request, timeout):
-        assert json.loads(request.data.decode())["stream"] is True
+        sent = json.loads(request.data.decode())
+        assert sent["stream"] is True and sent["stream_options"] == {"include_usage": True}
         return _Resp(body)
 
     monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
@@ -229,3 +230,20 @@ def test_invalid_extra_body_is_ignored(monkeypatch) -> None:
     assert OpenClawClient().extra_body == {}
     monkeypatch.setattr(settings, "llm_extra_body", "[1]")
     assert OpenClawClient().extra_body == {}
+
+
+def test_summaries_report_token_usage_including_map_steps(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "max_context_chars", 100)
+    monkeypatch.setattr(settings, "max_summary_sections", 2)
+
+    def fake_urlopen(request, timeout):
+        user = json.loads(request.data.decode())["messages"][1]["content"]
+        content = "要点" if "长文档" in user else '{"summary_text": "s", "suggestions": []}'
+        body = {"id": "r", "model": "m", "choices": [{"message": {"content": content}}],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 2, "total_tokens": 12}}
+        return _Resp(json.dumps(body).encode())
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    out = OpenClawClient().summarize_document("r", {}, {"document_text": "字" * 500})
+    assert out["usage"] == {"prompt_tokens": 30, "completion_tokens": 6, "total_tokens": 36}
+    assert "_usage" not in out
