@@ -305,6 +305,30 @@
 - 回滚镜像标签：`digidocs-mgt-{backend-go,backend-py-worker,frontend}:before-opt-m7`；部署前数据库备份：`/home/pgx/ops/digidocs-reviews/rollback-20261110-m7/db.sql.gz`。
 - 迁移 015 只新增两个带默认值的列，旧代码不读取，回滚应用时可以保留。
 
+## 后续处理（2026-11-10 晚）
+
+### 注册模式与孤儿文件
+
+- 生产 `.env` 设置 `SELF_REGISTRATION=invite_only` 并重启后端（改前备份 `rollback-20261110-m7/env.before-invite-only`）。`/system/info` 返回 `invite_only`；不带邀请令牌的注册探测返回 `403 invite_required`，未创建账号。
+- `digidocs-storage-audit` 新增 `-delete-orphan`：删除前重新对账，只删除当前仍是孤儿、位于 `documents/` 或 `data/` 下的文件；任一目标不合格则一个都不删；先把内容备份到 `-backup-dir`。用它删除了两个 `smoke-v2.txt`（各 21 字节，内容均为 "smoke second version"），备份在 `/home/pgx/ops/digidocs-reviews/orphan-backup-20261110/`。复核：存储 19 个文件，数据库引用 19 个，孤儿与缺失均为 0。
+- 负责人决定：演示口令与群晖密码不轮换。
+
+### OpenClaw 网关问题
+
+排查结论：
+
+- 18789 端口上是个人 OpenClaw **智能体**网关（带长期记忆、定时任务、WhatsApp 日报）。`/v1/chat/completions` 请求进入的是这个智能体，每次都被注入人设、记忆与工具说明，所以一句话的请求也计约 25,157 个提示 token。
+- 该智能体的**主模型是 `deepseek/deepseek-flash`（DeepSeek 公网 API）**，本地 Qwen 只是备用。DigiDocs 的摘要和问答都携带文档正文，因此课题文档一直被发往外部云服务，与「私有化部署、数据留在本单位」相冲突；文档内容也可能进入个人智能体的会话与记忆。
+- 本机 `llama-server`（Qwen3.8 27B，`127.0.0.1:11500`）提供 OpenAI 兼容接口。直连实测同样的问题只计 21 个提示 token、0.6 秒返回（关闭思考模式），`json_object` 可用。
+
+方案（最佳实践）：业务系统不经过个人智能体，直连本地模型；网关只留给个人助手用途。
+
+- 新增 `ops/systemd/digidocs-llm-bridge.py` 与 `scripts/codex/install-llm-bridge.sh`：照搬现有 `openclaw-loopback-proxy` 的模式，把 `172.29.0.1:11501/11502` 转发到本地 Qwen 和 Ollama。
+- Worker 新增 `LLM_EXTRA_BODY`，用于关闭 Qwen 的思考模式。
+- 向量检索：Ollama 目前只有对话模型。直连打通后，下一步可拉取中文嵌入模型（如 `bge-m3`）并经 11502 端口实现混合检索；在此之前仍用词面检索。
+
+状态：代码与脚本已提交，新 Worker 已部署但仍走原网关（行为不变）。安装桥接服务和放行防火墙属于系统持久化变更，被本会话的权限策略拦截，需负责人执行（命令见部署说明「模型端点」），之后切换 `.env` 并验证。
+
 ## 需负责人在仓库外执行的事项
 
 这些事项无法在仓库内完成，本轮不处理，保留在 `TASKS.md` 待办：
@@ -316,4 +340,4 @@
 - 通知外发通道：需要提供企业微信/钉钉群机器人地址或 SMTP 账号。
 - 公网演示环境的 `SELF_REGISTRATION` 取值（建议 `invite_only` 或 `closed`），以及是否设置 `METRICS_TOKEN` 开启指标。
 - 是否删除对账发现的 2 个烟测遗留孤儿文件。
-- OpenClaw 网关每次调用注入约 2.5 万提示 token：需在网关侧为业务链路配置不带 persona 的通道，并提供 `/v1/embeddings` 后才能启用向量检索。
+- 改为直连本地 Qwen：执行 `scripts/codex/install-llm-bridge.sh` 与一条 `sudo ufw` 放行，然后切换 Worker 的模型端点（见部署说明「模型端点」）。

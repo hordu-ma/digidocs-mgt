@@ -26,6 +26,10 @@ class Settings:
     max_summary_sections: int = 6
     stream_answers: bool = True
     progress_interval: float = 1.0
+    # JSON object merged into every chat completion request, for options a
+    # direct OpenAI-compatible model server needs, e.g. Qwen on llama.cpp:
+    # {"chat_template_kwargs": {"enable_thinking": false}}
+    llm_extra_body: str = ""
 
 
 def load_settings() -> Settings:
@@ -63,6 +67,7 @@ def load_settings() -> Settings:
         max_summary_sections=int(os.getenv("MAX_SUMMARY_SECTIONS", "6")),
         stream_answers=os.getenv("STREAM_ANSWERS", "true").lower() == "true",
         progress_interval=float(os.getenv("PROGRESS_INTERVAL", "1.0")),
+        llm_extra_body=os.getenv("LLM_EXTRA_BODY", ""),
     )
 
 

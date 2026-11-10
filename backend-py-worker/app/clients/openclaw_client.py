@@ -42,6 +42,7 @@ class OpenClawClient:
         # Flipped off the first time the gateway rejects response_format, so
         # later calls do not pay for a guaranteed 400.
         self._json_mode: bool = True
+        self.extra_body: ObjectDict = _parse_extra_body(settings.llm_extra_body)
 
     def check_gateway(self) -> tuple[bool, str]:
         """Probe GET /v1/models once. `openclaw status` being healthy does not
@@ -363,6 +364,8 @@ class OpenClawClient:
         )
 
     def _build_request(self, path: str, payload: ObjectDict, accept: str = "application/json") -> urllib.request.Request:
+        if self.extra_body:
+            payload = {**self.extra_body, **payload}
         request = urllib.request.Request(
             f"{self.base_url}{path}",
             data=json.dumps(payload).encode(),
@@ -445,6 +448,22 @@ def _extract_message_content(payload: ObjectDict) -> str:
                     parts.append(text.strip())
         return "\n".join(parts).strip()
     return ""
+
+
+def _parse_extra_body(raw: str) -> ObjectDict:
+    """LLM_EXTRA_BODY must be a JSON object; anything else is ignored loudly
+    rather than crashing the worker at import time."""
+    if not raw.strip():
+        return {}
+    try:
+        parsed = cast(object, json.loads(raw))
+    except json.JSONDecodeError:
+        logger.error("LLM_EXTRA_BODY is not valid JSON; ignoring it")
+        return {}
+    if not isinstance(parsed, dict):
+        logger.error("LLM_EXTRA_BODY must be a JSON object; ignoring it")
+        return {}
+    return cast(ObjectDict, parsed)
 
 
 def _extract_delta(event: ObjectDict) -> str:

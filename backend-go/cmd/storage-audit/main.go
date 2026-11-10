@@ -9,6 +9,12 @@
 //
 //	digidocs-storage-audit            # human-readable report
 //	digidocs-storage-audit -json      # machine-readable report
+//	digidocs-storage-audit -delete-orphan documents/<id>/x.txt [-delete-orphan ...] -backup-dir /backup
+//
+// -delete-orphan is the only write path. Each key is re-audited at deletion
+// time and removed only if it is still an orphan under an audited prefix; its
+// content is first copied to -backup-dir. Keys are named one by one on purpose:
+// there is no "delete all orphans".
 package main
 
 import (
@@ -20,6 +26,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -39,6 +46,17 @@ type lister interface {
 	ListDir(ctx context.Context, folderPath string) ([]storage.FileInfo, error)
 }
 
+type deleter interface {
+	lister
+	GetObject(ctx context.Context, objectKey string) (*storage.GetObjectOutput, error)
+	DeleteObject(ctx context.Context, objectKey string) error
+}
+
+type multiFlag []string
+
+func (m *multiFlag) String() string     { return strings.Join(*m, ",") }
+func (m *multiFlag) Set(v string) error { *m = append(*m, v); return nil }
+
 type object struct {
 	Key  string `json:"key"`
 	Size int64  `json:"size"`
@@ -56,6 +74,9 @@ type report struct {
 
 func main() {
 	asJSON := flag.Bool("json", false, "print the report as JSON")
+	var deleteKeys multiFlag
+	flag.Var(&deleteKeys, "delete-orphan", "delete this orphan object after re-verifying it (repeatable)")
+	backupDir := flag.String("backup-dir", "", "directory to copy objects into before deleting (required with -delete-orphan)")
 	flag.Parse()
 	cfg := config.Load()
 	if cfg.StorageBackend != "synology" {
@@ -76,6 +97,15 @@ func main() {
 	rep, err := audit(ctx, store, database, cfg.SynologySharePath)
 	if err != nil {
 		log.Fatalf("[storage-audit] %v", err)
+	}
+	if len(deleteKeys) > 0 {
+		if *backupDir == "" {
+			log.Fatalf("[storage-audit] -backup-dir is required with -delete-orphan")
+		}
+		if err := deleteOrphans(ctx, store, rep, deleteKeys, *backupDir, os.Stdout); err != nil {
+			log.Fatalf("[storage-audit] %v", err)
+		}
+		return
 	}
 	if *asJSON {
 		enc := json.NewEncoder(os.Stdout)
@@ -201,4 +231,51 @@ func printReport(w io.Writer, rep report) {
 			fmt.Fprintf(w, "  %s\n", e)
 		}
 	}
+}
+
+// deleteOrphans removes only keys that the fresh report lists as orphans and
+// that sit under an audited prefix. Every target is validated before anything
+// is deleted, so one bad key aborts the whole run with nothing removed.
+func deleteOrphans(ctx context.Context, store deleter, rep report, keys []string, backupDir string, w io.Writer) error {
+	if len(rep.ListErrors) > 0 {
+		return fmt.Errorf("refusing to delete: storage listing was incomplete (%d errors)", len(rep.ListErrors))
+	}
+	orphans := map[string]bool{}
+	for _, o := range rep.Orphans {
+		orphans[o.Key] = true
+	}
+	for _, k := range keys {
+		if !orphans[k] {
+			return fmt.Errorf("refusing to delete %q: not an orphan in the current audit (it is referenced or does not exist)", k)
+		}
+	}
+	for _, k := range keys {
+		out, err := store.GetObject(ctx, k)
+		if err != nil {
+			return fmt.Errorf("backup %s: %w", k, err)
+		}
+		dest := filepath.Join(backupDir, filepath.FromSlash(k))
+		if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
+			out.Reader.Close()
+			return err
+		}
+		f, err := os.OpenFile(dest, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+		if err != nil {
+			out.Reader.Close()
+			return fmt.Errorf("backup %s: %w", k, err)
+		}
+		_, copyErr := io.Copy(f, out.Reader)
+		out.Reader.Close()
+		if closeErr := f.Close(); copyErr == nil {
+			copyErr = closeErr
+		}
+		if copyErr != nil {
+			return fmt.Errorf("backup %s: %w", k, copyErr)
+		}
+		if err := store.DeleteObject(ctx, k); err != nil {
+			return fmt.Errorf("delete %s: %w", k, err)
+		}
+		fmt.Fprintf(w, "已删除 %s（备份：%s）\n", k, dest)
+	}
+	return nil
 }

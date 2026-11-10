@@ -207,3 +207,25 @@ def test_check_gateway(monkeypatch) -> None:
     monkeypatch.setattr("urllib.request.urlopen", boom)
     ok, detail = OpenClawClient().check_gateway()
     assert ok is False and "timed out" in detail
+
+
+def test_extra_body_is_merged_without_overriding_request_fields(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "llm_extra_body", '{"chat_template_kwargs": {"enable_thinking": false}, "model": "ignored"}')
+    seen: list[dict] = []
+
+    def fake_urlopen(request, timeout):
+        seen.append(json.loads(request.data.decode()))
+        return _completion("ok")
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    client = OpenClawClient()
+    client.ask("q", {}, {})
+    assert seen[0]["chat_template_kwargs"] == {"enable_thinking": False}
+    assert seen[0]["model"] == client.model, "request fields must win over extra body"
+
+
+def test_invalid_extra_body_is_ignored(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "llm_extra_body", "not json")
+    assert OpenClawClient().extra_body == {}
+    monkeypatch.setattr(settings, "llm_extra_body", "[1]")
+    assert OpenClawClient().extra_body == {}

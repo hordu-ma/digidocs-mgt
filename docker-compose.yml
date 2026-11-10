@@ -127,6 +127,7 @@ services:
       MAX_SUMMARY_SECTIONS: ${MAX_SUMMARY_SECTIONS:-6}
       STREAM_ANSWERS: ${STREAM_ANSWERS:-true}
       PROGRESS_INTERVAL: ${PROGRESS_INTERVAL:-1.0}
+      LLM_EXTRA_BODY: ${LLM_EXTRA_BODY:-}
       WORKER_HEARTBEAT_FILE: /tmp/digidocs-worker-heartbeat
     extra_hosts:
       - "host.docker.internal:host-gateway"
