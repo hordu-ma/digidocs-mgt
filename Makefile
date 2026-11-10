@@ -1,4 +1,4 @@
-.PHONY: doctor verify verify-go coverage-go verify-worker coverage-worker verify-frontend coverage-frontend integration-postgres check-doc-sync install-project-skills install-hooks install-persistent-routing smoke smoke-e2e smoke-stack-up smoke-stack-down smoke-stack-status status clean-demo-data clean-demo-data-apply
+.PHONY: post-deploy-check doctor verify verify-go coverage-go verify-worker coverage-worker verify-frontend coverage-frontend integration-postgres check-doc-sync install-project-skills install-hooks install-persistent-routing smoke smoke-e2e smoke-stack-up smoke-stack-down smoke-stack-status status clean-demo-data clean-demo-data-apply
 
 doctor:
 	./scripts/codex/doctor.sh
@@ -11,6 +11,9 @@ status:
 
 # 烟测默认打隔离栈（127.0.0.1:18083），不再碰演示环境。
 # 打非烟测环境会被脚本拒绝，除非显式 ALLOW_SMOKE_ON_SHARED=1。
+post-deploy-check:
+	PUBLIC_URL=$${PUBLIC_URL:-} ./scripts/codex/post-deploy-check.sh
+
 smoke:
 	./scripts/codex/smoke-local.sh
 
