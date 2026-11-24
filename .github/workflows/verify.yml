@@ -47,3 +47,6 @@ jobs:
 
       - name: PostgreSQL integration regressions
         run: make integration-postgres
+
+      - name: Isolated application smoke
+        run: make smoke-e2e

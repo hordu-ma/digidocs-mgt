@@ -69,7 +69,10 @@ def _extract_text_like(ext: str, content: bytes) -> str:
 def _extract_docx(content: bytes) -> str:
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
-            xml = archive.read("word/document.xml").decode("utf-8", errors="ignore")
+            _validate_office_archive(archive)
+            xml = _safe_zip_read(archive, "word/document.xml").decode("utf-8", errors="ignore")
+    except DocumentTextExtractionError:
+        raise
     except Exception as exc:  # pragma: no cover - exact stdlib exceptions vary
         raise DocumentTextExtractionError("docx 文件结构不完整，无法抽取正文") from exc
 
@@ -77,12 +80,27 @@ def _extract_docx(content: bytes) -> str:
     text = re.sub(r"<[^>]+>", "", text)
     text = re.sub(r"\n{2,}", "\n", text)
     cleaned = text.strip()
+    if len(cleaned) > _MAX_OFFICE_TEXT:
+        raise DocumentTextExtractionError("文档正文超过抽取字符上限")
     if cleaned == "":
         raise DocumentTextExtractionError("docx 文件中未提取到可用正文")
     return cleaned
 
 
 _MAX_ZIP_ENTRY = 50 * 1024 * 1024  # 50 MB per entry guard
+
+
+_MAX_XML_BYTES = 64 * 1024 * 1024
+_MAX_OFFICE_ENTRIES = 4096
+_MAX_OFFICE_TEXT = 4 * 1024 * 1024
+
+
+def _validate_office_archive(archive: zipfile.ZipFile) -> None:
+    entries = archive.infolist()
+    if len(entries) > _MAX_OFFICE_ENTRIES or sum(
+        entry.file_size for entry in entries if entry.filename.lower().endswith(".xml")
+    ) > _MAX_XML_BYTES:
+        raise DocumentTextExtractionError("Office 文件结构超过正文抽取资源上限")
 
 
 def _safe_zip_read(archive: zipfile.ZipFile, name: str) -> bytes:
@@ -97,6 +115,7 @@ def _extract_xlsx(content: bytes) -> str:
     ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            _validate_office_archive(archive)
             # Build shared strings table
             shared: list[str] = []
             if "xl/sharedStrings.xml" in archive.namelist():
@@ -115,6 +134,7 @@ def _extract_xlsx(content: bytes) -> str:
                 if re.match(r"xl/worksheets/sheet\d+\.xml$", n)
             )
             all_rows: list[str] = []
+            output_chars = 0
             for sheet_name in sheet_names:
                 sheet_xml = _safe_zip_read(archive, sheet_name)
                 sheet_root = ET.fromstring(sheet_xml)
@@ -139,6 +159,9 @@ def _extract_xlsx(content: bytes) -> str:
                             cell_text = "".join(parts)
                         elif v_el is not None and v_el.text:
                             cell_text = v_el.text
+                        output_chars += len(cell_text) + 3
+                        if output_chars > _MAX_OFFICE_TEXT:
+                            raise DocumentTextExtractionError("表格正文超过抽取字符上限")
                         cells.append(cell_text.strip())
                     row_text = " | ".join(cells)
                     if row_text.replace("|", "").strip():
@@ -159,6 +182,7 @@ def _extract_pptx(content: bytes) -> str:
     a_ns = "http://schemas.openxmlformats.org/drawingml/2006/main"
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            _validate_office_archive(archive)
             slide_names = sorted(
                 n for n in archive.namelist()
                 if re.match(r"ppt/slides/slide\d+\.xml$", n)
@@ -189,6 +213,8 @@ def _extract_pptx(content: bytes) -> str:
         raise DocumentTextExtractionError("pptx 文件结构不完整，无法抽取正文") from exc
 
     text = "\n\n".join(slides_text).strip()
+    if len(text) > _MAX_OFFICE_TEXT:
+        raise DocumentTextExtractionError("演示文稿正文超过抽取字符上限")
     if not text:
         raise DocumentTextExtractionError("pptx 文件中未提取到可用正文")
     return text

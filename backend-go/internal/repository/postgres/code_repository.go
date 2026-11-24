@@ -286,3 +286,22 @@ func (r CodeRepositoryRepository) ListCodePushEvents(ctx context.Context, reposi
 	}
 	return items, rows.Err()
 }
+
+func (r CodeRepositoryRepository) RotatePushToken(ctx context.Context, id, token, actorID string) error {
+	tx, err := asTx(ctx, r.db)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `UPDATE code_repositories SET push_token=$2, updated_at=NOW() WHERE id::text=$1 AND NOT is_deleted`, id, token)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return service.ErrNotFound
+	}
+	if err := insertAuditEvent(ctx, tx, "", "", "admin_update", actorID, map[string]any{"repository_id": id, "operation": "rotate_push_token"}); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

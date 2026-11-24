@@ -40,7 +40,7 @@ class WorkerDispatcher:
             os.getenv("WORKER_HEARTBEAT_FILE", str(Path(tempfile.gettempdir()) / "digidocs-worker-heartbeat"))
         )
 
-    def _touch_heartbeat(self) -> None:
+    def _touch_heartbeat(self, busy: bool = False) -> None:
         """Record that the poll loop is still turning.
 
         The worker exposes no port, so a container healthcheck has nothing to
@@ -50,7 +50,7 @@ class WorkerDispatcher:
         against — see the worker healthcheck in docker-compose.yml.
         """
         try:
-            self._heartbeat_path.write_text(str(int(time.time())), encoding="utf-8")
+            self._heartbeat_path.write_text(f"{int(time.time())} {int(busy)}\n", encoding="utf-8")
         except OSError:
             # A heartbeat failure must never take the worker down; losing the
             # liveness signal is strictly better than losing the worker.
@@ -105,7 +105,7 @@ class WorkerDispatcher:
         # seconds of shutdown latency.
         signal.signal(signal.SIGTERM, self._handle_stop_signal)
         signal.signal(signal.SIGINT, self._handle_stop_signal)
-        self._touch_heartbeat()
+        self._heartbeat_path.unlink(missing_ok=True)
         # One pool for the process lifetime rather than one per batch: task
         # handling is I/O-bound (OpenClaw, backend callbacks) or a bounded
         # subprocess (OCR), so there is nothing to gain from tearing threads
@@ -113,13 +113,19 @@ class WorkerDispatcher:
         # poll_interval.
         with ThreadPoolExecutor(max_workers=max(1, settings.worker_concurrency)) as executor:
             while not self._stop_requested:
-                self._touch_heartbeat()
                 try:
                     tasks = self.poller.poll()
                 except Exception:
                     logger.exception("poll failed")
                     tasks = []
+                if self.poller.last_poll_ok:
+                    if tasks:
+                        self._touch_heartbeat(busy=True)
+                    else:
+                        self._touch_heartbeat()
                 self._process_batch(tasks, executor)
+                if tasks:
+                    self._touch_heartbeat()
                 if self._stop_requested:
                     break
                 time.sleep(settings.poll_interval)
@@ -272,7 +278,10 @@ class WorkerDispatcher:
             if now - last_sent < settings.progress_interval:
                 return
             last_sent = now
-            self.callback_client.submit_progress(task.request_id, text)
+            if task.attempt:
+                self.callback_client.submit_progress(task.request_id, text, task.attempt)
+            else:
+                self.callback_client.submit_progress(task.request_id, text)
 
         return report
 
@@ -298,11 +307,11 @@ class WorkerDispatcher:
 
     @staticmethod
     def _completed(task: WorkerTask, output: ObjectDict) -> TaskResult:
-        return TaskResult(request_id=task.request_id, status="completed", output=output)
+        return TaskResult(request_id=task.request_id, status="completed", output=output, attempt=task.attempt)
 
     @staticmethod
     def _failed(task: WorkerTask, message: str) -> TaskResult:
-        return TaskResult(request_id=task.request_id, status="failed", error_message=message)
+        return TaskResult(request_id=task.request_id, status="failed", error_message=message, attempt=task.attempt)
 
     def handle_and_callback(self, task: WorkerTask) -> ObjectDict:
         result = self.handle_task(task)

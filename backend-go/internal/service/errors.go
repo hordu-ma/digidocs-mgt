@@ -8,3 +8,5 @@ var ErrUnauthorized = errors.New("unauthorized")
 var ErrForbidden = errors.New("forbidden")
 var ErrValidation = errors.New("validation error")
 var ErrConflict = errors.New("resource already exists")
+
+var ErrTaskAlreadyFinished = errors.New("task already finished")

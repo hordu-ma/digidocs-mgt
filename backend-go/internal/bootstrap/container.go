@@ -130,7 +130,7 @@ func BuildContainer(cfg config.Config) (Container, error) {
 			SearchService:         searchService,
 			Background:            background,
 			HandoverService:       service.NewHandoverService(pgrepo.NewHandoverRepository(postgresDB), actionRepo, permissionService).WithNotifications(notificationService),
-			DataAssetService:      service.NewDataAssetService(dataAssetRepo, dataAssetRepo, storageProvider, permissionService),
+			DataAssetService:      service.NewDataAssetService(dataAssetRepo, dataAssetRepo, storageProvider, permissionService).WithProjectTeamLookup(dataAssetRepo.ProjectTeam),
 			CodeRepositoryService: service.NewCodeRepositoryService(codeRepo, codeRepo, permissionService, cfg.CodeRepoRoot, storageProvider),
 			AuthService:           authService,
 			TokenService:          tokenService,

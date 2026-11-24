@@ -83,7 +83,6 @@ const auth = useAuthStore();
 const users = ref<UserOption[]>([]);
 const projects = ref<ProjectOption[]>([]);
 const projectDocuments = ref<DocumentOption[]>([]);
-const projectDataAssets = ref<DataAssetItem[]>([]);
 const showDialog = ref(false);
 const formLoading = ref(false);
 const referenceLoading = ref(false);
@@ -227,35 +226,35 @@ async function fetchReferenceData() {
   }
 }
 
-async function loadProjectDocuments(projectID?: string) {
-  const res = await api.get("/documents", {
-    params: {
-      page: 1,
-      page_size: 100,
-      project_id: projectID || undefined,
-    },
-  });
-  projectDocuments.value = res.data?.data ?? [];
+async function loadProjectDocuments(detail: HandoverDetail) {
+  const documents: DocumentOption[] = [];
+  for (let page = 1; ; page++) {
+    const { data } = await api.get("/documents", {
+      params: { page, page_size: 100, project_id: detail.project_id,
+        owner_id: detail.project_id ? undefined : detail.target_user_id },
+    });
+    const rows = (data?.data ?? []) as DocumentOption[];
+    documents.push(...rows);
+    if (rows.length === 0 || documents.length >= (data?.meta?.total ?? documents.length)) return documents;
+  }
 }
 
 async function loadProjectDataAssets(projectID?: string) {
   if (!projectID) {
-    projectDataAssets.value = [];
-    return;
+    return [];
   }
-  const res = await api.get("/data-assets", {
-    params: { project_id: projectID, page: 1, page_size: 200 },
-  });
-  projectDataAssets.value = res.data?.data?.items ?? [];
+  const assets: DataAssetItem[] = [];
+  for (let page = 1; ; page++) {
+    const { data } = await api.get("/data-assets", { params: { project_id: projectID, page, page_size: 200 } });
+    const rows = (data?.data?.items ?? []) as DataAssetItem[];
+    assets.push(...rows);
+    if (rows.length === 0 || assets.length >= (data?.data?.total ?? assets.length)) return assets;
+  }
 }
 
 async function fetchHandoverDataItems(handoverID: string): Promise<HandoverDataLine[]> {
-  try {
-    const res = await api.get(`/handovers/${handoverID}/data-items`);
-    return res.data?.data ?? [];
-  } catch {
-    return [];
-  }
+  const res = await api.get(`/handovers/${handoverID}/data-items`);
+  return res.data?.data ?? [];
 }
 
 function buildEditableDataItems(dataItems: HandoverDataLine[], assets: DataAssetItem[]) {
@@ -355,6 +354,7 @@ async function submitCreate() {
 
 async function openDetail(handoverID: string) {
   detailLoading.value = true;
+  showDetailDialog.value = false;
   activeTab.value = "documents";
   try {
     const res = await api.get(`/handovers/${handoverID}`);
@@ -364,13 +364,14 @@ async function openDetail(handoverID: string) {
       return;
     }
     activeHandover.value = detail;
-    const [, dataItems] = await Promise.all([
-      loadProjectDocuments(detail.project_id),
+    const [documents, dataItems, assets] = await Promise.all([
+      loadProjectDocuments(detail),
       fetchHandoverDataItems(handoverID),
       loadProjectDataAssets(detail.project_id),
     ]);
-    buildEditableItems(detail, projectDocuments.value);
-    buildEditableDataItems(dataItems, projectDataAssets.value);
+    projectDocuments.value = documents;
+    buildEditableItems(detail, documents);
+    buildEditableDataItems(dataItems, assets);
     showDetailDialog.value = true;
   } catch (err) {
     ElMessage.error(extractError(err, "加载交接单详情失败"));

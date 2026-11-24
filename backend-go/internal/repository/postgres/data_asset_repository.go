@@ -94,7 +94,7 @@ func (r DataAssetRepository) CreateDataFolder(ctx context.Context, input command
 		INSERT INTO data_folders (id, project_id, parent_id, depth, name, created_by, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
 	`, id, input.ProjectID, parentArg, depth, input.Name, input.ActorID, now); err != nil {
-		if strings.Contains(err.Error(), "uq_data_folder_parent_name") {
+		if strings.Contains(err.Error(), "uq_data_folder_parent_name") || strings.Contains(err.Error(), "uq_data_folder_root_name") {
 			return nil, fmt.Errorf("%w: folder name already exists", service.ErrConflict)
 		}
 		return nil, err
@@ -265,6 +265,15 @@ func (r DataAssetRepository) GetDataAsset(ctx context.Context, id string) (*quer
 		return nil, err
 	}
 	return &item, nil
+}
+
+func (r DataAssetRepository) ProjectTeam(ctx context.Context, projectID string) (string, error) {
+	var team string
+	err := r.db.QueryRowContext(ctx, `SELECT team_space_id::text FROM projects WHERE id::text=$1`, projectID).Scan(&team)
+	if err == sql.ErrNoRows {
+		return "", service.ErrNotFound
+	}
+	return team, err
 }
 
 func (r DataAssetRepository) CreateDataAsset(ctx context.Context, input command.DataAssetCreateInput) (map[string]any, error) {

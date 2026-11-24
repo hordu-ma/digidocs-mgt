@@ -175,6 +175,7 @@ fi
 # 环境一律拒绝执行，除非调用方明确 ALLOW_SMOKE_ON_SHARED=1 表示自己知道后果。
 # ---------------------------------------------------------------------------
 allow_shared="${ALLOW_SMOKE_ON_SHARED:-0}"
+smoke_isolated=0
 
 assert_smoke_target() {
   local info env_value
@@ -182,6 +183,7 @@ assert_smoke_target() {
   env_value=$(echo "$info" | extract_json_string env)
 
   if [[ "$env_value" == "smoke" ]]; then
+    smoke_isolated=1
     echo "[OK] 目标是隔离烟测栈（APP_ENV=smoke）"
     return 0
   fi
@@ -248,6 +250,30 @@ if [[ "$backend_ready" == "1" ]]; then
     smoke_project_id=""
     if command -v python3 >/dev/null 2>&1; then
       smoke_project_id=$(printf '%s' "$projects_resp" | python3 -c 'import json,sys; data=(json.load(sys.stdin).get("data") or []); print(data[0]["id"] if data else "", end="")' 2>/dev/null || true)
+    fi
+    if [[ "$smoke_isolated" == 1 && -n "$smoke_project_id" ]]; then
+      team_id=$(smoke_curl -fsS --max-time 5 -H "$auth_header" "$backend_url/api/v1/team-spaces" |
+        python3 -c 'import json,sys; rows=json.load(sys.stdin)["data"]; print(rows[0]["id"])' || true)
+      repo_resp=$(smoke_curl -fsS --max-time 8 -H "$auth_header" -H 'Content-Type: application/json' \
+        -d "{\"name\":\"Isolated release test\",\"team_space_id\":\"$team_id\",\"project_id\":\"$smoke_project_id\",\"target_folder_path\":\"/release-smoke\"}" \
+        "$backend_url/api/v1/code-repositories" 2>/dev/null || true)
+      repo_id=$(echo "$repo_resp" | extract_response_data_id)
+      repo_slug=$(echo "$repo_resp" | extract_json_string slug)
+      old_git_token=$(echo "$repo_resp" | extract_json_string push_token)
+      if [[ -n "$repo_id" && -n "$repo_slug" && -n "$old_git_token" ]]; then
+        new_git_token=$(smoke_curl -fsS --max-time 8 -X POST -H "$auth_header" \
+          "$backend_url/api/v1/code-repositories/$repo_id/rotate-token" 2>/dev/null | extract_json_string push_token)
+        git_info_url="$backend_url/api/v1/git/$repo_slug.git/info/refs?service=git-upload-pack"
+        git_old_status=$(smoke_curl -sS --max-time 5 -u "git:$old_git_token" -o /dev/null -w '%{http_code}' "$git_info_url" 2>/dev/null || true)
+        git_new_status=$(smoke_curl -sS --max-time 5 -u "git:$new_git_token" -o /dev/null -w '%{http_code}' "$git_info_url" 2>/dev/null || true)
+        if [[ -n "$new_git_token" && "$git_old_status" == 401 && "$git_new_status" == 200 ]]; then
+          echo '[OK] isolated Git repository rotation invalidates old credentials'
+        else
+          require_or_skip "isolated Git rotation failed ($git_old_status/$git_new_status)"
+        fi
+      else
+        require_or_skip 'failed to create isolated Git repository'
+      fi
     fi
     invite_resp=""
     if [[ -n "$smoke_project_id" ]]; then
@@ -409,6 +435,27 @@ if [[ "$backend_ready" == "1" ]]; then
           echo "[OK] version preview -> $preview_status"
         else
           require_or_skip "version preview smoke failed (status=$preview_status version_id=$version_id)"
+        fi
+
+        if [[ "$smoke_isolated" == 1 ]]; then
+          printf 'smoke third version with the same name\n' >"$upload_tmp"
+          repeat_resp=$(smoke_curl -fsS --max-time "$version_smoke_timeout" -X POST \
+            "$backend_url/api/v1/documents/$document_id/versions" -H "$auth_header" \
+            -F 'commit_message=same-name version check' \
+            -F "file=@$upload_tmp;filename=smoke-v2.txt;type=text/plain" 2>/dev/null || true)
+          repeat_id=$(echo "$repeat_resp" | extract_response_data_id)
+          before=$(smoke_curl -fsS --max-time "$version_smoke_timeout" -H "$auth_header" \
+            "$backend_url/api/v1/versions/$version_id/download" 2>/dev/null || true)
+          after=""
+          if [[ -n "$repeat_id" ]]; then
+            after=$(smoke_curl -fsS --max-time "$version_smoke_timeout" -H "$auth_header" \
+              "$backend_url/api/v1/versions/$repeat_id/download" 2>/dev/null || true)
+          fi
+          if [[ "$before" == 'smoke second version' && "$after" == 'smoke third version with the same name' ]]; then
+            echo '[OK] two same-name versions retain independent contents'
+          else
+            require_or_skip "same-name version isolation failed"
+          fi
         fi
 
         # Access audit (2026-11-10): the download and preview above must each

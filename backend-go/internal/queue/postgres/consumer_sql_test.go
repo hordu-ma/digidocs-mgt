@@ -26,9 +26,9 @@ func TestConsumerPollReturnsMessagesAndMarksRunning(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
 		WithArgs(2).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "request_type", "related_type", "related_id", "payload"}).
-			AddRow("req-1", "assistant.ask", "document", "doc-1", `{"question":"hello"}`).
-			AddRow("req-2", "document.summarize", "document", "doc-2", `{}`))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "request_type", "related_type", "related_id", "payload", "attempt"}).
+			AddRow("req-1", "assistant.ask", "document", "doc-1", `{"question":"hello"}`, 1).
+			AddRow("req-2", "document.summarize", "document", "doc-2", `{}`, 1))
 	mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'running'").
 		WithArgs(sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 2))
@@ -50,7 +50,7 @@ func TestConsumerPollDefaultsLimitAndHandlesEmptyQueue(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
 		WithArgs(10).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "request_type", "related_type", "related_id", "payload"}))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "request_type", "related_type", "related_id", "payload", "attempt"}))
 
 	got := consumer.Poll(context.Background(), 0)
 	if got != nil {
@@ -68,8 +68,8 @@ func TestConsumerPollReturnsNilOnDecodeError(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
 		WithArgs(1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "request_type", "related_type", "related_id", "payload"}).
-			AddRow("req-1", "assistant.ask", "document", "doc-1", `{bad`))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "request_type", "related_type", "related_id", "payload", "attempt"}).
+			AddRow("req-1", "assistant.ask", "document", "doc-1", `{bad`, 1))
 
 	got := consumer.Poll(context.Background(), 1)
 	if got != nil {
@@ -109,8 +109,8 @@ func TestConsumerPollReturnsNilOnTransactionFailures(t *testing.T) {
 				mock.ExpectBegin()
 				mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
 					WithArgs(1).
-					WillReturnRows(sqlmock.NewRows([]string{"id", "request_type", "related_type", "related_id", "payload"}).
-						AddRow("req-1", "assistant.ask", "document", "doc-1", `{}`))
+					WillReturnRows(sqlmock.NewRows([]string{"id", "request_type", "related_type", "related_id", "payload", "attempt"}).
+						AddRow("req-1", "assistant.ask", "document", "doc-1", `{}`, 1))
 				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'running'").
 					WithArgs(sqlmock.AnyArg()).
 					WillReturnError(errors.New("update failed"))
@@ -123,8 +123,8 @@ func TestConsumerPollReturnsNilOnTransactionFailures(t *testing.T) {
 				mock.ExpectBegin()
 				mock.ExpectQuery("FROM assistant_requests\\s+WHERE status = 'pending'").
 					WithArgs(1).
-					WillReturnRows(sqlmock.NewRows([]string{"id", "request_type", "related_type", "related_id", "payload"}).
-						AddRow("req-1", "assistant.ask", "document", "doc-1", `{}`))
+					WillReturnRows(sqlmock.NewRows([]string{"id", "request_type", "related_type", "related_id", "payload", "attempt"}).
+						AddRow("req-1", "assistant.ask", "document", "doc-1", `{}`, 1))
 				mock.ExpectExec("UPDATE assistant_requests\\s+SET status = 'running'").
 					WithArgs(sqlmock.AnyArg()).
 					WillReturnResult(sqlmock.NewResult(0, 1))

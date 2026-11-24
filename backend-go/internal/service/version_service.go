@@ -2,8 +2,12 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
+	"log"
+	"time"
 
 	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
@@ -59,7 +63,7 @@ func (s VersionService) UploadAndCreateVersion(
 		return nil, err
 	}
 
-	objectKey := fmt.Sprintf("documents/%s/%s", documentID, shared.SanitizeStoredFileName(fileName))
+	objectKey := fmt.Sprintf("documents/%s/%s/%s", documentID, rand.Text(), shared.SanitizeStoredFileName(fileName))
 	result, err := s.storage.PutObject(ctx, storage.PutObjectInput{
 		ObjectKey:   objectKey,
 		Reader:      reader,
@@ -79,6 +83,13 @@ func (s VersionService) UploadAndCreateVersion(
 		ActorID:          actorID,
 	})
 	if err != nil {
+		if errors.Is(err, ErrInvalidTransition) || errors.Is(err, ErrNotFound) {
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+			defer cancel()
+			if cleanupErr := s.storage.DeleteObject(cleanupCtx, result.ObjectKey); cleanupErr != nil {
+				log.Printf("rejected version upload cleanup failed key=%s: %v", result.ObjectKey, cleanupErr)
+			}
+		}
 		return nil, fmt.Errorf("version creation failed: %w", err)
 	}
 

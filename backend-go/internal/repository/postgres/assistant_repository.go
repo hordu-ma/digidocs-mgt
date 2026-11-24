@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"digidocs-mgt/backend-go/internal/domain/command"
 	"digidocs-mgt/backend-go/internal/domain/query"
 	"digidocs-mgt/backend-go/internal/domain/task"
 	"digidocs-mgt/backend-go/internal/repository"
@@ -340,6 +341,7 @@ func (r AssistantRepository) CompleteAssistantRequest(
 	var payloadText string
 	var createdAt time.Time
 	var currentStatus string
+	var attempts int
 	if err := tx.QueryRowContext(
 		ctx,
 		`
@@ -350,13 +352,13 @@ func (r AssistantRepository) CompleteAssistantRequest(
 			COALESCE(conversation_id::text, ''),
 			COALESCE(payload::text, '{}'),
 			created_at,
-			status
+			status, attempts
 		FROM assistant_requests
 		WHERE id::text = $1
 		FOR UPDATE
 		`,
 		result.RequestID,
-	).Scan(&reqType, &relatedType, &relatedID, &conversationID, &payloadText, &createdAt, &currentStatus); err != nil {
+	).Scan(&reqType, &relatedType, &relatedID, &conversationID, &payloadText, &createdAt, &currentStatus, &attempts); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return service.ErrNotFound
 		}
@@ -370,7 +372,11 @@ func (r AssistantRepository) CompleteAssistantRequest(
 	// have confirmed, and append a second chat message.
 	if currentStatus == "completed" || currentStatus == "failed" {
 		log.Printf("[assistant] ignoring duplicate result request_id=%s status=%s", result.RequestID, currentStatus)
-		return nil
+		return service.ErrTaskAlreadyFinished
+	}
+
+	if (result.Attempt > 0 || attempts > 1) && (currentStatus != "running" || result.Attempt != attempts) {
+		return service.ErrInvalidTransition
 	}
 
 	completedAt := time.Now().UTC()
@@ -848,6 +854,56 @@ func (r AssistantRepository) ConfirmSuggestion(
 	return r.updateSuggestionStatus(ctx, suggestionID, actorID, note, "confirmed")
 }
 
+// ExecuteSuggestion commits the ordinary document action, audit and confirmation together.
+func (r AssistantRepository) ExecuteSuggestion(ctx context.Context, suggestionID string, input command.FlowActionInput, note string) (map[string]any, error) {
+	tx, err := asTx(ctx, r.db)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var status, action, confirmedBy string
+	err = tx.QueryRowContext(ctx, `
+		SELECT status::text, COALESCE(action_payload->>'action',''), COALESCE(confirmed_by::text,'')
+		FROM assistant_suggestions WHERE id::text=$1 AND related_type='document' AND related_id::text=$2 FOR UPDATE
+	`, suggestionID, input.DocumentID).Scan(&status, &action, &confirmedBy)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, service.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if status == "confirmed" && confirmedBy == input.ActorID && action == input.Action {
+		var executed bool
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE((action_payload->>'executed')::boolean,false) FROM assistant_suggestions WHERE id::text=$1`, suggestionID).Scan(&executed); err != nil {
+			return nil, err
+		}
+		if executed {
+			return map[string]any{"id": suggestionID, "status": status, "executed_action": action}, nil
+		}
+	}
+	if status != "pending" || action != input.Action {
+		return nil, service.ErrInvalidTransition
+	}
+	if _, err := createFlowRecord(ctx, tx, input); err != nil {
+		return nil, err
+	}
+
+	result, err := (AssistantRepository{db: tx}).ConfirmSuggestion(ctx, suggestionID, input.ActorID, note)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE assistant_suggestions SET action_payload = action_payload || '{"executed": true}'::jsonb WHERE id::text=$1`, suggestionID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	result["executed_action"] = action
+	return result, nil
+}
+
 func (r AssistantRepository) DismissSuggestion(
 	ctx context.Context,
 	suggestionID string,
@@ -879,7 +935,7 @@ func (r AssistantRepository) updateSuggestionStatus(
 		SET status = '%s',
 		    %s_by = NULLIF($2, '')::uuid,
 		    %s_at = $3
-		WHERE id::text = $1
+		WHERE id::text = $1 AND status = 'pending'
 		RETURNING id::text
 		`,
 		status,
@@ -1343,6 +1399,16 @@ func (r AssistantRepository) UpdateRequestProgress(ctx context.Context, requestI
 		SET output = COALESCE(output, '{}'::jsonb) || jsonb_build_object('partial_answer', $2::text)
 		WHERE id::text = $1 AND status = 'running'
 	`, requestID, partialAnswer)
+	return err
+}
+
+func (r AssistantRepository) UpdateClaimProgress(ctx context.Context, requestID, partialAnswer string, attempt int) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE assistant_requests
+		SET output = COALESCE(output, '{}'::jsonb) || jsonb_build_object('partial_answer', $2::text)
+		WHERE id::text = $1 AND status = 'running'
+		  AND (attempts = $3 OR ($3 = 0 AND attempts = 1))
+	`, requestID, partialAnswer, attempt)
 	return err
 }
 

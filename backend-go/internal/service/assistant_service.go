@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -39,9 +40,14 @@ func (s AssistantService) WithAutoSummarize(enabled bool) AssistantService {
 }
 
 // ReceiveProgress stores a partially streamed answer for a running request.
-func (s AssistantService) ReceiveProgress(ctx context.Context, requestID string, partialAnswer string) error {
+func (s AssistantService) ReceiveProgress(ctx context.Context, requestID string, partialAnswer string, attempt ...int) error {
 	if strings.TrimSpace(requestID) == "" {
 		return fmt.Errorf("%w: request_id is required", ErrValidation)
+	}
+	if claimed, ok := s.repo.(interface {
+		UpdateClaimProgress(context.Context, string, string, int) error
+	}); ok && len(attempt) > 0 {
+		return claimed.UpdateClaimProgress(ctx, requestID, partialAnswer, attempt[0])
 	}
 	return s.repo.UpdateRequestProgress(ctx, requestID, partialAnswer)
 }
@@ -194,6 +200,9 @@ func (s AssistantService) QueueTask(
 
 func (s AssistantService) ReceiveResult(ctx context.Context, result task.Result) error {
 	if err := s.repo.CompleteAssistantRequest(ctx, result); err != nil {
+		if errors.Is(err, ErrTaskAlreadyFinished) {
+			return nil
+		}
 		return err
 	}
 	s.notify.OnAssistantResult(ctx, result)

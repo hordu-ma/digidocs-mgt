@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"digidocs-mgt/backend-go/internal/service"
 	"encoding/json"
 	"time"
 
@@ -24,6 +25,49 @@ func (w VersionWorkflow) CreateUploadedVersion(ctx context.Context, input comman
 		return nil, err
 	}
 	defer tx.Rollback()
+	result, err := createUploadedVersion(ctx, tx, input)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (w VersionWorkflow) CreateDocumentWithVersion(ctx context.Context, doc command.DocumentCreateInput, version command.VersionCreateInput) (map[string]any, map[string]any, error) {
+	tx, err := w.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer tx.Rollback()
+
+	document, err := NewDocumentRepository(tx).CreateDocument(ctx, doc)
+	if err != nil {
+		return nil, nil, err
+	}
+	result, err := createUploadedVersion(ctx, tx, version)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, nil, err
+	}
+	document["current_status"] = "in_progress"
+	return document, result, nil
+}
+
+func createUploadedVersion(ctx context.Context, tx *sql.Tx, input command.VersionCreateInput) (map[string]any, error) {
+	var status string
+	if err := tx.QueryRowContext(ctx, `SELECT current_status::text FROM documents WHERE id::text=$1 AND NOT is_deleted FOR UPDATE`, input.DocumentID).Scan(&status); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, service.ErrNotFound
+		}
+		return nil, err
+	}
+	if status == "archived" {
+		return nil, service.ErrInvalidTransition
+	}
 
 	versionRepo := NewVersionRepository(tx)
 	versionData, err := versionRepo.CreateVersion(ctx, input)
@@ -85,10 +129,6 @@ func (w VersionWorkflow) CreateUploadedVersion(ctx context.Context, input comman
 		time.Now().UTC(),
 		reqID,
 	); err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 

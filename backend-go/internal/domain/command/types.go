@@ -1,6 +1,7 @@
 package command
 
 type DocumentCreateInput struct {
+	DocumentID     string
 	TeamSpaceID    string
 	ProjectID      string
 	FolderID       string

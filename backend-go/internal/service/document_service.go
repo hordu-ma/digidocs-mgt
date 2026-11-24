@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
 
@@ -146,14 +147,28 @@ func (s DocumentService) CreateWithFirstVersion(
 		return nil, err
 	}
 
-	docData, err := s.writer.CreateDocument(ctx, input)
-	if err != nil {
-		return nil, fmt.Errorf("document creation failed: %w", err)
+	atomic, transactional := s.workflow.(interface {
+		CreateDocumentWithVersion(context.Context, command.DocumentCreateInput, command.VersionCreateInput) (map[string]any, map[string]any, error)
+	})
+	var docData map[string]any
+	var documentID string
+	if transactional {
+		var raw [16]byte
+		rand.Read(raw[:])
+		raw[6] = raw[6]&0x0f | 0x40
+		raw[8] = raw[8]&0x3f | 0x80
+		documentID = fmt.Sprintf("%x-%x-%x-%x-%x", raw[:4], raw[4:6], raw[6:8], raw[8:10], raw[10:])
+		input.DocumentID = documentID
+	} else {
+		var err error
+		docData, err = s.writer.CreateDocument(ctx, input)
+		if err != nil {
+			return nil, fmt.Errorf("document creation failed: %w", err)
+		}
+		documentID, _ = docData["id"].(string)
 	}
 
-	documentID, _ := docData["id"].(string)
-
-	objectKey := fmt.Sprintf("documents/%s/%s", documentID, shared.SanitizeStoredFileName(fileName))
+	objectKey := fmt.Sprintf("documents/%s/%s/%s", documentID, rand.Text(), shared.SanitizeStoredFileName(fileName))
 	uploadResult, err := s.storage.PutObject(ctx, storage.PutObjectInput{
 		ObjectKey:   objectKey,
 		Reader:      file,
@@ -163,7 +178,7 @@ func (s DocumentService) CreateWithFirstVersion(
 		return nil, fmt.Errorf("file upload failed: %w", err)
 	}
 
-	versionData, err := s.workflow.CreateUploadedVersion(ctx, command.VersionCreateInput{
+	versionInput := command.VersionCreateInput{
 		DocumentID:       documentID,
 		FileName:         fileName,
 		FileSize:         fileSize,
@@ -171,7 +186,13 @@ func (s DocumentService) CreateWithFirstVersion(
 		StorageObjectKey: uploadResult.ObjectKey,
 		StorageProvider:  uploadResult.Provider,
 		ActorID:          input.ActorID,
-	})
+	}
+	var versionData map[string]any
+	if transactional {
+		docData, versionData, err = atomic.CreateDocumentWithVersion(ctx, input, versionInput)
+	} else {
+		versionData, err = s.workflow.CreateUploadedVersion(ctx, versionInput)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("first version creation failed: %w", err)
 	}

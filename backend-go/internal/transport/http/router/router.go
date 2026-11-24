@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"digidocs-mgt/backend-go/internal/metrics"
 	"net/http"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"digidocs-mgt/backend-go/internal/config"
 	"digidocs-mgt/backend-go/internal/transport/http/handlers"
 	"digidocs-mgt/backend-go/internal/transport/http/middleware"
+	"digidocs-mgt/backend-go/internal/transport/http/response"
 )
 
 func New(cfg config.Config, container bootstrap.Container) http.Handler {
@@ -68,6 +70,17 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	metricsRegistry := metrics.NewRegistry()
 	mux.Handle("GET /metrics", metricsRegistry.Handler(container.DB, cfg.MetricsToken))
 	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/system/info", systemHandler.Info)
+	mux.HandleFunc("GET "+cfg.APIV1Prefix+"/system/readiness", func(w http.ResponseWriter, r *http.Request) {
+		if container.DB != nil {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			defer cancel()
+			if err := container.DB.PingContext(ctx); err != nil {
+				response.WriteError(w, http.StatusServiceUnavailable, "unavailable", "database unavailable")
+				return
+			}
+		}
+		response.WriteData(w, http.StatusOK, map[string]string{"status": "ready"})
+	})
 	loginLimiter := middleware.NewRateLimiter(cfg.LoginRateLimitPerMin, time.Minute)
 	registerLimiter := middleware.NewRateLimiter(cfg.RegisterRateLimitPerMin, time.Minute)
 	// Login is bucketed by the account being targeted, not only by client IP.
@@ -180,6 +193,7 @@ func New(cfg config.Config, container bootstrap.Container) http.Handler {
 	mux.Handle("POST "+cfg.APIV1Prefix+"/code-repositories", protect(codeRepositoryHandler.Create))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/code-repositories/{id}", protect(codeRepositoryHandler.Get))
 	mux.Handle("PATCH "+cfg.APIV1Prefix+"/code-repositories/{id}", protect(codeRepositoryHandler.Update))
+	mux.Handle("POST "+cfg.APIV1Prefix+"/code-repositories/{id}/rotate-token", protect(codeRepositoryHandler.RotatePushToken))
 	mux.Handle("GET "+cfg.APIV1Prefix+"/code-repositories/{id}/push-events", protect(codeRepositoryHandler.ListPushEvents))
 	mux.Handle(cfg.APIV1Prefix+"/git/", http.StripPrefix("", http.HandlerFunc(codeRepositoryHandler.ServeGit)))
 

@@ -28,7 +28,14 @@ func (r ActionRepository) CreateFlowRecord(ctx context.Context, input command.Fl
 		return nil, err
 	}
 	defer tx.Rollback()
+	result, err := createFlowRecord(ctx, tx, input)
+	if err != nil {
+		return nil, err
+	}
+	return result, tx.Commit()
+}
 
+func createFlowRecord(ctx context.Context, tx *sql.Tx, input command.FlowActionInput) (map[string]any, error) {
 	var fromUserID string
 	var fromStatus string
 	if err := tx.QueryRowContext(
@@ -38,7 +45,7 @@ func (r ActionRepository) CreateFlowRecord(ctx context.Context, input command.Fl
 			current_owner_id::text,
 			current_status::text
 		FROM documents
-		WHERE id::text = $1
+		WHERE id::text = $1 FOR UPDATE
 		`,
 		input.DocumentID,
 	).Scan(&fromUserID, &fromStatus); err != nil {
@@ -53,7 +60,7 @@ func (r ActionRepository) CreateFlowRecord(ctx context.Context, input command.Fl
 	nextOwnerID := nextOwnerID(input, fromUserID)
 	now := nowUTC()
 
-	_, err = tx.ExecContext(
+	_, err := tx.ExecContext(
 		ctx,
 		`
 		INSERT INTO flow_records (
@@ -128,10 +135,6 @@ func (r ActionRepository) CreateFlowRecord(ctx context.Context, input command.Fl
 			"to_status":  toStatus,
 		},
 	); err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 
@@ -284,6 +287,35 @@ func (r ActionRepository) UpdateHandoverItems(
 	}
 	defer tx.Rollback()
 
+	var status, projectID, targetID string
+	if err := tx.QueryRowContext(ctx, `SELECT status::text, COALESCE(project_id::text, ''), target_user_id::text FROM graduation_handovers WHERE id::text=$1 FOR UPDATE`, input.HandoverID).Scan(&status, &projectID, &targetID); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, service.ErrNotFound
+		}
+		return nil, err
+	}
+	if status != "generated" {
+		return nil, service.ErrInvalidTransition
+	}
+	seen := make(map[string]bool)
+	for _, item := range input.Items {
+		if item.DocumentID == "" || seen[item.DocumentID] {
+			return nil, service.ErrValidation
+		}
+		seen[item.DocumentID] = true
+		var eligible bool
+		err := tx.QueryRowContext(ctx, `
+    SELECT true FROM documents
+    WHERE id::text=$1 AND NOT is_deleted AND current_status <> 'archived'
+      AND (($2 <> '' AND project_id::text=$2) OR ($2 = '' AND current_owner_id::text=$3))
+    FOR SHARE`, item.DocumentID, projectID, targetID).Scan(&eligible)
+		if err == sql.ErrNoRows {
+			return nil, service.ErrValidation
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
 	if _, err := tx.ExecContext(
 		ctx,
 		`DELETE FROM graduation_handover_items WHERE handover_id::text = $1`,
@@ -294,9 +326,6 @@ func (r ActionRepository) UpdateHandoverItems(
 
 	now := nowUTC()
 	for _, item := range input.Items {
-		if item.DocumentID == "" {
-			continue
-		}
 		if _, err := tx.ExecContext(
 			ctx,
 			`

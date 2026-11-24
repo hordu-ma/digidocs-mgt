@@ -40,6 +40,10 @@ func (h InternalWorkerHandler) ReceiveResult(w http.ResponseWriter, r *http.Requ
 	}
 
 	if err := h.assistant.ReceiveResult(r.Context(), result); err != nil {
+		if errors.Is(err, service.ErrInvalidTransition) {
+			response.WriteError(w, http.StatusConflict, "stale_task", "task claim is no longer current")
+			return
+		}
 		if errors.Is(err, service.ErrNotFound) {
 			response.WriteError(w, http.StatusNotFound, "not_found", "assistant request not found")
 			return
@@ -65,6 +69,7 @@ func (h InternalWorkerHandler) ReceiveProgress(w http.ResponseWriter, r *http.Re
 		return
 	}
 	var body struct {
+		Attempt       int    `json:"attempt"`
 		RequestID     string `json:"request_id"`
 		PartialAnswer string `json:"partial_answer"`
 	}
@@ -72,7 +77,7 @@ func (h InternalWorkerHandler) ReceiveProgress(w http.ResponseWriter, r *http.Re
 		response.WriteError(w, http.StatusBadRequest, "bad_request", "invalid request body")
 		return
 	}
-	if err := h.assistant.ReceiveProgress(r.Context(), body.RequestID, body.PartialAnswer); err != nil {
+	if err := h.assistant.ReceiveProgress(r.Context(), body.RequestID, body.PartialAnswer, body.Attempt); err != nil {
 		writeServiceError(w, err, "assistant request not found", "failed to store progress")
 		return
 	}
@@ -86,7 +91,7 @@ func (h InternalWorkerHandler) PollTasks(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	messages := h.consumer.Poll(r.Context(), 10)
+	messages := h.consumer.Poll(r.Context(), min(10, max(1, parseIntOrDefault(r.URL.Query().Get("limit"), 10))))
 	if messages == nil {
 		messages = []task.Message{}
 	}

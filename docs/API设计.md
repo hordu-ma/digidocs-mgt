@@ -1794,7 +1794,7 @@ Query: `project_id`, `folder_id`, `keyword`, `page`, `page_size`
 #### 上传数据资产
 `POST /api/v1/data-assets`（multipart/form-data）
 
-字段：`file`（二进制）、`project_id`（必填）、`display_name`（可选）、`folder_id`（可选）、`description`（可选）
+字段：`file`（二进制）、`project_id`（必填）、`display_name`（必填）、`folder_id`（可选）、`description`（可选）
 
 文件名命名约束由前端执行（仅允许字母、数字、中文、下划线、连字符、点）。
 
@@ -1881,7 +1881,7 @@ Body: `{ "items": [{ "data_asset_id": "uuid", "selected": true, "note": "..." }]
 
 Query: `project_id`, `keyword`, `page`, `page_size`
 
-权限范围：非 `admin` 角色只能看到自己拥有或所属项目下的代码仓库；`GET /{id}` 详情同样要求调用者是该仓库所属项目的成员，否则返回 403。`push_token` 只在创建响应（`POST`）中一次性返回，`GET`（含列表和详情）不会回显；Git smart HTTP push 入口走仓库 `push_token` 校验，属于独立信任边界，不受这里的项目成员校验约束。
+权限范围：非 `admin` 角色只能看到自己拥有或所属项目下的代码仓库；`GET /{id}` 详情同样要求调用者是该仓库所属项目的成员，否则返回 403。`push_token` 仅在创建或轮换响应中一次性返回，`GET`（含列表和详情）不会回显；Git smart HTTP push 入口走仓库 `push_token` 校验，属于独立信任边界，不受这里的项目成员校验约束。
 
 #### 创建代码仓库
 
@@ -1953,7 +1953,7 @@ Query: `project_id`, `keyword`, `page`, `page_size`
 该入口服务 Git smart HTTP，供本地 Git 客户端使用：
 
 ```bash
-git remote add digidocs http://git:{push_token}@host/api/v1/git/{slug}.git
+git remote add digidocs https://host/api/v1/git/{slug}.git
 git push digidocs main
 ```
 
@@ -1969,3 +1969,12 @@ git push digidocs main
 - 摘要只接受 version_id、skill_name；交接摘要只接受 skill_name。版本必须属于 URL 文档；不接受客户端扩大上下文范围。
 - Worker 文档上下文支持 version_id 查询参数，校验版本归属；响应包含 version_id、extracted_text_version_id。正文缓存仅按文档及输出 version_id 匹配，旧的无版本结果不复用。
 - 数据上传请求体上限仍为 512 MiB，页面单文件限制为 511 MiB，预留 1 MiB 表单开销；选择文件时即校验，不再承诺 10 GB。
+
+## 16. 客户交付约束
+
+- 文档归档后须解档才能上传版本。
+- 交接文档明细仅在 `generated` 阶段编辑。项目交接限定同项目有效文档，无项目交接限定交出人负责的有效文档。
+- 数据资产上传的团队归属由项目推导，传入的目录须属于该项目。
+
+- 项目仓库管理员可通过 `POST /code-repositories/{id}/rotate-token` 轮换 Git 凭据。新凭据仅在轮换响应中返回，旧凭据立即失效。Git 远程地址不包含令牌。
+- AI 建议的正式动作、审计与确认在 PostgreSQL 同一事务完成。

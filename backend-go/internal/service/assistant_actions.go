@@ -60,7 +60,7 @@ func (s AssistantService) ConfirmAndExecuteSuggestion(
 	if err != nil {
 		return nil, err
 	}
-	if suggestion.Status != "pending" {
+	if suggestion.Status != "pending" && suggestion.Status != "confirmed" {
 		return nil, fmt.Errorf("%w: suggestion is already %s", ErrValidation, suggestion.Status)
 	}
 	action := NormalizeSuggestedAction(suggestion.SuggestedAction)
@@ -71,13 +71,25 @@ func (s AssistantService) ConfirmAndExecuteSuggestion(
 	if strings.TrimSpace(note) != "" {
 		flowNote += "；" + strings.TrimSpace(note)
 	}
-	if _, err := s.flows.ApplyAction(ctx, command.FlowActionInput{
+	input := command.FlowActionInput{
 		DocumentID: suggestion.RelatedID,
 		Action:     action,
 		Note:       flowNote,
 		ActorID:    actorID,
 		ActorRole:  actorRole,
-	}); err != nil {
+	}
+	if executor, ok := s.repo.(interface {
+		ExecuteSuggestion(context.Context, string, command.FlowActionInput, string) (map[string]any, error)
+	}); ok {
+		if err := s.permissions.EnsureFlowDocument(ctx, actorID, actorRole, input.DocumentID, input.Action); err != nil {
+			return nil, err
+		}
+		return executor.ExecuteSuggestion(ctx, suggestionID, input, note)
+	}
+	if suggestion.Status != "pending" {
+		return nil, ErrValidation
+	}
+	if _, err := s.flows.ApplyAction(ctx, input); err != nil {
 		return nil, err
 	}
 	result, err := s.repo.ConfirmSuggestion(ctx, suggestionID, actorID, note)

@@ -258,7 +258,10 @@ func (r DocumentRepository) GetDocument(ctx context.Context, documentID string) 
 }
 
 func (r DocumentRepository) CreateDocument(ctx context.Context, input command.DocumentCreateInput) (map[string]any, error) {
-	id := newID()
+	id := input.DocumentID
+	if id == "" {
+		id = newID()
+	}
 	now := time.Now().UTC()
 
 	_, err := r.db.ExecContext(

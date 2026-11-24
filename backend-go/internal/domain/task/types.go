@@ -11,6 +11,7 @@ const (
 )
 
 type Message struct {
+	Attempt     int            `json:"attempt,omitempty"`
 	RequestID   string         `json:"request_id"`
 	TaskType    TaskType       `json:"task_type"`
 	RelatedType string         `json:"related_type,omitempty"`
@@ -19,6 +20,7 @@ type Message struct {
 }
 
 type Result struct {
+	Attempt      int            `json:"attempt,omitempty"`
 	RequestID    string         `json:"request_id"`
 	Status       string         `json:"status"`
 	Output       map[string]any `json:"output,omitempty"`

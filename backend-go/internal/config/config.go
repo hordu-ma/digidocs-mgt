@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -111,10 +112,13 @@ func Load() Config {
 	}
 
 	if cfg.AppEnv == "production" {
-		if cfg.JWTSecret == "dev-secret" {
+		if cfg.DataBackend != "postgres" || cfg.StorageBackend != "synology" {
+			log.Fatal("FATAL: production requires PostgreSQL and Synology storage")
+		}
+		if len(cfg.JWTSecret) < 32 || strings.HasPrefix(cfg.JWTSecret, "replace-") {
 			log.Fatal("FATAL: JWT_SECRET must be set to a secure value in production")
 		}
-		if cfg.WorkerCallbackToken == "replace-me" {
+		if len(cfg.WorkerCallbackToken) < 24 || strings.HasPrefix(cfg.WorkerCallbackToken, "replace-") {
 			log.Fatal("FATAL: WORKER_CALLBACK_TOKEN must be set to a secure value in production")
 		}
 		if cfg.CORSAllowOrigins == "*" {

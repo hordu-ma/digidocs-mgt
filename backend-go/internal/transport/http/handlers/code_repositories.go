@@ -293,3 +293,14 @@ func (h CodeRepositoryHandler) remoteURL(r *http.Request, slug string) string {
 	}
 	return scheme + "://" + r.Host + h.prefix + "/git/" + slug + ".git"
 }
+
+func (h CodeRepositoryHandler) RotatePushToken(w http.ResponseWriter, r *http.Request) {
+	actorID, actorRole := actorFrom(r)
+	token, err := h.service.RotatePushToken(r.Context(), r.PathValue("id"), actorID, actorRole)
+	if err != nil {
+		writeServiceError(w, err, "code repository not found", "failed to rotate repository token")
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	response.WriteData(w, http.StatusOK, map[string]string{"push_token": token})
+}

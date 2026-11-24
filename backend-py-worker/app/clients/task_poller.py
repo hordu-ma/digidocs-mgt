@@ -20,9 +20,12 @@ class TaskPollerClient:
     def __init__(self) -> None:
         self.base_url: str = settings.callback_base_url
         self.token: str = settings.callback_token
+        self.last_poll_ok = False
 
     def poll(self) -> list[WorkerTask]:
-        url = f"{self.base_url}/api/v1/internal/poll-tasks"
+        self.last_poll_ok = False
+        limit = min(10, max(1, settings.worker_concurrency))
+        url = f"{self.base_url}/api/v1/internal/poll-tasks?limit={limit}"
         req = urllib.request.Request(url, method="GET")
         req.add_header("Authorization", f"Bearer {self.token}")
         req.add_header("Accept", "application/json")
@@ -55,6 +58,7 @@ class TaskPollerClient:
         data = body.get("data")
         if not isinstance(data, list):
             return []
+        self.last_poll_ok = True
         items = cast(list[object], data)
 
         tasks: list[WorkerTask] = []
@@ -68,6 +72,7 @@ class TaskPollerClient:
             if not isinstance(request_id, str) or task_type is None:
                 continue
 
+            attempt = item_dict.get("attempt")
             payload = _as_object_dict(item_dict.get("payload")) or {}
             related_type = item_dict.get("related_type")
             related_id = item_dict.get("related_id")
@@ -79,6 +84,7 @@ class TaskPollerClient:
                     related_type=related_type if isinstance(related_type, str) else None,
                     related_id=related_id if isinstance(related_id, str) else None,
                     payload=payload,
+                    attempt=attempt if isinstance(attempt, int) else 0,
                 )
             )
         return tasks

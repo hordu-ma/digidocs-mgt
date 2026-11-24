@@ -9,10 +9,11 @@ import {
   Timer,
   Warning,
 } from "@element-plus/icons-vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 
 import api from "@/api";
+import { useAuthStore } from "@/stores/auth";
 import { formatDateTime } from "@/utils/format";
 import { extractError } from "@/utils/error";
 import AppLayout from "@/components/AppLayout.vue";
@@ -55,7 +56,9 @@ type PushEvent = {
 const teamSpaces = ref<TeamSpaceOption[]>([]);
 const allProjects = ref<ProjectOption[]>([]);
 const repositories = ref<CodeRepository[]>([]);
+const auth = useAuthStore();
 const total = ref(0);
+const page = ref(1);
 const keyword = ref("");
 const filterProjectID = ref("");
 const selectedRepoID = ref("");
@@ -110,9 +113,8 @@ function formatTime(value?: string) {
   return formatDateTime(value, "暂无推送");
 }
 
-function remoteWithToken(repo: CodeRepository | null) {
-  if (!repo?.remote_url || !repo.push_token) return repo?.remote_url || "";
-  return repo.remote_url.replace("://", `://git:${repo.push_token}@`);
+function repositoryRemote(repo: CodeRepository | null) {
+  return repo?.remote_url || "";
 }
 
 async function loadReference() {
@@ -129,17 +131,18 @@ async function loadReference() {
   allProjects.value = projectLists.flat();
 }
 
-async function fetchRepositories() {
+async function fetchRepositories(targetPage = 1) {
   loading.value = true;
   try {
     const res = await api.get("/code-repositories", {
       params: {
         keyword: keyword.value || undefined,
         project_id: filterProjectID.value || undefined,
-        page: 1,
+        page: targetPage,
         page_size: 100,
       },
     });
+    page.value = targetPage;
     repositories.value = res.data?.data?.items ?? [];
     total.value = res.data?.data?.total ?? 0;
     if (!selectedRepoID.value && repositories.value.length) {
@@ -187,6 +190,30 @@ function onTeamSpaceChange() {
   createForm.project_id = filteredProjects.value[0]?.id ?? "";
 }
 
+const canRotateToken = computed(() => {
+  const project = allProjects.value.find((item) => item.id === selectedRepo.value?.project_id);
+  return auth.role === "admin" || project?.my_role === "owner" || project?.my_role === "manager";
+});
+
+async function rotateToken() {
+  const repo = selectedRepo.value;
+  if (!repo) return;
+  try {
+    await ElMessageBox.confirm("旧令牌将立即失效。请在轮换后将新令牌交给仍有权限的成员。", "轮换 Git 令牌", { type: "warning" });
+  } catch {
+    return;
+  }
+  try {
+    const { data } = await api.post(`/code-repositories/${repo.id}/rotate-token`);
+    if (selectedRepo.value?.id === repo.id) {
+      selectedRepo.value = { ...selectedRepo.value, push_token: data.data.push_token };
+    }
+    ElMessage.success("Git 令牌已轮换");
+  } catch (error) {
+    ElMessage.error(extractError(error, "Git 令牌轮换失败"));
+  }
+}
+
 async function submitCreate() {
   createLoading.value = true;
   try {
@@ -228,7 +255,7 @@ onMounted(async () => {
           <p>为课题配置受控 Git 远程仓库，成员提交后可推送到平台维护的代码目录，形成可追踪的代码资产记录。</p>
         </div>
         <div class="header-actions">
-          <ElButton @click="fetchRepositories">
+          <ElButton @click="fetchRepositories()">
             <ElIcon><Refresh /></ElIcon>
             刷新
           </ElButton>
@@ -259,15 +286,16 @@ onMounted(async () => {
             v-model="keyword"
             placeholder="搜索仓库"
             clearable
-            @keyup.enter="fetchRepositories"
-            @clear="fetchRepositories"
+            @keyup.enter="fetchRepositories()"
+            @clear="fetchRepositories()"
           >
             <template #prefix><ElIcon><Search /></ElIcon></template>
           </ElInput>
-          <ElSelect v-model="filterProjectID" clearable placeholder="全部课题" @change="fetchRepositories">
+          <ElSelect v-model="filterProjectID" clearable placeholder="全部课题" @change="fetchRepositories()">
             <ElOption v-for="p in allProjects" :key="p.id" :label="p.name" :value="p.id" />
           </ElSelect>
 
+          <ElPagination v-if="total > 100" :current-page="page" :page-size="100" :total="total" layout="prev, pager, next" @current-change="fetchRepositories" />
           <div class="repo-count">共 {{ total }} 个仓库</div>
           <div v-loading="loading" class="repo-list">
             <button
@@ -313,7 +341,8 @@ onMounted(async () => {
                     <ElIcon><Refresh /></ElIcon>
                     刷新仓库
                   </ElButton>
-                  <ElButton type="primary" plain @click="copyText(remoteWithToken(selectedRepo), 'Remote URL')">
+                  <ElButton v-if="canRotateToken" @click="rotateToken">轮换 Git 令牌</ElButton>
+                  <ElButton type="primary" plain @click="copyText(repositoryRemote(selectedRepo), 'Remote URL')">
                     <ElIcon><CopyDocument /></ElIcon>
                     复制 remote
                   </ElButton>
@@ -346,11 +375,12 @@ onMounted(async () => {
                     <h3>推送命令</h3>
                     <p>在本地项目完成 git add 和 git commit 后，添加 remote 并推送默认分支。</p>
                   </div>
-                  <ElButton text @click="copyText(remoteWithToken(selectedRepo), 'Remote URL')">
+                  <ElButton v-if="selectedRepo.push_token" text @click="copyText(selectedRepo.push_token, 'Git 令牌')">复制 Git 令牌</ElButton>
+                  <ElButton text @click="copyText(repositoryRemote(selectedRepo), 'Remote URL')">
                     <ElIcon><CopyDocument /></ElIcon>
                   </ElButton>
                 </div>
-                <pre><code>git remote add digidocs {{ remoteWithToken(selectedRepo) }}
+                <pre><code>git remote add digidocs {{ repositoryRemote(selectedRepo) }}
 git push digidocs {{ selectedRepo.default_branch }}</code></pre>
               </div>
 

@@ -39,6 +39,7 @@ class CallbackClient:
         payload = json.dumps(
             {
                 "request_id": result.request_id,
+                "attempt": result.attempt,
                 "status": result.status,
                 "output": result.output,
                 "error_message": result.error_message,
@@ -64,12 +65,12 @@ class CallbackClient:
         return {"request_id": result.request_id, "status": result.status}
 
 
-    def submit_progress(self, request_id: str, partial_answer: str) -> None:
+    def submit_progress(self, request_id: str, partial_answer: str, attempt: int = 0) -> None:
         """Best effort: store the answer streamed so far. One attempt with a
         short timeout and no exception, because a lost progress update only
         delays what the user sees; the final result is posted separately."""
         url = f"{self.base_url}/api/v1/internal/worker-progress"
-        payload = json.dumps({"request_id": request_id, "partial_answer": partial_answer}).encode()
+        payload = json.dumps({"request_id": request_id, "partial_answer": partial_answer, "attempt": attempt}).encode()
         req = urllib.request.Request(url, data=payload, method="POST")
         req.add_header("Authorization", f"Bearer {self.token}")
         req.add_header("Content-Type", "application/json")

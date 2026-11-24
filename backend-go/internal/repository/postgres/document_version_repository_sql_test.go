@@ -156,6 +156,8 @@ func TestVersionWorkflowCreateUploadedVersionCommitsDocumentAndAudit(t *testing.
 	workflow := NewVersionWorkflow(db)
 
 	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT current_status::text").WithArgs("doc-1").
+		WillReturnRows(sqlmock.NewRows([]string{"status"}).AddRow("in_progress"))
 	mock.ExpectExec("SELECT id\\s+FROM documents").
 		WithArgs("doc-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))

@@ -113,12 +113,16 @@ func TestActionRepositoryCreateHandoverCommitsAudit(t *testing.T) {
 	assertExpectations(t, mock)
 }
 
-func TestActionRepositoryUpdateHandoverItemsSkipsEmptyDocumentID(t *testing.T) {
+func TestActionRepositoryUpdateHandoverItemsChecksScopeUnderLock(t *testing.T) {
 	ctx := context.Background()
 	db, mock := newMockDB(t)
 	repo := NewActionRepository(db)
 
 	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT status::text").WithArgs("handover-1").
+		WillReturnRows(sqlmock.NewRows([]string{"status", "project_id", "target_user_id"}).AddRow("generated", "project-1", "target-1"))
+	mock.ExpectQuery("SELECT true FROM documents").WithArgs("doc-1", "project-1", "target-1").
+		WillReturnRows(sqlmock.NewRows([]string{"eligible"}).AddRow(true))
 	mock.ExpectExec("DELETE FROM graduation_handover_items").
 		WithArgs("handover-1").
 		WillReturnResult(sqlmock.NewResult(0, 2))
@@ -132,7 +136,6 @@ func TestActionRepositoryUpdateHandoverItemsSkipsEmptyDocumentID(t *testing.T) {
 		HandoverID: "handover-1",
 		ActorID:    "actor-1",
 		Items: []command.HandoverItemInput{
-			{DocumentID: "", Selected: true, Note: "跳过"},
 			{DocumentID: "doc-1", Selected: true, Note: "保留"},
 		},
 	})

@@ -1,7 +1,6 @@
 package synology
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -12,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"sync"
@@ -375,10 +375,15 @@ func (p *Provider) PutObject(ctx context.Context, input storage.PutObjectInput) 
 		overwrite = "true"
 	}
 
-	// build multipart form once, buffered, so it can be resent unchanged if a
-	// session-expired retry (below) needs a second request.
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
+	// Spool the multipart body to disk so session renewal can replay large files
+	// without retaining the whole payload in the Go heap.
+	body, err := os.CreateTemp("", "digidocs-synology-upload-*")
+	if err != nil {
+		return storage.PutObjectResult{}, err
+	}
+	defer os.Remove(body.Name())
+	defer body.Close()
+	writer := multipart.NewWriter(body)
 	_ = writer.WriteField("api", "SYNO.FileStation.Upload")
 	_ = writer.WriteField("version", "2")
 	_ = writer.WriteField("method", "upload")
@@ -399,11 +404,16 @@ func (p *Provider) PutObject(ctx context.Context, input storage.PutObjectInput) 
 			return storage.PutObjectResult{}, err
 		}
 	}
-	writer.Close()
+	if err := writer.Close(); err != nil {
+		return storage.PutObjectResult{}, err
+	}
 	contentType := writer.FormDataContentType()
-	bodyBytes := body.Bytes()
+	size, err := body.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return storage.PutObjectResult{}, err
+	}
 
-	dr, err := p.uploadOnce(ctx, contentType, bodyBytes)
+	dr, err := p.uploadOnce(ctx, contentType, body, size)
 	if err != nil {
 		return storage.PutObjectResult{}, err
 	}
@@ -415,7 +425,7 @@ func (p *Provider) PutObject(ctx context.Context, input storage.PutObjectInput) 
 		if err := p.login(ctx); err != nil {
 			return storage.PutObjectResult{}, err
 		}
-		dr, err = p.uploadOnce(ctx, contentType, bodyBytes)
+		dr, err = p.uploadOnce(ctx, contentType, body, size)
 		if err != nil {
 			return storage.PutObjectResult{}, err
 		}
@@ -430,13 +440,14 @@ func (p *Provider) PutObject(ctx context.Context, input storage.PutObjectInput) 
 	}, nil
 }
 
-func (p *Provider) uploadOnce(ctx context.Context, contentType string, bodyBytes []byte) (*dsmResponse, error) {
+func (p *Provider) uploadOnce(ctx context.Context, contentType string, body io.ReaderAt, size int64) (*dsmResponse, error) {
 	req, err := newRequest(ctx, http.MethodPost,
-		p.baseURL+"/webapi/entry.cgi?_sid="+url.QueryEscape(p.getSID()), bytes.NewReader(bodyBytes))
+		p.baseURL+"/webapi/entry.cgi?_sid="+url.QueryEscape(p.getSID()), io.NewSectionReader(body, 0, size))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", contentType)
+	req.ContentLength = size
 
 	resp, err := p.do(req)
 	if err != nil {

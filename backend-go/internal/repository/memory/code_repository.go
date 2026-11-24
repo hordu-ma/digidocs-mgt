@@ -171,3 +171,16 @@ func (r *CodeRepositoryRepository) ListCodePushEvents(ctx context.Context, repos
 	}
 	return items, nil
 }
+
+func (r *CodeRepositoryRepository) RotatePushToken(_ context.Context, id, token, _ string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i := range r.repos {
+		if r.repos[i].item.ID == id {
+			r.repos[i].pushToken = token
+			r.repos[i].item.PushToken = ""
+			return nil
+		}
+	}
+	return service.ErrNotFound
+}

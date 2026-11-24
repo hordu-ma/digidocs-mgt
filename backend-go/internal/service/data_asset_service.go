@@ -20,6 +20,7 @@ type DataAssetService struct {
 	writer      repository.DataAssetWriter
 	storage     storage.Provider
 	permissions PermissionService
+	projectTeam func(context.Context, string) (string, error)
 }
 
 func NewDataAssetService(
@@ -38,6 +39,25 @@ func NewDataAssetService(
 		storage:     storageProvider,
 		permissions: perm,
 	}
+}
+
+func (s DataAssetService) WithProjectTeamLookup(lookup func(context.Context, string) (string, error)) DataAssetService {
+	s.projectTeam = lookup
+	return s
+}
+
+func (s DataAssetService) ensureProjectFolder(ctx context.Context, projectID, folderID string) error {
+	if folderID == "" {
+		return nil
+	}
+	folder, err := s.reader.GetDataFolder(ctx, folderID)
+	if err != nil {
+		return err
+	}
+	if folder.ProjectID != projectID {
+		return fmt.Errorf("%w: folder must belong to the asset project", ErrValidation)
+	}
+	return nil
 }
 
 // ─────────────────────────── folders ────────────────────────────
@@ -118,6 +138,17 @@ func (s DataAssetService) UploadDataAsset(
 		return nil, err
 	}
 
+	if s.projectTeam != nil {
+		team, err := s.projectTeam(ctx, input.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		input.TeamSpaceID = team
+	}
+	if err := s.ensureProjectFolder(ctx, input.ProjectID, input.FolderID); err != nil {
+		return nil, err
+	}
+
 	// Use a placeholder ID for the object key; repo will generate the real ID.
 	// We upload first, then persist metadata.  If metadata fails, the orphaned
 	// object is a minor storage concern (acceptable for V1).
@@ -151,6 +182,15 @@ func (s DataAssetService) UpdateDataAsset(ctx context.Context, input command.Dat
 	}
 	if err := s.permissions.EnsureManageDataAsset(ctx, input.ActorID, input.ActorRole, input.DataAssetID); err != nil {
 		return err
+	}
+	if input.FolderID != "" {
+		asset, err := s.reader.GetDataAsset(ctx, input.DataAssetID)
+		if err != nil {
+			return err
+		}
+		if err := s.ensureProjectFolder(ctx, asset.ProjectID, input.FolderID); err != nil {
+			return err
+		}
 	}
 	return s.writer.UpdateDataAsset(ctx, input)
 }

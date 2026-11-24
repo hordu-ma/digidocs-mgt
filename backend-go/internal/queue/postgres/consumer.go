@@ -71,7 +71,7 @@ func (c Consumer) Poll(ctx context.Context, limit int) []task.Message {
 			request_type,
 			COALESCE(related_type, ''),
 			COALESCE(related_id::text, ''),
-			COALESCE(payload::text, '{}')
+			COALESCE(payload::text, '{}'), attempts + 1
 		FROM assistant_requests
 		WHERE status = 'pending'
 		ORDER BY created_at ASC
@@ -98,6 +98,7 @@ func (c Consumer) Poll(ctx context.Context, limit int) []task.Message {
 			&message.RelatedType,
 			&message.RelatedID,
 			&payloadText,
+			&message.Attempt,
 		); err != nil {
 			log.Printf("postgres-queue scan failed: %v", err)
 			return nil
@@ -123,7 +124,7 @@ func (c Consumer) Poll(ctx context.Context, limit int) []task.Message {
 		ctx,
 		`
 		UPDATE assistant_requests
-		SET status = 'running', started_at = NOW(), attempts = attempts + 1
+		SET status = 'running', started_at = NOW(), attempts = attempts + 1, output = NULL, error_message = NULL
 		WHERE id::text = ANY($1)
 		`,
 		pq.Array(ids),

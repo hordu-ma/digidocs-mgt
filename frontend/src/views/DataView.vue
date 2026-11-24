@@ -57,6 +57,7 @@ const projects = ref<ProjectOption[]>([]);
 // list state
 const assets = ref<DataAsset[]>([]);
 const total = ref(0);
+const page = ref(1);
 const keyword = ref("");
 const filterProjectID = ref("");
 const filterFolderID = ref("");
@@ -80,18 +81,19 @@ const filteredAssets = computed(() => {
 // resolve after a newer one and silently overwrite the list with stale data.
 let fetchAssetsSeq = 0;
 
-async function fetchAssets() {
+async function fetchAssets(targetPage = 1) {
   const mySeq = ++fetchAssetsSeq;
   const res = await api.get("/data-assets", {
     params: {
       keyword: keyword.value || undefined,
       project_id: filterProjectID.value || undefined,
       folder_id: selectedFolderID.value || undefined,
-      page: 1,
+      page: targetPage,
       page_size: 200,
     },
   });
   if (mySeq !== fetchAssetsSeq) return;
+  page.value = targetPage;
   assets.value = res.data?.data?.items ?? [];
   total.value = res.data?.data?.total ?? 0;
 }
@@ -627,6 +629,7 @@ onMounted(async () => {
               >
                 <template #prefix><ElIcon><Search /></ElIcon></template>
               </ElInput>
+              <ElPagination v-if="total > 200" :current-page="page" :page-size="200" :total="total" layout="prev, pager, next" @current-change="fetchAssets" />
               <span class="file-count">当前显示 {{ filteredAssets.length }} / {{ total }} 个文件</span>
             </div>
 

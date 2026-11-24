@@ -20,6 +20,7 @@ class WorkerTask:
     related_type: str | None = None
     related_id: str | None = None
     payload: ObjectDict = field(default_factory=dict)
+    attempt: int = 0
 
 
 @dataclass(slots=True)
@@ -28,3 +29,4 @@ class TaskResult:
     status: Literal["completed", "failed"]
     output: ObjectDict = field(default_factory=dict)
     error_message: str | None = None
+    attempt: int = 0

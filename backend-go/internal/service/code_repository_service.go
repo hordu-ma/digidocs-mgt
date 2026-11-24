@@ -127,6 +127,23 @@ func (s CodeRepositoryService) Update(ctx context.Context, input command.CodeRep
 	return s.writer.UpdateCodeRepository(ctx, input)
 }
 
+func (s CodeRepositoryService) RotatePushToken(ctx context.Context, id, actorID, actorRole string) (string, error) {
+	if err := s.permissions.EnsureManageCodeRepository(ctx, actorID, actorRole, id); err != nil {
+		return "", err
+	}
+	writer, ok := s.writer.(interface {
+		RotatePushToken(context.Context, string, string, string) error
+	})
+	if !ok {
+		return "", ErrValidation
+	}
+	token := shortToken(24)
+	if err := writer.RotatePushToken(ctx, id, token, actorID); err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
 func (s CodeRepositoryService) ListPushEvents(ctx context.Context, repositoryID string, actorID string, actorRole string) ([]query.CodePushEventItem, error) {
 	if repositoryID == "" {
 		return nil, fmt.Errorf("%w: repository_id is required", ErrValidation)
