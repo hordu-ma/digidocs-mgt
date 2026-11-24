@@ -12,7 +12,7 @@
 
 | 文件 | 用途 | 何时需要读取 |
 | --- | --- | --- |
-| `workflows/verify.yml` | 仓库统一验证门禁，执行 `make verify` | 当任务涉及 CI、提交门禁、验证流程或需要解释 GitHub Actions 行为时 |
+| `workflows/verify.yml` | 仓库统一验证门禁，执行 `make verify`、PostgreSQL 集成和隔离烟测 | 当任务涉及 CI、提交门禁、验证流程或需要解释 GitHub Actions 行为时 |
 
 ## 关联入口
 

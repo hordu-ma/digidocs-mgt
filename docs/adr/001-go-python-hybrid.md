@@ -1,5 +1,7 @@
 # DigiDocs Mgt Go-Python 混合迁移方案
 
+> 本文记录迁移时的架构决策。当前实现以[技术架构](../项目定义与技术架构.md)和 [API 契约](../API设计.md)为准。
+
 ## 1. 目标
 
 本方案用于指导 DigiDocs Mgt 从当前 `Python 单体后端骨架` 迁移到 `Go 主业务后端 + Python AI/文档处理 Worker` 的混合架构。

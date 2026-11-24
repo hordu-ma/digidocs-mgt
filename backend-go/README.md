@@ -1,46 +1,7 @@
-# Backend Go
+# Go 主业务 API
 
-Go 主业务后端骨架。
+维护账户与权限、文档和独立版本、数据与代码资产、流转、交接、审计及 AI 附属结果。生产使用 PostgreSQL 和群晖。Go 在启动时应用 `migrations/`，Worker 通过内部 API 领取任务并回写。
 
-## Run
+在本目录运行 `go test ./...`。使用真实 PostgreSQL 的回归从仓库根目录执行 `make integration-postgres`，完整开发联调执行 `make smoke-e2e`。
 
-```bash
-cd backend-go
-go run ./cmd/api
-```
-
-或使用 Docker：
-
-```bash
-docker compose --profile app up -d backend-go
-```
-
-## Env
-
-复制 `.env.example` 为 `.env`，或直接通过环境变量注入：
-
-```bash
-APP_NAME=DigiDocs\ Mgt\ Go\ API
-HTTP_ADDR=:8080
-APP_ENV=development
-```
-
-## Current Scope
-
-- 服务入口
-- 配置加载
-- 基础路由
-- 健康检查
-- 统一 JSON 响应结构
-- API v1 主模块占位路由
-- `handler -> service -> repository` 查询链路
-- `memory repository` 运行模式
-- `postgres repository` 查询骨架
-- `DATA_BACKEND=postgres` 的装配入口
-- 统一任务消息类型与内存队列发布骨架
-- `assistant` 路由迁移占位
-- Worker 结果内部回写入口与简单鉴权
-- `auth/login` 请求体解析已接入
-- 已接入 PostgreSQL 驱动
-- JWT、上传存储、审计服务已有最小落点
-- `versions / flows / handovers / dashboard` 路由已迁入 Go 骨架
+阅读 [API 设计](../docs/API设计.md)、[数据库设计](../docs/数据库设计.md)和[源码说明](../docs/backend-go代码说明.md)。客户安装以[现场部署手册](../docs/现场部署逐条清单.md)为准。

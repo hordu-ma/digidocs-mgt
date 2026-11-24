@@ -1,5 +1,7 @@
 # backend-py-worker 代码说明
 
+本文帮助读者定位源码和理解调用路径。接口行为与部署参数分别维护在 [API 设计](API设计.md)和[运行参考](部署准备与运行说明.md)。
+
 本文档解释 `backend-py-worker/` 目录中每个文件的职责，以及这些文件如何组合成 Python Worker，支撑项目里的 AI 和文档处理能力。
 
 ## 1. backend-py-worker 最终解决什么问题
@@ -9,7 +11,7 @@
 - 从 Go 后端轮询待处理任务；
 - 按任务类型拉取项目、文档、交接单的业务上下文；
 - 需要时下载文档原始文件并做正文抽取；
-- 调用 OpenClaw Gateway 获取问答、摘要和结构化建议；
+- 调用配置的 OpenAI 兼容端点获取问答、摘要和结构化建议；
 - 把处理结果回写给 Go 主后端。
 
 它不直接对前端提供 API，也不直接写主业务状态；它只生产附属 AI 结果。
@@ -23,7 +25,7 @@
 3. `dispatcher.py` 根据任务类型决定处理流程。
 4. `BackendContextClient` 获取文档、项目、交接单上下文，必要时下载原始版本文件。
 5. `document_text_extractor.py` 把 `txt/md/csv/json/docx` 等文件转成纯文本。
-6. `OpenClawClient` 把任务提示词、业务上下文和正文发给 OpenClaw Gateway。
+6. `OpenClawClient` 把任务提示词、业务上下文和正文发给配置的模型端点。
 7. `CallbackClient` 把结果回写到 Go 后端的内部回调接口。
 
 因此 `backend-py-worker` 是“异步 AI 执行层”。
@@ -57,7 +59,7 @@
 | `backend-py-worker/app/clients/http_util.py` | 共享 `fetch`：`urlopen` 带指数退避重试（瞬时网络错误 + HTTP 5xx 重试，4xx 不重试），供各客户端复用；次数/退避由 `HTTP_RETRY_ATTEMPTS`、`HTTP_RETRY_BASE_DELAY` 配置。 |
 | `backend-py-worker/app/clients/backend_context_client.py` | 调用 Go 后端内部接口，获取项目/文档/交接单上下文，并下载文档版本原文件（经 `fetch` 重试）。 |
 | `backend-py-worker/app/clients/callback_client.py` | 将任务处理结果回写到 Go 后端 `/internal/worker-results`（经 `fetch` 重试，失败不静默丢任务）。 |
-| `backend-py-worker/app/clients/openclaw_client.py` | OpenClaw Gateway 客户端，封装问答、文档摘要、交接摘要、建议生成逻辑。 |
+| `backend-py-worker/app/clients/openclaw_client.py` | 模型端点兼容客户端，封装问答、文档摘要、交接摘要、建议生成逻辑。 |
 | `backend-py-worker/app/clients/task_poller.py` | 轮询 Go 后端待处理任务，把原始 JSON 解析成 `WorkerTask`。 |
 
 ### 4.3 core 子目录

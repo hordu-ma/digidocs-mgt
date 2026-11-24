@@ -28,7 +28,7 @@
 
   <rect width="1200" height="760" fill="#f8fafc"/>
   <text x="600" y="46" text-anchor="middle" class="title">智研云枢系统部署架构</text>
-  <text x="600" y="76" text-anchor="middle" class="small">DGX Spark 承载应用与 AI 能力，群晖 DS925+ 承载文件和数据库底座。</text>
+  <text x="600" y="76" text-anchor="middle" class="small">DGX Spark 承载应用、数据库与 AI，群晖 DS925+ 承载文件与备份。</text>
 
   <rect x="430" y="100" rx="18" ry="18" width="340" height="92" fill="#dbeafe" class="frame"/>
   <text x="600" y="138" text-anchor="middle" class="subtitle">使用终端</text>
@@ -36,7 +36,7 @@
 
   <rect x="70" y="220" rx="24" ry="24" width="500" height="430" fill="#eff6ff" class="frame"/>
   <text x="100" y="262" class="subtitle">DGX Spark</text>
-  <text x="100" y="288" class="small">业务应用与智能能力</text>
+  <text x="100" y="288" class="small">业务应用、PostgreSQL 与智能能力</text>
 
   <rect x="120" y="330" rx="18" ry="18" width="180" height="104" fill="#ffffff" class="box"/>
   <text x="210" y="370" text-anchor="middle" class="label">前端界面</text>
@@ -51,7 +51,7 @@
   <text x="210" y="550" text-anchor="middle" class="small">OCR / 摘要 / 异步任务</text>
 
   <rect x="350" y="482" rx="18" ry="18" width="180" height="104" fill="#ffffff" class="box"/>
-  <text x="440" y="522" text-anchor="middle" class="label">OpenClaw</text>
+  <text x="440" y="522" text-anchor="middle" class="label">模型服务</text>
   <text x="440" y="550" text-anchor="middle" class="small">问答 / 摘要 / 建议生成</text>
 
   <rect x="120" y="610" rx="18" ry="18" width="410" height="54" fill="#dbeafe" class="box"/>
@@ -62,8 +62,8 @@
   <text x="660" y="288" class="small">文件与数据底座</text>
 
   <rect x="690" y="330" rx="18" ry="18" width="170" height="104" fill="#ffffff" class="box"/>
-  <text x="775" y="370" text-anchor="middle" class="label">PostgreSQL</text>
-  <text x="775" y="398" text-anchor="middle" class="small">元数据 / 审计 / 状态</text>
+  <text x="775" y="370" text-anchor="middle" class="label">异机备份</text>
+  <text x="775" y="398" text-anchor="middle" class="small">数据库与 Git 副本</text>
 
   <rect x="910" y="330" rx="18" ry="18" width="170" height="104" fill="#ffffff" class="box"/>
   <text x="995" y="370" text-anchor="middle" class="label">DSM / File Station</text>
@@ -87,7 +87,7 @@
 
   <path d="M 530 356 L 610 356 L 610 300 L 775 300 L 775 330" class="line"/>
   <rect x="630" y="268" rx="14" ry="14" width="122" height="28" class="pill-box"/>
-  <text x="691" y="287" text-anchor="middle" class="pill-text">元数据 / 审计</text>
+  <text x="691" y="287" text-anchor="middle" class="pill-text">备份同步</text>
 
   <path d="M 530 388 L 610 388 L 610 286 L 995 286 L 995 330" class="line"/>
   <rect x="792" y="254" rx="14" ry="14" width="112" height="28" class="pill-box"/>

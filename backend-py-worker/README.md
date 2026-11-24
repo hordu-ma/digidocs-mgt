@@ -1,48 +1,7 @@
-# Backend Python Worker
+# Python Worker
 
-Python AI 与文档处理 Worker。
+从 Go API 领取任务、读取获准上下文、抽取正文、调用 OpenAI 兼容模型端点并回写附属结果。任务类型、回调凭据、领取次数和业务边界见[异步任务契约](../docs/异步任务消息契约.md)。
 
-## Scope
+本目录执行 `uv sync --group dev` 安装开发依赖，执行 `uv run pytest -q` 验证。连接开发 Go API 与模型网关后可运行 `uv run python -m app.main`。生产通过 Compose 启动，配置见[部署参考](../docs/部署准备与运行说明.md)。
 
-- OpenClaw 客户端封装
-- AI 任务调度
-- 摘要、建议、文档预处理等异步任务
-- 不直接承接前端主 API
-- 不直接修改主业务状态
-
-## Run
-
-```bash
-cd backend-py-worker
-uv run python -m app.main
-```
-
-或使用 Docker：
-
-```bash
-docker compose --profile app up -d backend-py-worker
-```
-
-## Current Modules
-
-- 配置加载
-- 任务消息结构
-- OpenClaw Gateway OpenAI 兼容客户端
-- OpenClaw skill 白名单注册与适配层
-- Go 后端内部上下文读取客户端
-- Worker 调度器与真实 HTTP 轮询消费
-- 与 `异步任务消息契约.md` 对齐
-- 结果回写目标约定为 `/api/v1/internal/worker-results`
-- OpenClaw 调用统一走 `POST /v1/chat/completions`
-- 业务侧 skill 只允许消费显式 `scope / context / memory`，并按任务类型走白名单绑定
-- 已补调度器与 OpenClaw 客户端测试样例
-- 调度器按 `WORKER_CONCURRENCY`（默认 3）用线程池并发处理一批任务，不再逐个串行；单任务崩溃仍相互隔离，互不影响
-
-## Current Notes
-
-- 当前 OpenClaw 对接使用官方 Gateway 的 OpenAI 兼容 HTTP 接口。
-- 当前已增加 `skill_registry` / `skill_adapter`：允许的无状态 skill 按任务白名单绑定，结果会回写 `skill_name`、`skill_version`、`source_scope`、`memory_sources` 便于审计。
-- 当前文档摘要和交接摘要优先消费“结构化业务上下文”；如果缺少正文内容，结果会明确标注为元数据级摘要。
-- `document.extract_text` 已支持 `txt / md / csv / json / docx / pdf` 文本抽取。
-- 若 Worker 主机存在 `tesseract`，还可进一步支持图片 OCR 与扫描 PDF OCR；若不存在，会返回明确的运行时错误提示。
-- 扫描 PDF 自动 OCR 有页数上限 `MAX_OCR_PAGES`（默认 30 页）：超出会在渲染阶段（`pdftoppm -l MAX_OCR_PAGES+1`）就提前拒绝，不会先跑完整份 OCR 再报错，避免任意用户上传超大扫描件把单个 Worker 线程堵上几小时。
+容器包含 Office 文件正文解析所需的代码和 PDF、OCR、旧版 Word 的外部工具。支持 TXT、Markdown、CSV、JSON、DOCX、XLSX、PPTX、DOC、PDF 和常见图片 OCR。扫描 PDF 默认最多处理 30 页，上限由 `MAX_OCR_PAGES` 控制。提取失败时，请求错误或摘要的元数据级标记须如实展示。

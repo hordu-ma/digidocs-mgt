@@ -1,6 +1,6 @@
 # 面向课题组的文档资产管理与智能助理平台
 
-## REST API 设计草案
+## REST API 设计
 
 ## 1. 设计约定
 
@@ -684,6 +684,8 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 
 `POST /api/v1/documents/{document_id}/versions`
 
+归档文档须先解档。各版本保存独立文件，上传可沿用原文件名。
+
 请求类型：`multipart/form-data`
 
 表单字段：
@@ -987,6 +989,8 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 ### 7.4 更新交接项
 
 `PATCH /api/v1/handovers/{handover_id}/items`
+
+仅在 `generated` 可修改。项目交接限定同项目有效文档，无项目交接限定交出人负责的有效文档。
 
 请求体：
 
@@ -1587,7 +1591,7 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 ```json
 {
   "note": "采纳该建议",
-  "execute": false
+  "execute": true
 }
 ```
 
@@ -1605,7 +1609,7 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 }
 ```
 
-确认并执行（2026-11-10）：`execute=true` 且建议带 `suggested_action` 时，后端先以**确认人身份**执行该流转动作，成功后再把建议标为已确认，响应带 `executed_action`。流转动作照常经过权限与状态机校验；执行失败时返回对应错误（403 / 409），建议保持 `pending`。建议不是 `pending`、没有可执行动作或不属于文档时返回 400。AI 本身从不执行任何动作。
+确认并执行：`execute=true` 时，以确认人身份执行文档建议中受支持的流转动作，沿用权限和状态机校验。PostgreSQL 在同一事务内提交动作、审计和建议确认。成功响应包含 `executed_action`；同一确认人重试已经执行的建议会返回已执行结果。执行失败时建议保持原状态。
 
 ### 9.7 忽略建议
 
@@ -1689,9 +1693,9 @@ JWT 中的 `username` 取数据库真实值。自助注册用户没有用户名�
 
 | 类别 | 上限 | 超出返回 |
 | --- | --- | --- |
-| 普通 JSON 请求体 | **1 MB** | `413 payload_too_large` |
-| 创建文档 / 提交版本（`multipart/form-data`） | **32 MB** | `413 payload_too_large`，`message` 为「文件超过 32 MB 上限」 |
-| 上传数据资产（`multipart/form-data`） | **512 MB** | `413 payload_too_large`，`message` 为「文件超过 512 MB 上限」 |
+| 普通 JSON 请求体 | **1 MiB** | `413 payload_too_large` |
+| 创建文档 / 提交版本（`multipart/form-data`） | **32 MiB** | `413 payload_too_large`，`message` 为「文件超过 32 MB 上限」 |
+| 上传数据资产（`multipart/form-data`） | **512 MiB** | `413 payload_too_large`，`message` 为「文件超过 512 MB 上限」 |
 | git smart-HTTP（`/api/v1/git/*`）、Worker 回调（`/api/v1/internal/*`） | 不限 | — |
 
 说明：上传上限由 `http.MaxBytesReader` 在处理器入口强制，常量定义在 `backend-go/internal/shared/upload.go`。此前代码把上限值传给 `ParseMultipartForm`，而该参数只是内存缓冲大小、超出部分会落盘，因此文档中的 32 MB 实际从未生效；现已改为真实强制。
@@ -1796,7 +1800,7 @@ Query: `project_id`, `folder_id`, `keyword`, `page`, `page_size`
 
 字段：`file`（二进制）、`project_id`（必填）、`display_name`（必填）、`folder_id`（可选）、`description`（可选）
 
-文件名命名约束由前端执行（仅允许字母、数字、中文、下划线、连字符、点）。
+上传时由项目推导团队，目录须属于该项目。前端单文件上限 511 MiB，为表单头部预留 1 MiB。
 
 #### 获取数据资产详情
 `GET /api/v1/data-assets/{id}`
@@ -1946,6 +1950,12 @@ Query: `project_id`, `keyword`, `page`, `page_size`
 }
 ```
 
+#### 轮换推送令牌
+
+`POST /api/v1/code-repositories/{id}/rotate-token`
+
+项目仓库管理员可轮换令牌。响应一次性返回新的 `push_token`，旧令牌立即失效。Git 远程地址不包含令牌。
+
 ### 14.3 Git remote 入口
 
 `GET/POST /api/v1/git/{slug}.git/...`
@@ -1968,13 +1978,3 @@ git push digidocs main
 - assistant/ask 追问必须具备会话所有权；document scope 的 project_id 由文档归属推导，客户端冲突范围拒绝。
 - 摘要只接受 version_id、skill_name；交接摘要只接受 skill_name。版本必须属于 URL 文档；不接受客户端扩大上下文范围。
 - Worker 文档上下文支持 version_id 查询参数，校验版本归属；响应包含 version_id、extracted_text_version_id。正文缓存仅按文档及输出 version_id 匹配，旧的无版本结果不复用。
-- 数据上传请求体上限仍为 512 MiB，页面单文件限制为 511 MiB，预留 1 MiB 表单开销；选择文件时即校验，不再承诺 10 GB。
-
-## 16. 客户交付约束
-
-- 文档归档后须解档才能上传版本。
-- 交接文档明细仅在 `generated` 阶段编辑。项目交接限定同项目有效文档，无项目交接限定交出人负责的有效文档。
-- 数据资产上传的团队归属由项目推导，传入的目录须属于该项目。
-
-- 项目仓库管理员可通过 `POST /code-repositories/{id}/rotate-token` 轮换 Git 凭据。新凭据仅在轮换响应中返回，旧凭据立即失效。Git 远程地址不包含令牌。
-- AI 建议的正式动作、审计与确认在 PostgreSQL 同一事务完成。
