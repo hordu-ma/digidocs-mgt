@@ -34,12 +34,13 @@ version_smoke_timeout="${VERSION_SMOKE_TIMEOUT:-20}"
 run_assistant_smoke="${RUN_ASSISTANT_SMOKE:-0}"
 # 隔离栈与演示栈的容器名不同；按目标端口推断，可用 SMOKE_* 覆盖。
 if [[ "$backend_url" == *":18081"* ]]; then
-  backend_container="${SMOKE_BACKEND_CONTAINER:-digidocs-backend-go}"
-  worker_container="${SMOKE_WORKER_CONTAINER:-digidocs-backend-py-worker}"
+  container_prefix="digidocs"
 else
-  backend_container="${SMOKE_BACKEND_CONTAINER:-digidocs-smoke-backend-go}"
-  worker_container="${SMOKE_WORKER_CONTAINER:-digidocs-smoke-backend-py-worker}"
+  container_prefix="digidocs-smoke"
 fi
+postgres_container="${SMOKE_POSTGRES_CONTAINER:-$container_prefix-postgres}"
+backend_container="${SMOKE_BACKEND_CONTAINER:-$container_prefix-backend-go}"
+worker_container="${SMOKE_WORKER_CONTAINER:-$container_prefix-backend-py-worker}"
 
 is_truthy() {
   case "${1:-}" in
@@ -139,19 +140,11 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 echo '== compose services =='
-for container in digidocs-postgres; do
+for container in "$postgres_container" "$backend_container"; do
   if container_running "$container"; then
     echo "[OK] $container running"
   else
     require_or_skip "$container is not running"
-  fi
-done
-
-for container in digidocs-backend-go; do
-  if container_running "$container"; then
-    echo "[OK] $container running"
-  else
-    require_or_skip "$container is not running; start with docker compose --profile app up -d backend-go"
   fi
 done
 if is_truthy "$run_assistant_smoke"; then

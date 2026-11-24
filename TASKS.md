@@ -6,6 +6,8 @@
 
 ## 已完成
 
+- 2026-11-24 修复 GitHub Actions 隔离烟测。烟测脚本按目标环境检查 PostgreSQL、Go 后端及可选 Worker 的容器名。原失败运行 [45333358649](https://github.com/hordu-ma/digidocs-mgt/actions/runs/45333358649) 和 [45334669756](https://github.com/hordu-ma/digidocs-mgt/actions/runs/45334669756) 均通过基础验证和 PostgreSQL 集成测试。本地 `make verify` 与 `make smoke-e2e` 通过。
+
 - 2026-11-24 整理[文档索引](docs/INDEX.md)、现行契约和[现场部署手册](docs/现场部署逐条清单.md)。运维参考、已部署证据和客户未结项可从索引定位。
 
 以下条目按当时的实现和验证记录保留，当前部署要求以现场手册为准。
